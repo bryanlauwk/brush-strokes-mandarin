@@ -38,6 +38,14 @@ export function useRoom(code: string, playerId: string | null) {
     let cancelled = false;
     const upper = code.toUpperCase();
 
+    setMissing(false);
+    setRoom(null);
+    setPlayers([]);
+    setMessages([]);
+    setStrokes([]);
+    setLive({});
+    turnRef.current = -1;
+
     void (async () => {
       const { data: roomRow } = await supabase
         .from("rooms")

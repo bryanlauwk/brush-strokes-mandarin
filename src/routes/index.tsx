@@ -14,7 +14,7 @@ export const Route = createFileRoute("/")({
         content: "创建房间、邀请好友，轮流作画并用汉字抢答。300 个中文词库，实时同步画布与聊天。",
       },
       { property: "og:title", content: "你画我猜 · 中文多人在线画图猜词游戏" },
-      { property: "og:description", content: "创建房间、邀请好友，轮流作画并用汉字抢答。" },
+      { property: "og:description", content: "创建房间、邀请好友，轮流作画并用汉字抢答。300 个中文词库，实时同步画布与聊天。" },
     ],
   }),
   component: Index,

@@ -78,14 +78,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "你画我猜 · 中文多人在线画图猜词游戏" },
+      { name: "description", content: "创建房间、邀请好友，轮流作画并用汉字抢答。300 个中文词库，实时同步画布与聊天。" },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "你画我猜 · 中文多人在线画图猜词游戏" },
+      { property: "og:description", content: "创建房间、邀请好友，轮流作画并用汉字抢答。300 个中文词库，实时同步画布与聊天。" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "你画我猜 · 中文多人在线画图猜词游戏" },
+      { name: "twitter:description", content: "创建房间、邀请好友，轮流作画并用汉字抢答。300 个中文词库，实时同步画布与聊天。" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/008c554c-9e1c-4342-8cc4-d97bfcdcdb74/id-preview-3db3404b--f16726b3-91c3-4723-b062-f6b732d5c207.lovable.app-1785342605361.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/008c554c-9e1c-4342-8cc4-d97bfcdcdb74/id-preview-3db3404b--f16726b3-91c3-4723-b062-f6b732d5c207.lovable.app-1785342605361.png" },
     ],
     links: [
       {

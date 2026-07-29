@@ -34,6 +34,13 @@ export const Route = createFileRoute("/room/$code")({
   component: RoomPage,
 });
 
+const DIFFICULTIES = ["全部", "简单", "中等", "困难"] as const;
+type Difficulty = (typeof DIFFICULTIES)[number];
+
+function asDifficulty(value: string): Difficulty {
+  return DIFFICULTIES.includes(value as Difficulty) ? (value as Difficulty) : "全部";
+}
+
 function RoomPage() {
   const { code } = Route.useParams();
   const navigate = useNavigate();
@@ -175,7 +182,7 @@ function RoomPage() {
             disabled={joining}
             className="mt-4 w-full rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-2 font-display text-lg text-primary-foreground shadow-[3px_3px_0_0_var(--ink)] disabled:opacity-60"
           >
-            进入房间
+            {joining ? "进入中…" : "进入房间"}
           </button>
         </div>
       </Shell>
@@ -202,11 +209,13 @@ function RoomPage() {
         </Link>
         <button
           type="button"
+          title="复制房号"
+          aria-label={`复制房号 ${upper}`}
           onClick={() => {
             void navigator.clipboard?.writeText(upper);
             toast.success(`房号 ${upper} 已复制`);
           }}
-          className="flex items-center gap-1 rounded-md border-2 border-[var(--ink)] bg-secondary px-3 py-1 text-sm tracking-[0.2em]"
+          className="flex items-center gap-1 rounded-md border-2 border-[var(--ink)] bg-secondary px-3 py-1 text-sm tracking-[0.2em] transition-transform hover:-translate-y-0.5"
         >
           {upper}
           <Copy className="size-3.5" />
@@ -409,11 +418,12 @@ function WaitingCard({
   totalRounds: number;
   drawSeconds: number;
   difficulty: string;
-  onSettings: (s: { totalRounds: number; drawSeconds: number; difficulty: "全部" | "简单" | "中等" | "困难" }) => void;
+  onSettings: (s: { totalRounds: number; drawSeconds: number; difficulty: Difficulty }) => void;
   onStart: () => void;
 }) {
+  const currentDifficulty = asDifficulty(difficulty);
   const select =
-    "rounded-md border-2 border-[var(--ink)] bg-background px-2 py-1 text-sm outline-none disabled:opacity-60";
+    "mt-1 w-full rounded-md border-2 border-[var(--ink)] bg-background px-2 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60";
   return (
     <div className="panel w-full max-w-sm p-5 text-center">
       <p className="font-display text-xl">等待玩家加入</p>
@@ -421,14 +431,14 @@ function WaitingCard({
         把房号 <span className="font-semibold tracking-[0.2em]">{code}</span> 发给好友
       </p>
       <div className="mt-4 grid grid-cols-3 gap-2 text-left">
-        <label className="text-xs">
+        <label className="text-xs font-medium">
           回合数
           <select
             className={select}
             disabled={!isHost}
             value={totalRounds}
             onChange={(e) =>
-              onSettings({ totalRounds: Number(e.target.value), drawSeconds, difficulty: difficulty as "全部" })
+              onSettings({ totalRounds: Number(e.target.value), drawSeconds, difficulty: currentDifficulty })
             }
           >
             {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
@@ -436,14 +446,14 @@ function WaitingCard({
             ))}
           </select>
         </label>
-        <label className="text-xs">
+        <label className="text-xs font-medium">
           每回合秒
           <select
             className={select}
             disabled={!isHost}
             value={drawSeconds}
             onChange={(e) =>
-              onSettings({ totalRounds, drawSeconds: Number(e.target.value), difficulty: difficulty as "全部" })
+              onSettings({ totalRounds, drawSeconds: Number(e.target.value), difficulty: currentDifficulty })
             }
           >
             {[40, 60, 80, 100, 120].map((n) => (
@@ -451,26 +461,29 @@ function WaitingCard({
             ))}
           </select>
         </label>
-        <label className="text-xs">
+        <label className="text-xs font-medium">
           难度
           <select
             className={select}
             disabled={!isHost}
-            value={difficulty}
+            value={currentDifficulty}
             onChange={(e) =>
               onSettings({
                 totalRounds,
                 drawSeconds,
-                difficulty: e.target.value as "全部" | "简单" | "中等" | "困难",
+                difficulty: asDifficulty(e.target.value),
               })
             }
           >
-            {["全部", "简单", "中等", "困难"].map((d) => (
+            {DIFFICULTIES.map((d) => (
               <option key={d} value={d}>{d}</option>
             ))}
           </select>
         </label>
       </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        {isHost ? "房主设置会自动保存" : "等待房主调整设置"}
+      </p>
       {isHost ? (
         <button
           type="button"

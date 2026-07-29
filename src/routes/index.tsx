@@ -1,24 +1,116 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { createRoom } from "@/lib/game.functions";
+import { loadNickname, saveIdentity, saveNickname } from "@/lib/player-identity";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "你画我猜 · 中文多人在线画图猜词游戏" },
+      {
+        name: "description",
+        content: "创建房间、邀请好友，轮流作画并用汉字抢答。300 个中文词库，实时同步画布与聊天。",
+      },
+      { property: "og:title", content: "你画我猜 · 中文多人在线画图猜词游戏" },
+      { property: "og:description", content: "创建房间、邀请好友，轮流作画并用汉字抢答。" },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
+  const navigate = useNavigate();
+  const createFn = useServerFn(createRoom);
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setName(loadNickname());
+  }, []);
+
+  const create = async () => {
+    setBusy(true);
+    try {
+      const res = await createFn({ data: { name } });
+      saveNickname(name.trim());
+      saveIdentity(res);
+      void navigate({ to: "/room/$code", params: { code: res.code } });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "创建失败");
+      setBusy(false);
+    }
+  };
+
+  const join = () => {
+    const c = code.trim().toUpperCase();
+    if (c.length < 4) {
+      toast.error("请输入房号");
+      return;
+    }
+    saveNickname(name.trim());
+    void navigate({ to: "/room/$code", params: { code: c } });
+  };
+
+  const field =
+    "w-full rounded-md border-2 border-[var(--ink)] bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-primary";
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+    <main className="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center gap-6 p-6">
+      <div className="text-center">
+        <h1 className="font-display text-5xl text-primary sm:text-6xl">你画我猜</h1>
+        <p className="mt-2 text-muted-foreground">中文多人在线 · 画图 + 汉字抢答</p>
+      </div>
+
+      <div className="panel w-full max-w-md p-6">
+        <label className="block text-sm font-medium" htmlFor="name">
+          昵称
+        </label>
+        <input
+          id="name"
+          value={name}
+          maxLength={12}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="小画家"
+          className={`mt-1 ${field}`}
+        />
+
+        <button
+          type="button"
+          onClick={create}
+          disabled={busy}
+          className="mt-4 w-full rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-3 font-display text-xl text-primary-foreground shadow-[4px_4px_0_0_var(--ink)] disabled:opacity-60"
+        >
+          创建房间
+        </button>
+
+        <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="h-px flex-1 bg-border" />或<span className="h-px flex-1 bg-border" />
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            value={code}
+            maxLength={8}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="输入房号"
+            className={`${field} tracking-[0.3em]`}
+          />
+          <button
+            type="button"
+            onClick={join}
+            className="shrink-0 rounded-md border-2 border-[var(--ink)] bg-accent px-5 font-display text-lg text-accent-foreground shadow-[3px_3px_0_0_var(--ink)]"
+          >
+            加入
+          </button>
+        </div>
+      </div>
+
+      <Link to="/how-to-play" className="text-sm text-primary underline underline-offset-4">
+        玩法说明
+      </Link>
+    </main>
   );
 }

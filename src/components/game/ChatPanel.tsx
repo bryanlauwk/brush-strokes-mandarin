@@ -32,9 +32,13 @@ export function ChatPanel({ messages, disabled, placeholder, onSend }: Props) {
         聊天 · 猜词
       </div>
       <div className="flex-1 space-y-1 overflow-y-auto p-3 text-sm">
-        {messages.map((m) => (
-          <MessageRow key={m.id} message={m} />
-        ))}
+        {messages.length === 0 ? (
+          <div className="flex h-full min-h-32 items-center justify-center rounded-md border-2 border-dashed border-border px-3 text-center text-muted-foreground">
+            等第一位玩家开口
+          </div>
+        ) : (
+          messages.map((m) => <MessageRow key={m.id} message={m} />)
+        )}
         <div ref={endRef} />
       </div>
       <div className="flex items-center gap-2 border-t-2 border-[var(--ink)] p-2">

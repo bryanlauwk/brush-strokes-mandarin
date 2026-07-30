@@ -11,6 +11,17 @@ export function svgToDataUrl(svg: string) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
+export function InlineSvgAvatar({ svg, label, className }: { svg: string; label: string; className?: string }) {
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      className={cn("block h-full w-full [&>svg]:h-full [&>svg]:w-full", className)}
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
+}
+
 export function PlayerAvatar({
   player,
   size = "md",
@@ -31,7 +42,7 @@ export function PlayerAvatar({
       )}
     >
       {player.avatar_svg ? (
-        <img src={svgToDataUrl(player.avatar_svg)} alt={label} className="h-full w-full object-cover" />
+        <InlineSvgAvatar svg={player.avatar_svg} label={label} />
       ) : (
         <span aria-label={label}>{AVATARS[player.avatar % AVATARS.length]}</span>
       )}

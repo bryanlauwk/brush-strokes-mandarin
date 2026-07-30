@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowRight, Brush, ChevronDown, DoorOpen, Link2, MapPin, Sparkles, Tv, UserRound } from "lucide-react";
+import { ArrowRight, Brush, ChevronDown, DoorOpen, Sparkles, UserRound } from "lucide-react";
 import { CharacterPicker } from "@/components/game/CharacterPicker";
 import { createRoom, roomExists } from "@/lib/game.functions";
 import { ROOM_THEME_OPTIONS, type RoomTheme } from "@/lib/game-themes";
@@ -15,6 +15,7 @@ const appTitle = "画啦猜啦 · 马来西亚华语画猜派对";
 const appDescription = "选角色、开房间、一起画画猜题。";
 
 type EntryIntent = "create" | "join";
+type EntryTab = "create" | "join";
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 5;
@@ -48,16 +49,10 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const highlights = [
-  { icon: UserRound, label: "选角登场", text: "选一个角色，马上进场。" },
-  { icon: MapPin, label: "主题开局", text: "本地题目，朋友一起猜。" },
-  { icon: Brush, label: "开画抢答", text: "轮到谁，就大胆画。" },
-];
-
-const flow = [
-  { icon: DoorOpen, title: "选角", text: "填名选角色。" },
-  { icon: Tv, title: "开房", text: "分享号码。" },
-  { icon: Sparkles, title: "开画", text: "边画边猜。" },
+const steps = [
+  { icon: UserRound, label: "填名选角", text: "写个名字，挑一个角色。" },
+  { icon: DoorOpen, label: "开房分享", text: "选主题开房，把号码丢给朋友。" },
+  { icon: Brush, label: "开画抢答", text: "轮到谁就大胆画，其他人抢答。" },
 ];
 
 function Index() {

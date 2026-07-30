@@ -81,6 +81,7 @@ export type Database = {
       players: {
         Row: {
           avatar: number
+          avatar_svg: string | null
           has_guessed: boolean
           id: string
           is_host: boolean
@@ -93,6 +94,7 @@ export type Database = {
         }
         Insert: {
           avatar?: number
+          avatar_svg?: string | null
           has_guessed?: boolean
           id?: string
           is_host?: boolean
@@ -105,6 +107,7 @@ export type Database = {
         }
         Update: {
           avatar?: number
+          avatar_svg?: string | null
           has_guessed?: boolean
           id?: string
           is_host?: boolean
@@ -131,6 +134,7 @@ export type Database = {
           drawer_id: string | null
           room_id: string
           updated_at: string
+          used_words: Json
           word: string | null
         }
         Insert: {
@@ -138,6 +142,7 @@ export type Database = {
           drawer_id?: string | null
           room_id: string
           updated_at?: string
+          used_words?: Json
           word?: string | null
         }
         Update: {
@@ -145,6 +150,7 @@ export type Database = {
           drawer_id?: string | null
           room_id?: string
           updated_at?: string
+          used_words?: Json
           word?: string | null
         }
         Relationships: [

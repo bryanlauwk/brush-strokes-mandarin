@@ -192,11 +192,13 @@ function Index() {
   };
 
   const createWithProfile = async () => {
-    if (!validateName() || !avatarSvg) return;
+    if (!validateName()) return;
+    const svg = avatarSvg ?? createDefaultAvatar(trimmedName);
     setBusy(true);
     try {
-      const res = await createFn({ data: { name: trimmedName, avatarSvg, roomTheme } });
-      rememberProfile();
+      const res = await createFn({ data: { name: trimmedName, avatarSvg: svg, roomTheme } });
+      saveNickname(trimmedName);
+      saveAvatarSvg(svg);
       saveIdentity(res);
       void navigate({ to: "/room/$code", params: { code: res.code } });
     } catch (e) {
@@ -206,16 +208,13 @@ function Index() {
   };
 
   const joinWithProfile = () => {
-    if (!validateName() || !validateJoinCode() || !avatarSvg) return;
-    rememberProfile();
+    if (!validateName() || !validateJoinCode()) return;
+    saveNickname(trimmedName);
+    saveAvatarSvg(avatarSvg ?? createDefaultAvatar(trimmedName));
     void navigate({ to: "/room/$code", params: { code } });
   };
 
   const continueEntry = () => {
-    if (!avatarSvg) {
-      toast.error("先做一个入场角色");
-      return;
-    }
     const intent = entryIntent;
     setEntryIntent(null);
     if (intent === "create") void createWithProfile();

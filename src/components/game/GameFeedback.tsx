@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { CheckCircle2, PartyPopper, Sparkles, TimerReset } from "lucide-react";
+import { CheckCircle2, Sparkles, TimerReset } from "lucide-react";
 
 export type GameFeedbackKind = "correct" | "round-start" | "round-end";
 

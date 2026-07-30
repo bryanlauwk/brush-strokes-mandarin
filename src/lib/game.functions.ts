@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { ROOM_THEMES, normalizeRoomTheme } from "@/lib/game-themes";
+import type { Stroke } from "@/lib/game-types";
 
 const identity = z.object({
   code: z.string().min(4).max(8),
@@ -378,4 +379,43 @@ export const leaveRoom = createServerFn({ method: "POST" })
       await g.endTurn(room, null);
     }
     return { ok: true };
+  });
+
+export const roomExists = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ code: z.string().min(4).max(8) }).parse(d))
+  .handler(async ({ data }) => {
+    const g = await import("./game.server");
+    const room = await g.getRoomByCode(data.code);
+    return { exists: Boolean(room) };
+  });
+
+export const getRoomSnapshot = createServerFn({ method: "POST" })
+  .inputValidator((d) => identity.parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const g = await import("./game.server");
+    const { room } = await g.authPlayer(data.code, data.playerId, data.token);
+
+    const players = await g.listPlayers(room.id);
+    const [{ data: strokes }, { data: messages }] = await Promise.all([
+      supabaseAdmin
+        .from("strokes")
+        .select("payload")
+        .eq("room_id", room.id)
+        .eq("turn_index", room.turn_index)
+        .order("id", { ascending: true }),
+      supabaseAdmin
+        .from("guesses")
+        .select("id, round, player_id, player_name, text, kind, created_at")
+        .eq("room_id", room.id)
+        .order("id", { ascending: true })
+        .limit(200),
+    ]);
+
+    return {
+      room,
+      players,
+      strokes: ((strokes ?? []) as unknown as { payload: Stroke }[]).map((r) => r.payload),
+      messages: messages ?? [],
+    };
   });

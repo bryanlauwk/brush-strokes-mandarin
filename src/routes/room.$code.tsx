@@ -104,7 +104,7 @@ function RoomPage() {
   }, [upper]);
 
   const { room, players, messages, strokes, live, missing, me, broadcastLive, broadcastLiveEnd, appendLocalStroke } =
-    useRoom(upper, identity?.playerId ?? null);
+    useRoom(upper, identity);
 
   const auth = identity ? { code: upper, playerId: identity.playerId, token: identity.token } : null;
   const roomJoinReady = nickname.trim().length > 0 && !!avatarSvg;

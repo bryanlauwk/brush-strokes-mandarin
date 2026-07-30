@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { getRoomSnapshot, roomExists } from "@/lib/game.functions";
 import type { ChatMessage, Player, Room, Stroke } from "@/lib/game-types";
 
 export type LiveStroke = { id: string; color: string; size: number; points: [number, number][] };
 
-export function useRoom(code: string, playerId: string | null) {
+export type RoomIdentity = { playerId: string; token: string } | null;
+
+const POLL_MS = 1000;
+
+export function useRoom(code: string, identity: RoomIdentity) {
   const [room, setRoom] = useState<Room | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -15,136 +20,112 @@ export function useRoom(code: string, playerId: string | null) {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const turnRef = useRef<number>(-1);
 
-  const loadPlayers = useCallback(async (roomId: string) => {
-    const { data } = await supabase
-      .from("players")
-      .select("*")
-      .eq("room_id", roomId)
-      .order("joined_at", { ascending: true });
-    setPlayers((data ?? []) as Player[]);
-  }, []);
+  const playerId = identity?.playerId ?? null;
+  const token = identity?.token ?? null;
 
-  const loadStrokes = useCallback(async (roomId: string, turnIndex: number) => {
-    const { data } = await supabase
-      .from("strokes")
-      .select("payload")
-      .eq("room_id", roomId)
-      .eq("turn_index", turnIndex)
-      .order("id", { ascending: true });
-    setStrokes(((data ?? []) as { payload: Stroke }[]).map((r) => r.payload));
-  }, []);
+  // Without an identity we can only check that the room code exists.
+  useEffect(() => {
+    if (identity) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await roomExists({ data: { code: code.toUpperCase() } });
+        if (!cancelled) setMissing(!res.exists);
+      } catch {
+        /* keep current state */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [code, identity]);
 
   useEffect(() => {
+    if (!playerId || !token) return;
     let cancelled = false;
     const upper = code.toUpperCase();
 
     setMissing(false);
-    setRoom(null);
-    setPlayers([]);
-    setMessages([]);
-    setStrokes([]);
-    setLive({});
     turnRef.current = -1;
 
-    void (async () => {
-      const { data: roomRow } = await supabase
-        .from("rooms")
-        .select("*")
-        .eq("code", upper)
-        .maybeSingle();
+    const applySnapshot = (snap: {
+      room: Room;
+      players: Player[];
+      messages: ChatMessage[];
+      strokes: Stroke[];
+    }) => {
       if (cancelled) return;
-      if (!roomRow) {
-        setMissing(true);
-        return;
+      setRoom(snap.room);
+      setPlayers(snap.players);
+      setMessages(snap.messages);
+      if (snap.room.turn_index !== turnRef.current) {
+        turnRef.current = snap.room.turn_index;
+        setLive({});
       }
-      const r = roomRow as Room;
-      setRoom(r);
-      turnRef.current = r.turn_index;
-      await loadPlayers(r.id);
-      await loadStrokes(r.id, r.turn_index);
-      const { data: chat } = await supabase
-        .from("guesses")
-        .select("*")
-        .eq("room_id", r.id)
-        .order("id", { ascending: true })
-        .limit(200);
-      if (cancelled) return;
-      setMessages((chat ?? []) as ChatMessage[]);
+      setStrokes((prev) => {
+        const seen = new Set(snap.strokes.map((s) => s.id));
+        const localOnly = prev.filter((s) => !seen.has(s.id));
+        return snap.strokes.length || !localOnly.length ? snap.strokes : prev;
+      });
+      setLive((prev) => {
+        if (!snap.strokes.length) return prev;
+        const next = { ...prev };
+        for (const s of snap.strokes) delete next[s.id];
+        return next;
+      });
+    };
 
-      const channel = supabase
-        .channel(`room-${r.id}`, { config: { broadcast: { self: false } } })
-        .on(
-          "postgres_changes",
-          { event: "UPDATE", schema: "public", table: "rooms", filter: `id=eq.${r.id}` },
-          (payload) => {
-            const next = payload.new as Room;
-            setRoom(next);
-            if (next.turn_index !== turnRef.current) {
-              turnRef.current = next.turn_index;
-              setStrokes([]);
-              setLive({});
-            }
-          },
-        )
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "players", filter: `room_id=eq.${r.id}` },
-          () => {
-            void loadPlayers(r.id);
-          },
-        )
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "guesses", filter: `room_id=eq.${r.id}` },
-          (payload) => {
-            const msg = payload.new as ChatMessage;
-            setMessages((prev) =>
-              prev.some((m) => m.id === msg.id) ? prev : [...prev.slice(-199), msg],
-            );
-          },
-        )
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "strokes", filter: `room_id=eq.${r.id}` },
-          (payload) => {
-            const row = payload.new as { payload: Stroke; turn_index: number };
-            if (row.turn_index !== turnRef.current) return;
-            setStrokes((prev) =>
-              prev.some((s) => s.id === row.payload.id) ? prev : [...prev, row.payload],
-            );
-            setLive((prev) => {
-              if (!prev[row.payload.id]) return prev;
-              const next = { ...prev };
-              delete next[row.payload.id];
-              return next;
-            });
-          },
-        )
-        .on("broadcast", { event: "live" }, ({ payload }) => {
-          const s = payload as LiveStroke;
-          setLive((prev) => ({ ...prev, [s.id]: s }));
-        })
-        .on("broadcast", { event: "live-end" }, ({ payload }) => {
-          const { id } = payload as { id: string };
-          setLive((prev) => {
-            const next = { ...prev };
-            delete next[id];
-            return next;
-          });
+    const refresh = async () => {
+      try {
+        const snap = await getRoomSnapshot({
+          data: { code: upper, playerId, token },
         });
+        applySnapshot(snap as unknown as {
+          room: Room;
+          players: Player[];
+          messages: ChatMessage[];
+          strokes: Stroke[];
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "";
+        if (message.includes("找不到这个号码")) setMissing(true);
+      }
+    };
 
-      channel.subscribe();
-      channelRef.current = channel;
-    })();
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), POLL_MS);
+
+    const channel = supabase
+      .channel(`room-${upper}`, { config: { broadcast: { self: false } } })
+      .on("broadcast", { event: "live" }, ({ payload }) => {
+        const s = payload as LiveStroke;
+        setLive((prev) => ({ ...prev, [s.id]: s }));
+      })
+      .on("broadcast", { event: "live-end" }, ({ payload }) => {
+        const { id } = payload as { id: string };
+        setLive((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        void refresh();
+      })
+      .on("broadcast", { event: "sync" }, () => {
+        void refresh();
+      });
+
+    channel.subscribe();
+    channelRef.current = channel;
 
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
       if (channelRef.current) {
         void supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
     };
-  }, [code, loadPlayers, loadStrokes]);
+  }, [code, playerId, token]);
 
   const broadcastLive = useCallback((stroke: LiveStroke) => {
     void channelRef.current?.send({ type: "broadcast", event: "live", payload: stroke });
@@ -156,6 +137,7 @@ export function useRoom(code: string, playerId: string | null) {
 
   const appendLocalStroke = useCallback((stroke: Stroke) => {
     setStrokes((prev) => (prev.some((s) => s.id === stroke.id) ? prev : [...prev, stroke]));
+    void channelRef.current?.send({ type: "broadcast", event: "sync", payload: {} });
   }, []);
 
   const me = players.find((p) => p.id === playerId) ?? null;

@@ -48,23 +48,23 @@ function isMissingColumn(error: { code?: string; message?: string } | null, colu
 }
 
 async function insertRoom(supabaseAdmin: SupabaseAdmin, payload: Record<string, unknown>) {
-  const withTheme = await supabaseAdmin.from("rooms").insert(payload).select("*").single();
+  const withTheme = await supabaseAdmin.from("rooms").insert(payload as never).select("*").single();
   if (!withTheme.error || !isMissingColumn(withTheme.error, "room_theme")) return withTheme;
 
   const { room_theme: _roomTheme, ...fallbackPayload } = payload;
-  return supabaseAdmin.from("rooms").insert(fallbackPayload).select("*").single();
+  return supabaseAdmin.from("rooms").insert(fallbackPayload as never).select("*").single();
 }
 
 async function updateRoomSettings(supabaseAdmin: SupabaseAdmin, roomId: string, payload: Record<string, unknown>) {
-  const withTheme = await supabaseAdmin.from("rooms").update(payload).eq("id", roomId);
+  const withTheme = await supabaseAdmin.from("rooms").update(payload as never).eq("id", roomId);
   if (!withTheme.error || !isMissingColumn(withTheme.error, "room_theme")) return withTheme;
 
   const { room_theme: _roomTheme, ...fallbackPayload } = payload;
-  return supabaseAdmin.from("rooms").update(fallbackPayload).eq("id", roomId);
+  return supabaseAdmin.from("rooms").update(fallbackPayload as never).eq("id", roomId);
 }
 
 async function insertPlayer(supabaseAdmin: SupabaseAdmin, payload: PlayerInsert) {
-  return supabaseAdmin.from("players").insert(payload).select("*").single();
+  return supabaseAdmin.from("players").insert(payload as never).select("*").single();
 }
 
 async function parkRoomForLowPlayers(

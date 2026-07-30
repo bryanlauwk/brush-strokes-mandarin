@@ -7,7 +7,7 @@ import { DrawBoard } from "@/components/game/DrawBoard";
 import { ChatPanel } from "@/components/game/ChatPanel";
 import { Scoreboard } from "@/components/game/Scoreboard";
 import { useRoom } from "@/hooks/use-room";
-import { AVATARS, type Stroke } from "@/lib/game-types";
+import { AVATARS, DIFFICULTIES, type Difficulty, type Stroke } from "@/lib/game-types";
 import { cn } from "@/lib/utils";
 import {
   chooseWord,
@@ -25,21 +25,25 @@ import { clearIdentity, loadIdentity, loadNickname, saveIdentity, saveNickname }
 export const Route = createFileRoute("/room/$code")({
   head: () => ({
     meta: [
-      { title: "游戏房间 · 你画我猜（中文）" },
-      { name: "description", content: "和好友一起在中文你画我猜房间里作画、抢答、比拼分数。" },
-      { property: "og:title", content: "游戏房间 · 你画我猜（中文）" },
-      { property: "og:description", content: "输入房号即可加入，一起画画猜汉字。" },
+      { title: "游戏桌 · 画啦猜啦" },
+      { name: "description", content: "朋友一起画画、猜华语答案、比谁反应快。" },
+      { property: "og:title", content: "游戏桌 · 画啦猜啦" },
+      { property: "og:description", content: "输入号码即可加入，一起画画猜答案。" },
       { name: "robots", content: "noindex" },
     ],
   }),
   component: RoomPage,
 });
 
-const DIFFICULTIES = ["全部", "简单", "中等", "困难"] as const;
-type Difficulty = (typeof DIFFICULTIES)[number];
+const LEGACY_DIFFICULTIES: Record<string, Difficulty> = {
+  简单: "容易",
+  中等: "普通",
+  困难: "挑战",
+};
 
 function asDifficulty(value: string): Difficulty {
-  return DIFFICULTIES.includes(value as Difficulty) ? (value as Difficulty) : "全部";
+  const normalized = LEGACY_DIFFICULTIES[value] ?? value;
+  return DIFFICULTIES.includes(normalized as Difficulty) ? (normalized as Difficulty) : "全部";
 }
 
 function RoomPage() {
@@ -146,16 +150,16 @@ function RoomPage() {
     void navigate({ to: "/" });
   };
 
-  if (!ready) return <Shell><p className="text-muted-foreground">加载中…</p></Shell>;
+  if (!ready) return <Shell><p className="text-muted-foreground">载入中…</p></Shell>;
 
   if (missing) {
     return (
       <Shell>
         <div className="panel max-w-md p-6 text-center">
-          <h1 className="font-display text-2xl">房间不存在</h1>
-          <p className="mt-2 text-sm text-muted-foreground">房号 {upper} 已关闭或输入有误。</p>
+          <h1 className="font-display text-2xl">找不到这一局</h1>
+          <p className="mt-2 text-sm text-muted-foreground">号码 {upper} 可能已经结束，或输入有误。</p>
           <Link to="/" className="mt-4 inline-block rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-2 text-primary-foreground">
-            回到首页
+            回到主页
           </Link>
         </div>
       </Shell>
@@ -166,16 +170,16 @@ function RoomPage() {
     return (
       <Shell>
         <div className="panel w-full max-w-sm p-6">
-          <h1 className="font-display text-2xl">加入房间 {upper}</h1>
+          <h1 className="font-display text-2xl">加入 {upper}</h1>
           <label className="mt-4 block text-sm font-medium" htmlFor="nick">
-            你的昵称
+            你的名字
           </label>
           <input
             id="nick"
             value={nickname}
             maxLength={12}
             onChange={(e) => setNickname(e.target.value)}
-            placeholder="小画家"
+            placeholder="画画人"
             className="mt-1 w-full rounded-md border-2 border-[var(--ink)] bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-primary"
           />
           <button
@@ -184,14 +188,14 @@ function RoomPage() {
             disabled={joining}
             className="mt-4 w-full rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-2 font-display text-lg text-primary-foreground shadow-[3px_3px_0_0_var(--ink)] disabled:opacity-60"
           >
-            {joining ? "进入中…" : "进入房间"}
+            {joining ? "加入中…" : "加入这一局"}
           </button>
         </div>
       </Shell>
     );
   }
 
-  if (!room) return <Shell><p className="text-muted-foreground">正在连接房间…</p></Shell>;
+  if (!room) return <Shell><p className="text-muted-foreground">正在连接这一局…</p></Shell>;
 
   const drawer = players.find((p) => p.id === room.drawer_id) ?? null;
   const iAmDrawer = room.drawer_id === identity.playerId;
@@ -213,10 +217,10 @@ function RoomPage() {
       disabled={iAmDrawer && room.status === "drawing"}
       placeholder={
         iAmDrawer && room.status === "drawing"
-          ? "你是画者，安静作画吧"
+          ? "你负责画，先别猜"
           : guessed
-            ? "你已猜对，聊聊天吧"
-            : "输入中文答案…"
+            ? "你已经猜中，可以聊天"
+            : "输入华语答案…"
       }
       onSend={(text) =>
         void guessFn({ data: { ...auth!, text } }).catch((e) =>
@@ -230,15 +234,15 @@ function RoomPage() {
     <main className="mx-auto flex h-[100dvh] max-w-6xl flex-col gap-3 overflow-hidden p-3 sm:p-5">
       <header className="panel flex shrink-0 flex-wrap items-center gap-3 px-4 py-2 sm:py-3">
         <Link to="/" className="font-display text-xl text-primary">
-          你画我猜
+          画啦猜啦
         </Link>
         <button
           type="button"
-          title="复制房号"
-          aria-label={`复制房号 ${upper}`}
+          title="复制号码"
+          aria-label={`复制号码 ${upper}`}
           onClick={() => {
             void navigator.clipboard?.writeText(upper);
-            toast.success(`房号 ${upper} 已复制`);
+            toast.success(`号码 ${upper} 已复制`);
           }}
           className="press flex items-center gap-1 rounded-md border-2 border-[var(--ink)] bg-secondary px-3 py-1 text-sm tracking-[0.2em] shadow-[2px_2px_0_0_var(--ink)]"
         >
@@ -248,7 +252,7 @@ function RoomPage() {
         {inGame && (
           <>
             <span className="rounded-full border-2 border-[var(--ink)] bg-card px-3 py-1 text-xs sm:text-sm">
-              第 {room.current_round}/{room.total_rounds} 回合 · 本回合 {turnInRound}/{turnsPerRound} 人
+              第 {room.current_round}/{room.total_rounds} 轮 · 这一轮 {turnInRound}/{turnsPerRound} 人
             </span>
             <span
               className={cn(
@@ -274,7 +278,7 @@ function RoomPage() {
       {inGame && (
         <div className="panel shrink-0 px-4 py-2 text-center">
           <p className="text-xs text-muted-foreground">
-            {iAmDrawer ? "你正在画：" : `${drawer?.name ?? "?"} 正在画 · ${room.word_length ?? "?"} 个字`}
+            {iAmDrawer ? "你正在画：" : `${drawer?.name ?? "画画人"} 正在画 · ${room.word_length ?? "?"} 个字`}
           </p>
           <p className="font-display text-2xl tracking-[0.3em] break-all">{wordDisplay || "…"}</p>
         </div>
@@ -322,7 +326,7 @@ function RoomPage() {
                   <Overlay>
                     {iAmDrawer ? (
                       <div className="text-center">
-                        <p className="font-display text-xl">选一个词开始作画</p>
+                        <p className="font-display text-xl">选一个题目开始画</p>
                         <div className="mt-3 flex flex-wrap justify-center gap-2">
                           {priv.choices.map((w) => (
                             <button
@@ -339,7 +343,7 @@ function RoomPage() {
                         </div>
                       </div>
                     ) : (
-                      <p className="font-display text-xl">{drawer?.name ?? "画者"} 正在选词…</p>
+                      <p className="font-display text-xl">{drawer?.name ?? "画画人"} 正在选题…</p>
                     )}
                   </Overlay>
                 )}
@@ -374,7 +378,7 @@ function RoomPage() {
                 {room.status === "ended" && (
                   <Overlay>
                     <div className="panel animate-pop-in max-w-xs px-6 py-4 text-center">
-                      <p className="font-display text-2xl">🏆 最终排名</p>
+                      <p className="font-display text-2xl">🏆 最后排名</p>
                       <ol className="mt-3 space-y-1 text-base">
                         {[...players]
                           .sort((a, b) => b.score - a.score)
@@ -483,13 +487,13 @@ function WaitingCard({
     "mt-1 w-full rounded-md border-2 border-[var(--ink)] bg-background px-2 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60";
   return (
     <div className="panel w-full max-w-sm p-5 text-center">
-      <p className="font-display text-xl">等待玩家加入</p>
+      <p className="font-display text-xl">等大家加入</p>
       <p className="mt-1 text-sm text-muted-foreground">
-        把房号 <span className="font-semibold tracking-[0.2em]">{code}</span> 发给好友
+        把号码 <span className="font-semibold tracking-[0.2em]">{code}</span> 发给朋友
       </p>
       <div className="mt-4 grid grid-cols-3 gap-2 text-left">
         <label className="text-xs font-medium">
-          回合数
+          轮数
           <select
             className={select}
             disabled={!isHost}
@@ -504,7 +508,7 @@ function WaitingCard({
           </select>
         </label>
         <label className="text-xs font-medium">
-          每回合秒
+          每轮秒数
           <select
             className={select}
             disabled={!isHost}
@@ -539,7 +543,7 @@ function WaitingCard({
         </label>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
-        {isHost ? "房主设置会自动保存" : "等待房主调整设置"}
+        {isHost ? "主持人的设置会自动保存" : "等主持人调整设置"}
       </p>
       {isHost ? (
         <button
@@ -548,10 +552,10 @@ function WaitingCard({
           disabled={!canStart}
           className="mt-4 w-full rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-2 font-display text-lg text-primary-foreground shadow-[3px_3px_0_0_var(--ink)] disabled:opacity-50"
         >
-          {canStart ? "开始游戏" : "至少需要 2 人"}
+          {canStart ? "开始这一局" : "至少 2 人"}
         </button>
       ) : (
-        <p className="mt-4 text-sm text-muted-foreground">等待房主开始…</p>
+        <p className="mt-4 text-sm text-muted-foreground">等主持人开始…</p>
       )}
     </div>
   );

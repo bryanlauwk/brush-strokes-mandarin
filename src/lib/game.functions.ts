@@ -320,9 +320,36 @@ export const leaveRoom = createServerFn({ method: "POST" })
       await supabaseAdmin.from("rooms").delete().eq("id", room.id);
       return { ok: true };
     }
-    if (room.host_id === player.id) {
-      await supabaseAdmin.from("rooms").update({ host_id: rest[0].id }).eq("id", room.id);
-      await supabaseAdmin.from("players").update({ is_host: true }).eq("id", rest[0].id);
+
+    const nextHost = room.host_id === player.id ? rest[0] : null;
+    if (nextHost) {
+      await supabaseAdmin.from("players").update({ is_host: true }).eq("id", nextHost.id);
+    }
+
+    if (rest.length < 2) {
+      await supabaseAdmin
+        .from("rooms")
+        .update({
+          host_id: nextHost?.id ?? room.host_id,
+          status: "waiting",
+          drawer_id: null,
+          masked_word: null,
+          word_length: null,
+          revealed_word: null,
+          round_started_at: null,
+          round_ends_at: null,
+        })
+        .eq("id", room.id);
+      await supabaseAdmin
+        .from("room_secrets")
+        .update({ word: null, choices: [], drawer_id: null })
+        .eq("room_id", room.id);
+      await g.say(room.id, room.current_round, "system", "人数不足，先回到等人");
+      return { ok: true };
+    }
+
+    if (nextHost) {
+      await supabaseAdmin.from("rooms").update({ host_id: nextHost.id }).eq("id", room.id);
     }
     if (room.drawer_id === player.id && room.status !== "waiting" && room.status !== "ended") {
       await g.endTurn(room, null);

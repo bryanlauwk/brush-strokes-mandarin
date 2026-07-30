@@ -7,6 +7,12 @@
   z-index: 2;
 }
 
+.home-shell .ink-title + p {
+  text-shadow:
+    0 1px 0 oklch(0.99 0.02 88 / 0.85),
+    0 10px 24px oklch(0.98 0.03 84 / 0.45);
+}
+
 .home-ukiyo-bg {
   position: fixed;
   inset: 0;
@@ -14,9 +20,9 @@
   pointer-events: none;
   overflow: hidden;
   background:
-    radial-gradient(circle at 73% 47%, oklch(0.74 0.17 42 / 0.62) 0 4.7rem, transparent 4.85rem),
-    radial-gradient(circle at 72% 47%, oklch(0.84 0.12 70 / 0.25) 0 10rem, transparent 10.2rem),
-    linear-gradient(112deg, oklch(0.63 0.21 30 / 0.22) 0 18%, transparent 18% 100%),
+    radial-gradient(circle at 73% 47%, oklch(0.74 0.17 42 / 0.58) 0 4.7rem, transparent 4.85rem),
+    radial-gradient(circle at 72% 47%, oklch(0.84 0.12 70 / 0.23) 0 10rem, transparent 10.2rem),
+    linear-gradient(112deg, oklch(0.63 0.21 30 / 0.18) 0 18%, transparent 18% 100%),
     linear-gradient(168deg, transparent 0 58%, oklch(0.61 0.14 198 / 0.16) 58% 77%, transparent 77% 100%),
     repeating-linear-gradient(0deg, oklch(0.2 0.02 54 / 0.022) 0 1px, transparent 1px 6px),
     radial-gradient(oklch(0.5 0.05 80 / 0.12) 0.8px, transparent 1px),
@@ -33,20 +39,20 @@
 }
 
 .home-ukiyo-bg::before {
-  left: -16vw;
-  bottom: -30vh;
-  width: min(72rem, 78vw);
+  left: -22vw;
+  bottom: -45vh;
+  width: min(61rem, 65vw);
   aspect-ratio: 1;
   border-radius: 50%;
   transform: rotate(-10deg);
-  opacity: 0.94;
+  opacity: 0.76;
   background:
     radial-gradient(circle at 38% 30%, transparent 0 10%, oklch(0.94 0.035 86) 10.2% 13%, transparent 13.2% 16%, oklch(0.94 0.035 86) 16.2% 19%, transparent 19.2% 100%),
     radial-gradient(circle at 52% 26%, transparent 0 8%, oklch(0.92 0.04 86) 8.2% 10.7%, transparent 10.9% 100%),
     repeating-radial-gradient(circle at 36% 34%, oklch(0.42 0.12 226) 0 0.8rem, oklch(0.66 0.13 195) 0.85rem 1.35rem, oklch(0.94 0.035 86) 1.42rem 1.78rem),
     conic-gradient(from 202deg at 41% 38%, transparent 0 32deg, oklch(0.21 0.05 238) 32deg 62deg, oklch(0.62 0.13 198) 62deg 96deg, transparent 96deg 360deg);
-  box-shadow: inset -2rem 1rem 0 oklch(0.19 0.024 52 / 0.09);
-  mask-image: radial-gradient(circle at 45% 43%, #000 0 52%, transparent 72% 100%);
+  box-shadow: inset -2rem 1rem 0 oklch(0.19 0.024 52 / 0.08);
+  mask-image: radial-gradient(circle at 45% 43%, #000 0 47%, transparent 68% 100%);
 }
 
 .home-ukiyo-bg::after {
@@ -56,7 +62,7 @@
   aspect-ratio: 1;
   border-radius: 50%;
   transform: rotate(12deg);
-  opacity: 0.86;
+  opacity: 0.8;
   background:
     radial-gradient(ellipse at 53% 28%, oklch(0.61 0.2 31) 0 8%, oklch(0.83 0.12 62) 8.4% 9.2%, transparent 9.7%),
     radial-gradient(ellipse at 71% 38%, oklch(0.61 0.2 31) 0 9%, oklch(0.83 0.12 62) 9.5% 10.2%, transparent 10.7%),
@@ -67,26 +73,26 @@
 
 .ukiyo-ink-swipe {
   left: 5vw;
-  top: 0;
-  width: min(50rem, 62vw);
-  height: 14rem;
+  top: -1.5rem;
+  width: min(46rem, 58vw);
+  height: 11rem;
   transform: rotate(-10deg);
   border-radius: 999px;
-  opacity: 0.8;
+  opacity: 0.58;
   background:
-    linear-gradient(90deg, oklch(0.21 0.04 45 / 0.72), oklch(0.59 0.21 31 / 0.56) 38%, transparent 82%),
+    linear-gradient(90deg, oklch(0.21 0.04 45 / 0.66), oklch(0.59 0.21 31 / 0.48) 38%, transparent 82%),
     radial-gradient(circle at 8% 50%, oklch(0.17 0.04 45) 0 0.45rem, transparent 0.5rem),
     radial-gradient(circle at 18% 66%, oklch(0.17 0.04 45 / 0.75) 0 0.35rem, transparent 0.4rem);
   filter: blur(0.2px);
-  mask-image: linear-gradient(90deg, #000 0 72%, transparent 100%);
+  mask-image: linear-gradient(90deg, #000 0 66%, transparent 100%);
 }
 
 .ukiyo-shophouses {
   left: 4vw;
-  bottom: 10vh;
+  bottom: 6vh;
   width: min(29rem, 38vw);
   height: 11rem;
-  opacity: 0.7;
+  opacity: 0.56;
   background:
     linear-gradient(90deg, oklch(0.2 0.02 54 / 0.5) 0 0.2rem, transparent 0.2rem 3rem) 0 55% / 3rem 4.6rem repeat-x,
     repeating-linear-gradient(90deg, oklch(0.62 0.12 190 / 0.78) 0 2.4rem, oklch(0.82 0.11 74 / 0.78) 2.4rem 4.8rem, oklch(0.64 0.19 32 / 0.78) 4.8rem 7.2rem),
@@ -113,7 +119,7 @@
   top: 11vh;
   width: 18rem;
   height: 8rem;
-  opacity: 0.68;
+  opacity: 0.58;
   background:
     linear-gradient(18deg, transparent 0 22%, oklch(0.2 0.02 54 / 0.35) 22% 24%, transparent 24% 100%),
     linear-gradient(18deg, oklch(0.99 0.02 88 / 0.88), oklch(0.91 0.05 84 / 0.88)) 18% 8% / 3.1rem 4.1rem no-repeat,
@@ -127,7 +133,7 @@
   top: 12vh;
   width: 5.8rem;
   height: 8rem;
-  opacity: 0.92;
+  opacity: 0.9;
   background:
     linear-gradient(180deg, oklch(0.18 0.025 48 / 0.55) 0 0.2rem, transparent 0.2rem 100%),
     radial-gradient(ellipse at 50% 34%, oklch(0.67 0.2 31) 0 42%, oklch(0.86 0.11 62) 43% 47%, transparent 48%),
@@ -137,7 +143,7 @@
 
 .ukiyo-dots {
   inset: 0;
-  opacity: 0.7;
+  opacity: 0.62;
   background:
     radial-gradient(circle at 22% 20%, oklch(0.82 0.15 82) 0 0.23rem, transparent 0.25rem),
     radial-gradient(circle at 32% 35%, oklch(0.61 0.2 31) 0 0.18rem, transparent 0.2rem),
@@ -154,26 +160,26 @@
   }
 
   .home-ukiyo-bg::before {
-    left: -36vw;
-    bottom: -23vh;
-    width: 105vw;
-    opacity: 0.62;
+    left: -38vw;
+    bottom: -32vh;
+    width: 92vw;
+    opacity: 0.52;
   }
 
   .home-ukiyo-bg::after {
     right: -30vw;
     width: 76vw;
-    opacity: 0.58;
+    opacity: 0.5;
   }
 
   .ukiyo-ink-swipe {
     width: 92vw;
-    opacity: 0.42;
+    opacity: 0.36;
   }
 
   .ukiyo-shophouses,
   .ukiyo-cards,
   .ukiyo-clouds {
-    opacity: 0.28;
+    opacity: 0.24;
   }
 }

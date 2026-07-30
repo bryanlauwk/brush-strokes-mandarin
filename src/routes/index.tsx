@@ -3,7 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { ArrowRight, Brush, Camera, ChevronDown, DoorOpen, Link2, MapPin, Sparkles, Tv, X } from "lucide-react";
-import { SelfieAvatar } from "@/components/game/SelfieAvatar";
+import { SelfieAvatar, createDefaultAvatar } from "@/components/game/SelfieAvatar";
 import { createRoom, roomExists } from "@/lib/game.functions";
 import { ROOM_THEME_OPTIONS, type RoomTheme } from "@/lib/game-themes";
 import { homeEntryPreviewImage } from "@/lib/home-assets";

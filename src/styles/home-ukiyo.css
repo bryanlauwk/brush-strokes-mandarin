@@ -30,156 +30,35 @@
   background-size: auto, auto, auto, auto, auto, 24px 24px, auto;
 }
 
-.home-ukiyo-bg::before,
-.home-ukiyo-bg::after,
 .home-ukiyo-bg span {
   content: "";
   position: absolute;
   display: block;
 }
 
-.home-ukiyo-bg::before {
-  left: -22vw;
-  bottom: -45vh;
-  width: min(61rem, 65vw);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  transform: rotate(-10deg);
-  opacity: 0.76;
-  background:
-    radial-gradient(circle at 38% 30%, transparent 0 10%, oklch(0.94 0.035 86) 10.2% 13%, transparent 13.2% 16%, oklch(0.94 0.035 86) 16.2% 19%, transparent 19.2% 100%),
-    radial-gradient(circle at 52% 26%, transparent 0 8%, oklch(0.92 0.04 86) 8.2% 10.7%, transparent 10.9% 100%),
-    repeating-radial-gradient(circle at 36% 34%, oklch(0.42 0.12 226) 0 0.8rem, oklch(0.66 0.13 195) 0.85rem 1.35rem, oklch(0.94 0.035 86) 1.42rem 1.78rem),
-    conic-gradient(from 202deg at 41% 38%, transparent 0 32deg, oklch(0.21 0.05 238) 32deg 62deg, oklch(0.62 0.13 198) 62deg 96deg, transparent 96deg 360deg);
-  box-shadow: inset -2rem 1rem 0 oklch(0.19 0.024 52 / 0.08);
-  mask-image: radial-gradient(circle at 45% 43%, #000 0 47%, transparent 68% 100%);
-}
-
-.home-ukiyo-bg::after {
-  right: -11vw;
-  top: -11vh;
-  width: min(34rem, 48vw);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  transform: rotate(12deg);
-  opacity: 0.8;
-  background:
-    radial-gradient(ellipse at 53% 28%, oklch(0.61 0.2 31) 0 8%, oklch(0.83 0.12 62) 8.4% 9.2%, transparent 9.7%),
-    radial-gradient(ellipse at 71% 38%, oklch(0.61 0.2 31) 0 9%, oklch(0.83 0.12 62) 9.5% 10.2%, transparent 10.7%),
-    repeating-linear-gradient(110deg, transparent 0 1.25rem, oklch(0.18 0.07 205 / 0.48) 1.3rem 1.55rem, transparent 1.6rem 2.25rem),
-    repeating-linear-gradient(24deg, transparent 0 1.6rem, oklch(0.2 0.08 176 / 0.52) 1.65rem 1.95rem, transparent 2rem 3.4rem);
-  mask-image: radial-gradient(circle at 58% 43%, #000 0 52%, transparent 76%);
-}
-
-.ukiyo-ink-swipe {
-  left: 5vw;
-  top: -1.5rem;
-  width: min(46rem, 58vw);
-  height: 11rem;
-  transform: rotate(-10deg);
-  border-radius: 999px;
-  opacity: 0.58;
-  background:
-    linear-gradient(90deg, oklch(0.21 0.04 45 / 0.66), oklch(0.59 0.21 31 / 0.48) 38%, transparent 82%),
-    radial-gradient(circle at 8% 50%, oklch(0.17 0.04 45) 0 0.45rem, transparent 0.5rem),
-    radial-gradient(circle at 18% 66%, oklch(0.17 0.04 45 / 0.75) 0 0.35rem, transparent 0.4rem);
-  filter: blur(0.2px);
-  mask-image: linear-gradient(90deg, #000 0 66%, transparent 100%);
-}
-
-.ukiyo-shophouses {
-  left: 4vw;
-  bottom: 6vh;
-  width: min(29rem, 38vw);
-  height: 11rem;
-  opacity: 0.56;
-  background:
-    linear-gradient(90deg, oklch(0.2 0.02 54 / 0.5) 0 0.2rem, transparent 0.2rem 3rem) 0 55% / 3rem 4.6rem repeat-x,
-    repeating-linear-gradient(90deg, oklch(0.62 0.12 190 / 0.78) 0 2.4rem, oklch(0.82 0.11 74 / 0.78) 2.4rem 4.8rem, oklch(0.64 0.19 32 / 0.78) 4.8rem 7.2rem),
-    linear-gradient(180deg, transparent 0 20%, oklch(0.19 0.024 52 / 0.55) 20% 25%, transparent 25% 100%);
-  clip-path: polygon(0 100%, 0 42%, 8% 34%, 16% 42%, 16% 28%, 25% 21%, 34% 28%, 34% 43%, 43% 33%, 53% 43%, 53% 29%, 63% 22%, 73% 29%, 73% 42%, 84% 31%, 95% 42%, 100% 42%, 100% 100%);
-}
-
-.ukiyo-clouds {
-  right: 20vw;
-  top: 23vh;
-  width: 30rem;
-  max-width: 44vw;
-  height: 8rem;
-  opacity: 0.42;
-  background:
-    radial-gradient(ellipse at 15% 70%, oklch(0.92 0.08 77) 0 18%, transparent 19%),
-    radial-gradient(ellipse at 34% 54%, oklch(0.92 0.08 77) 0 22%, transparent 23%),
-    radial-gradient(ellipse at 58% 70%, oklch(0.92 0.08 77) 0 20%, transparent 21%),
-    radial-gradient(ellipse at 78% 58%, oklch(0.92 0.08 77) 0 17%, transparent 18%);
-}
-
-.ukiyo-cards {
-  left: 38vw;
-  top: 11vh;
-  width: 18rem;
-  height: 8rem;
-  opacity: 0.58;
-  background:
-    linear-gradient(18deg, transparent 0 22%, oklch(0.2 0.02 54 / 0.35) 22% 24%, transparent 24% 100%),
-    linear-gradient(18deg, oklch(0.99 0.02 88 / 0.88), oklch(0.91 0.05 84 / 0.88)) 18% 8% / 3.1rem 4.1rem no-repeat,
-    linear-gradient(-14deg, oklch(0.99 0.02 88 / 0.9), oklch(0.9 0.04 84 / 0.9)) 58% 42% / 3.7rem 4.8rem no-repeat,
-    radial-gradient(circle at 23% 36%, oklch(0.62 0.19 31) 0 0.35rem, transparent 0.38rem),
-    radial-gradient(circle at 66% 70%, oklch(0.64 0.13 195) 0 0.32rem, transparent 0.35rem);
-}
-
-.ukiyo-lantern {
-  right: 8vw;
-  top: 12vh;
-  width: 5.8rem;
-  height: 8rem;
-  opacity: 0.9;
-  background:
-    linear-gradient(180deg, oklch(0.18 0.025 48 / 0.55) 0 0.2rem, transparent 0.2rem 100%),
-    radial-gradient(ellipse at 50% 34%, oklch(0.67 0.2 31) 0 42%, oklch(0.86 0.11 62) 43% 47%, transparent 48%),
-    repeating-linear-gradient(0deg, transparent 0 0.8rem, oklch(0.97 0.03 80 / 0.34) 0.85rem 0.95rem, transparent 1rem 1.4rem);
-  filter: drop-shadow(0 0.7rem 0 oklch(0.19 0.024 52 / 0.08));
-}
-
-.ukiyo-dots {
+.ukiyo-art {
   inset: 0;
-  opacity: 0.62;
+  background-position: center bottom;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: 0.95;
+}
+
+.ukiyo-veil {
+  inset: 0;
   background:
-    radial-gradient(circle at 22% 20%, oklch(0.82 0.15 82) 0 0.23rem, transparent 0.25rem),
-    radial-gradient(circle at 32% 35%, oklch(0.61 0.2 31) 0 0.18rem, transparent 0.2rem),
-    radial-gradient(circle at 49% 18%, oklch(0.65 0.13 190) 0 0.2rem, transparent 0.22rem),
-    radial-gradient(circle at 84% 65%, oklch(0.82 0.15 82) 0 0.25rem, transparent 0.27rem),
-    radial-gradient(circle at 70% 82%, oklch(0.61 0.2 31) 0 0.16rem, transparent 0.18rem),
-    radial-gradient(circle at 57% 70%, oklch(0.65 0.13 190) 0 0.18rem, transparent 0.2rem);
+    radial-gradient(ellipse at 24% 44%, oklch(0.99 0.02 88 / 0.86) 0 26%, oklch(0.98 0.03 84 / 0.45) 48%, transparent 72%),
+    radial-gradient(ellipse at 62% 42%, oklch(0.99 0.02 88 / 0.7) 0 30%, transparent 70%),
+    linear-gradient(180deg, oklch(0.99 0.02 88 / 0.3), transparent 45%);
 }
 
 @media (max-width: 900px) {
-  .home-ukiyo-bg {
-    opacity: 0.82;
-    background-position: center top;
+  .ukiyo-art {
+    background-position: 62% bottom;
+    opacity: 0.85;
   }
 
-  .home-ukiyo-bg::before {
-    left: -38vw;
-    bottom: -32vh;
-    width: 92vw;
-    opacity: 0.52;
-  }
-
-  .home-ukiyo-bg::after {
-    right: -30vw;
-    width: 76vw;
-    opacity: 0.5;
-  }
-
-  .ukiyo-ink-swipe {
-    width: 92vw;
-    opacity: 0.36;
-  }
-
-  .ukiyo-shophouses,
-  .ukiyo-cards,
-  .ukiyo-clouds {
-    opacity: 0.24;
+  .ukiyo-veil {
+    background: radial-gradient(ellipse at 50% 40%, oklch(0.99 0.02 88 / 0.9) 0 40%, oklch(0.98 0.03 84 / 0.5) 62%, transparent 85%);
   }
 }

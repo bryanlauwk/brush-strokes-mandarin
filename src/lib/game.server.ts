@@ -604,11 +604,11 @@ async function getUsedWords(roomId: string, resetHistory: boolean) {
 }
 
 async function saveTurnChoices(roomId: string, payload: Record<string, unknown>, supportsUsedWords: boolean) {
-  const saved = await supabaseAdmin.from("room_secrets").upsert(payload);
+  const saved = await supabaseAdmin.from("room_secrets").upsert(payload as never);
   if (!saved.error || !supportsUsedWords || !isMissingColumn(saved.error, "used_words")) return saved;
 
   const { used_words: _usedWords, ...fallbackPayload } = payload;
-  return supabaseAdmin.from("room_secrets").upsert(fallbackPayload);
+  return supabaseAdmin.from("room_secrets").upsert(fallbackPayload as never);
 }
 
 function entryMatchesTheme(entry: WordEntry, theme: RoomTheme) {

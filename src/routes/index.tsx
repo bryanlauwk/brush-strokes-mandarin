@@ -147,11 +147,6 @@ function Index() {
     focusControl(intent === "create" ? nameRef.current : codeRef.current);
   };
 
-  const rememberProfile = () => {
-    saveNickname(trimmedName);
-    saveAvatarSvg(avatarSvg);
-  };
-
   const validateName = () => {
     if (!trimmedName) {
       toast.error("先输入你的名字");
@@ -465,7 +460,7 @@ function Index() {
               <div>
                 <p className="font-display text-3xl leading-none text-primary">做个角色</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  拍照或上传一张，我们会转成圆脸漫画头像。
+                  拍照或上传一张，我们会转成圆脸漫画头像。不拍也行，会用名字自动生成一个。
                 </p>
               </div>
               <button
@@ -490,16 +485,22 @@ function Index() {
             </div>
 
             <div className="mt-4">
-              <SelfieAvatar value={avatarSvg} onChange={setAvatarSvg} name={name} compact required />
+              <SelfieAvatar value={avatarSvg} onChange={setAvatarSvg} name={name} compact />
             </div>
 
             <button
               type="button"
               onClick={continueEntry}
-              disabled={busy || !avatarSvg}
+              disabled={busy}
               className="press mt-4 flex w-full items-center justify-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
             >
-              {entryIntent === "create" ? "角色好了，开房" : "角色好了，进房"}
+              {avatarSvg
+                ? entryIntent === "create"
+                  ? "角色好了，开房"
+                  : "角色好了，进房"
+                : entryIntent === "create"
+                  ? "先用默认角色开房"
+                  : "先用默认角色进房"}
               <ArrowRight className="size-5" />
             </button>
           </div>

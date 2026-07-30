@@ -7,6 +7,8 @@ const identity = z.object({
   token: z.string().min(10).max(128),
 });
 
+const difficulty = z.enum(["全部", "容易", "普通", "挑战", "高手", "简单", "中等", "困难"]);
+
 export const createRoom = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ name: z.string().max(30) }).parse(d))
   .handler(async ({ data }) => {
@@ -26,7 +28,7 @@ export const createRoom = createServerFn({ method: "POST" })
       .insert({ code })
       .select("*")
       .single();
-    if (error || !room) throw new Error("创建房间失败");
+    if (error || !room) throw new Error("开局失败");
 
     const { data: player, error: pErr } = await supabaseAdmin
       .from("players")
@@ -38,13 +40,13 @@ export const createRoom = createServerFn({ method: "POST" })
       })
       .select("*")
       .single();
-    if (pErr || !player) throw new Error("加入房间失败");
+    if (pErr || !player) throw new Error("加入失败");
 
     const token = g.makeToken();
     await supabaseAdmin.from("player_tokens").insert({ player_id: player.id, token });
     await supabaseAdmin.from("rooms").update({ host_id: player.id }).eq("id", room.id);
     await supabaseAdmin.from("room_secrets").insert({ room_id: room.id });
-    await g.say(room.id, 0, "system", `${name} 创建了房间`);
+    await g.say(room.id, 0, "system", `${name} 开了一局`);
 
     return { code: room.code, playerId: player.id, token };
   });
@@ -57,10 +59,10 @@ export const joinRoom = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
     const room = await g.getRoomByCode(data.code);
-    if (!room) throw new Error("房间不存在，请检查房号");
+    if (!room) throw new Error("找不到这个号码，请再检查一次");
 
     const players = await g.listPlayers(room.id);
-    if (players.length >= 12) throw new Error("房间已满（最多 12 人）");
+    if (players.length >= 12) throw new Error("这一局满了（最多 12 人）");
 
     let name = g.cleanName(data.name);
     if (players.some((p) => p.name === name)) name = `${name}2`.slice(0, 12);
@@ -70,11 +72,11 @@ export const joinRoom = createServerFn({ method: "POST" })
       .insert({ room_id: room.id, name, avatar: Math.floor(Math.random() * 8) })
       .select("*")
       .single();
-    if (error || !player) throw new Error("加入房间失败");
+    if (error || !player) throw new Error("加入失败");
 
     const token = g.makeToken();
     await supabaseAdmin.from("player_tokens").insert({ player_id: player.id, token });
-    await g.say(room.id, room.current_round, "system", `${name} 加入了房间`);
+    await g.say(room.id, room.current_round, "system", `${name} 加入这局`);
 
     return { code: room.code, playerId: player.id, token };
   });
@@ -113,7 +115,7 @@ export const updateSettings = createServerFn({ method: "POST" })
       .extend({
         totalRounds: z.number().int().min(1).max(10),
         drawSeconds: z.number().int().min(30).max(180),
-        difficulty: z.enum(["全部", "简单", "中等", "困难"]),
+        difficulty,
       })
       .parse(d),
   )
@@ -121,15 +123,15 @@ export const updateSettings = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
     const { room, player } = await g.authPlayer(data.code, data.playerId, data.token);
-    if (room.host_id !== player.id) throw new Error("只有房主可以修改设置");
-    if (room.status !== "waiting" && room.status !== "ended") throw new Error("游戏进行中");
+    if (room.host_id !== player.id) throw new Error("只有主持人可以改设置");
+    if (room.status !== "waiting" && room.status !== "ended") throw new Error("这一局已经开始了");
 
     await supabaseAdmin
       .from("rooms")
       .update({
         total_rounds: data.totalRounds,
         draw_seconds: data.drawSeconds,
-        difficulty: data.difficulty,
+        difficulty: g.normalizeDifficulty(data.difficulty),
       })
       .eq("id", room.id);
     return { ok: true };
@@ -141,10 +143,10 @@ export const startGame = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
     const { room, player } = await g.authPlayer(data.code, data.playerId, data.token);
-    if (room.host_id !== player.id) throw new Error("只有房主可以开始游戏");
+    if (room.host_id !== player.id) throw new Error("只有主持人可以开始");
 
     const players = await g.listPlayers(room.id);
-    if (players.length < 2) throw new Error("至少需要 2 名玩家");
+    if (players.length < 2) throw new Error("至少需要 2 位玩家");
 
     await supabaseAdmin
       .from("players")
@@ -177,8 +179,8 @@ export const chooseWord = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
     const { room, player } = await g.authPlayer(data.code, data.playerId, data.token);
-    if (room.drawer_id !== player.id) throw new Error("现在不是你选词");
-    if (room.status !== "choosing") throw new Error("现在不能选词");
+    if (room.drawer_id !== player.id) throw new Error("现在还没轮到你选题");
+    if (room.status !== "choosing") throw new Error("现在不能选题");
 
     const { data: secret } = await supabaseAdmin
       .from("room_secrets")
@@ -186,7 +188,7 @@ export const chooseWord = createServerFn({ method: "POST" })
       .eq("room_id", room.id)
       .maybeSingle();
     const choices = (secret?.choices as string[] | null) ?? [];
-    if (!choices.includes(data.word)) throw new Error("无效的词语");
+    if (!choices.includes(data.word)) throw new Error("这个题目不能选");
 
     await g.lockWord(room, data.word);
     return { ok: true };
@@ -220,8 +222,8 @@ export const pushStroke = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
     const { room, player } = await g.authPlayer(data.code, data.playerId, data.token);
-    if (room.drawer_id !== player.id) throw new Error("只有画者可以作画");
-    if (room.status !== "drawing") throw new Error("现在不能作画");
+    if (room.drawer_id !== player.id) throw new Error("只有画画的人可以动笔");
+    if (room.status !== "drawing") throw new Error("现在还不能画");
 
     await supabaseAdmin.from("strokes").insert({
       room_id: room.id,
@@ -254,7 +256,7 @@ export const leaveRoom = createServerFn({ method: "POST" })
     const { room, player } = await g.authPlayer(data.code, data.playerId, data.token);
 
     await supabaseAdmin.from("players").delete().eq("id", player.id);
-    await g.say(room.id, room.current_round, "system", `${player.name} 离开了房间`);
+    await g.say(room.id, room.current_round, "system", `${player.name} 离开这局`);
 
     const rest = await g.listPlayers(room.id);
     if (rest.length === 0) {

@@ -1,4 +1,4 @@
-type CharacterGroup = "哥妹俩风" | "动漫风" | "超英风";
+type CharacterGroup = "圆脸漫画风" | "动漫风" | "超英风";
 
 type CharacterSpec = {
   id: string;
@@ -16,11 +16,11 @@ type CharacterSpec = {
 };
 
 const SPECS: CharacterSpec[] = [
-  { id: "kopi-boy", name: "Kopi Boy", group: "哥妹俩风", caption: "开朗男", skin: "#f4bd87", hair: "#201713", shirt: "#2b7cff", bg: "#64c7ff", accent: "#ffd45c", hairStyle: "short", smile: "open" },
-  { id: "milo-girl", name: "Milo Girl", group: "哥妹俩风", caption: "元气女", skin: "#f1b783", hair: "#2b1a13", shirt: "#1dbf85", bg: "#7ee0c3", accent: "#ff7a90", hairStyle: "long", smile: "open" },
-  { id: "penang-kid", name: "槟城仔", group: "哥妹俩风", caption: "街头男", skin: "#d99a6b", hair: "#181614", shirt: "#f36b35", bg: "#ffcc73", accent: "#1aa7a8", hairStyle: "spiky", accessory: "cap", smile: "grin" },
-  { id: "melaka-mate", name: "马六甲妹", group: "哥妹俩风", caption: "甜笑女", skin: "#e7a878", hair: "#5a321c", shirt: "#e6415f", bg: "#ffa0b2", accent: "#ffe58a", hairStyle: "bob", smile: "soft" },
-  { id: "mamak-star", name: "Mamak Star", group: "哥妹俩风", caption: "夜宵咖", skin: "#b97955", hair: "#151515", shirt: "#7b4bc4", bg: "#b29cff", accent: "#ffd45c", hairStyle: "short", accessory: "glasses", smile: "open" },
+  { id: "kopi-boy", name: "Kopi Boy", group: "圆脸漫画风", caption: "开朗男", skin: "#f4bd87", hair: "#201713", shirt: "#2b7cff", bg: "#64c7ff", accent: "#ffd45c", hairStyle: "short", smile: "open" },
+  { id: "milo-girl", name: "Milo Girl", group: "圆脸漫画风", caption: "元气女", skin: "#f1b783", hair: "#2b1a13", shirt: "#1dbf85", bg: "#7ee0c3", accent: "#ff7a90", hairStyle: "long", smile: "open" },
+  { id: "penang-kid", name: "槟城仔", group: "圆脸漫画风", caption: "街头男", skin: "#d99a6b", hair: "#181614", shirt: "#f36b35", bg: "#ffcc73", accent: "#1aa7a8", hairStyle: "spiky", accessory: "cap", smile: "grin" },
+  { id: "melaka-mate", name: "马六甲妹", group: "圆脸漫画风", caption: "甜笑女", skin: "#e7a878", hair: "#5a321c", shirt: "#e6415f", bg: "#ffa0b2", accent: "#ffe58a", hairStyle: "bob", smile: "soft" },
+  { id: "mamak-star", name: "Mamak Star", group: "圆脸漫画风", caption: "夜宵咖", skin: "#b97955", hair: "#151515", shirt: "#7b4bc4", bg: "#b29cff", accent: "#ffd45c", hairStyle: "short", accessory: "glasses", smile: "open" },
   { id: "school-ace", name: "School Ace", group: "动漫风", caption: "学园男", skin: "#f2bd8c", hair: "#111827", shirt: "#294edb", bg: "#9fc8ff", accent: "#ffffff", hairStyle: "spiky", accessory: "headband", smile: "grin" },
   { id: "anime-spark", name: "Anime Spark", group: "动漫风", caption: "闪亮女", skin: "#f6c39a", hair: "#3b2468", shirt: "#ff71a8", bg: "#ffd0ec", accent: "#ffe76b", hairStyle: "waves", accessory: "star", smile: "open" },
   { id: "neon-bro", name: "Neon Bro", group: "动漫风", caption: "酷酷男", skin: "#d49365", hair: "#0f172a", shirt: "#00a8a8", bg: "#83f0ff", accent: "#ffdd57", hairStyle: "short", accessory: "glasses", smile: "soft" },

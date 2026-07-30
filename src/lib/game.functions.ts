@@ -8,13 +8,49 @@ const identity = z.object({
 });
 
 const difficulty = z.enum(["全部", "容易", "普通", "挑战", "高手", "简单", "中等", "困难"]);
+const profile = z.object({ name: z.string().max(30), avatarSvg: z.string().max(5000).nullable().optional() });
+
+type PlayerInsert = Record<string, unknown>;
+
+function cleanAvatarSvg(raw?: string | null) {
+  const svg = (raw ?? "").trim();
+  if (!svg) return null;
+  if (svg.length > 5000) return null;
+  if (!svg.startsWith("<svg ") || !svg.endsWith("</svg>")) return null;
+  if (/[\u0000-\u001f]/.test(svg)) return null;
+  const lowered = svg.toLowerCase();
+  if (
+    lowered.includes("<script") ||
+    lowered.includes("foreignobject") ||
+    lowered.includes("javascript:") ||
+    lowered.includes("data:") ||
+    lowered.includes("http:") ||
+    lowered.includes("https:") ||
+    /\son[a-z]+\s*=/.test(lowered)
+  ) {
+    return null;
+  }
+  return svg;
+}
+
+async function insertPlayer(supabaseAdmin: Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"], payload: PlayerInsert) {
+  const withAvatar = await supabaseAdmin.from("players").insert(payload).select("*").single();
+  if (!withAvatar.error || !("avatar_svg" in payload)) return withAvatar;
+
+  const message = `${withAvatar.error.code ?? ""} ${withAvatar.error.message ?? ""}`;
+  if (!message.includes("avatar_svg")) return withAvatar;
+
+  const { avatar_svg: _avatarSvg, ...withoutAvatar } = payload;
+  return supabaseAdmin.from("players").insert(withoutAvatar).select("*").single();
+}
 
 export const createRoom = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({ name: z.string().max(30) }).parse(d))
+  .inputValidator((d) => profile.parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
     const name = g.cleanName(data.name);
+    const avatarSvg = cleanAvatarSvg(data.avatarSvg);
 
     let code = g.makeCode();
     for (let i = 0; i < 6; i++) {
@@ -30,16 +66,13 @@ export const createRoom = createServerFn({ method: "POST" })
       .single();
     if (error || !room) throw new Error("开局失败");
 
-    const { data: player, error: pErr } = await supabaseAdmin
-      .from("players")
-      .insert({
-        room_id: room.id,
-        name,
-        is_host: true,
-        avatar: Math.floor(Math.random() * 8),
-      })
-      .select("*")
-      .single();
+    const { data: player, error: pErr } = await insertPlayer(supabaseAdmin, {
+      room_id: room.id,
+      name,
+      is_host: true,
+      avatar: Math.floor(Math.random() * 8),
+      avatar_svg: avatarSvg,
+    });
     if (pErr || !player) throw new Error("加入失败");
 
     const token = g.makeToken();
@@ -53,7 +86,7 @@ export const createRoom = createServerFn({ method: "POST" })
 
 export const joinRoom = createServerFn({ method: "POST" })
   .inputValidator((d) =>
-    z.object({ code: z.string().min(4).max(8), name: z.string().max(30) }).parse(d),
+    profile.extend({ code: z.string().min(4).max(8) }).parse(d),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -66,12 +99,14 @@ export const joinRoom = createServerFn({ method: "POST" })
 
     let name = g.cleanName(data.name);
     if (players.some((p) => p.name === name)) name = `${name}2`.slice(0, 12);
+    const avatarSvg = cleanAvatarSvg(data.avatarSvg);
 
-    const { data: player, error } = await supabaseAdmin
-      .from("players")
-      .insert({ room_id: room.id, name, avatar: Math.floor(Math.random() * 8) })
-      .select("*")
-      .single();
+    const { data: player, error } = await insertPlayer(supabaseAdmin, {
+      room_id: room.id,
+      name,
+      avatar: Math.floor(Math.random() * 8),
+      avatar_svg: avatarSvg,
+    });
     if (error || !player) throw new Error("加入失败");
 
     const token = g.makeToken();

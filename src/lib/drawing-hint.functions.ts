@@ -97,12 +97,14 @@ export const generateDrawingHint = createServerFn({ method: "POST" })
 
 function buildPrompt(word: string) {
   return [
-    `Illustrate: ${word}.`,
-    "Create one clear visual hint that is easy to copy by hand: strong silhouette, simple readable shapes, no clutter.",
-    "Visual style: Japanese ukiyo-e print mixed with warm modern anime illustration, ink-brush outlines, washi paper texture, soft watercolor washes, lively but not photorealistic.",
-    "When the subject allows, place it in a Malaysian everyday scene with tropical light, kopitiam, shophouse, pasar malam, sea breeze, or local street details.",
+    `Draw a simple doodle hint for: ${word}.`,
+    "Make it look like a quick whiteboard sketch for a party drawing game, not a polished illustration.",
+    "Use clean black marker lines on a plain white or warm paper background, with only one or two tiny accent colors if truly helpful.",
+    "Keep the subject large, centered, and easy to copy in under 20 seconds: simple outline, iconic shape, minimal details.",
+    "Avoid realistic rendering, anime polish, ukiyo-e texture, complex background, dramatic lighting, shading, gradients, and decorative patterns.",
+    "If local context helps, use only one simple Malaysian clue prop or setting element, drawn as a basic line doodle.",
     "No readable text, no letters, no Chinese characters, no numbers, no watermarks, no app UI, no labels.",
-    "Do not reveal the answer through written words. Make it inspirational, not a finished drawing to copy exactly.",
+    "Do not reveal the answer through written words. The result should be a rough sketch guide that an amateur player can imitate.",
   ].join(" ");
 }
 

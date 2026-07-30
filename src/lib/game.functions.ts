@@ -65,7 +65,12 @@ async function updateRoomSettings(supabaseAdmin: SupabaseAdmin, roomId: string, 
 }
 
 async function insertPlayer(supabaseAdmin: SupabaseAdmin, payload: PlayerInsert) {
-  return supabaseAdmin.from("players").insert(payload as never).select("*").single();
+  const withAvatar = await supabaseAdmin.from("players").insert(payload as never).select("*").single();
+  if (!withAvatar.error || !isMissingColumn(withAvatar.error, "avatar_svg")) return withAvatar;
+
+  // Older databases may not have the avatar column yet — still let the player in.
+  const { avatar_svg: _avatarSvg, ...fallbackPayload } = payload;
+  return supabaseAdmin.from("players").insert(fallbackPayload as never).select("*").single();
 }
 
 async function parkRoomForLowPlayers(

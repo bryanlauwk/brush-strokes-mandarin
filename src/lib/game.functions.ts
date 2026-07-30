@@ -16,7 +16,10 @@ const profile = z.object({
   avatarSvg: z.string().max(5000).nullable().optional(),
   roomTheme: roomTheme.optional(),
 });
-const avatarRequiredMessage = "先拍照或上传照片，生成入场画像";
+function insertPlayerMessage(error: { message?: string } | null) {
+  const detail = (error?.message ?? "").trim();
+  return detail ? `加入失败：${detail}` : "加入失败，请再试一次";
+}
 
 type PlayerInsert = Record<string, unknown>;
 

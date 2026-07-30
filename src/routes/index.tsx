@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowRight, Brush, ChevronDown, DoorOpen, Link2, MapPin, Sparkles, Tv, UserRound } from "lucide-react";
+import { ArrowRight, Brush, ChevronDown, DoorOpen, Sparkles, UserRound } from "lucide-react";
 import { CharacterPicker } from "@/components/game/CharacterPicker";
 import { createRoom, roomExists } from "@/lib/game.functions";
 import { ROOM_THEME_OPTIONS, type RoomTheme } from "@/lib/game-themes";
@@ -15,6 +15,7 @@ const appTitle = "画啦猜啦 · 马来西亚华语画猜派对";
 const appDescription = "选角色、开房间、一起画画猜题。";
 
 type EntryIntent = "create" | "join";
+type EntryTab = "create" | "join";
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 5;
@@ -48,16 +49,10 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const highlights = [
-  { icon: UserRound, label: "选角登场", text: "选一个角色，马上进场。" },
-  { icon: MapPin, label: "主题开局", text: "本地题目，朋友一起猜。" },
-  { icon: Brush, label: "开画抢答", text: "轮到谁，就大胆画。" },
-];
-
-const flow = [
-  { icon: DoorOpen, title: "选角", text: "填名选角色。" },
-  { icon: Tv, title: "开房", text: "分享号码。" },
-  { icon: Sparkles, title: "开画", text: "边画边猜。" },
+const steps = [
+  { icon: UserRound, label: "填名选角", text: "写个名字，挑一个角色。" },
+  { icon: DoorOpen, label: "开房分享", text: "选主题开房，把号码丢给朋友。" },
+  { icon: Brush, label: "开画抢答", text: "轮到谁就大胆画，其他人抢答。" },
 ];
 
 function Index() {
@@ -68,6 +63,7 @@ function Index() {
   const [avatarSvg, setAvatarSvg] = useState<string | null>(null);
   const [roomTheme, setRoomTheme] = useState<RoomTheme>("全部主题");
   const [code, setCode] = useState("");
+  const [tab, setTab] = useState<EntryTab>("create");
   const [codeHint, setCodeHint] = useState<string | null>(null);
   const [codeStatus, setCodeStatus] = useState<CodeStatus>("idle");
   const [busy, setBusy] = useState(false);
@@ -145,7 +141,12 @@ function Index() {
   };
 
   const focusEntry = (intent: EntryIntent) => {
-    focusControl(intent === "create" ? nameRef.current : codeRef.current);
+    setTab(intent);
+    if (!trimmedName) {
+      focusControl(nameRef.current);
+      return;
+    }
+    window.setTimeout(() => focusControl(intent === "create" ? themeRef.current : codeRef.current), 0);
   };
 
   const validateName = () => {
@@ -222,9 +223,6 @@ function Index() {
           <span className="label-chip text-xs font-semibold text-primary animate-pop-in">
             <Sparkles className="size-3.5 animate-sparkle" /> 马来西亚华语画猜
           </span>
-          <span className="label-chip text-xs font-semibold animate-pop-in" style={{ animationDelay: "120ms" }}>
-            <Link2 className="size-3.5 text-[var(--teal)]" /> 主题房，马上玩
-          </span>
         </div>
 
         <div className="title-backing relative block w-full min-w-0 rounded-2xl border-2 border-[var(--ink)]/15 bg-[var(--card)]/72 p-5 shadow-[4px_4px_0_0_var(--ink)] backdrop-blur-sm sm:p-6">
@@ -245,41 +243,37 @@ function Index() {
             <button
               type="button"
               onClick={() => focusEntry("create")}
-              aria-label="聚焦到创建房间表单"
-              className="press cta-pulse inline-flex items-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-5 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)]"
+              aria-label="前往开房表单"
+              className="press cta-pulse inline-flex items-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-5 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)] lg:hidden"
             >
               <DoorOpen className="size-5" />
-              创建房间
+              开始玩
             </button>
-            <button
-              type="button"
-              onClick={() => focusEntry("join")}
-              aria-label="聚焦到加入房间号码输入框"
-              className="press inline-flex items-center gap-2 rounded-md border-2 border-[var(--ink)] bg-accent px-5 py-3 font-display text-xl text-accent-foreground shadow-[5px_5px_0_0_var(--ink)]"
-            >
-              <Link2 className="size-5" />
-              加入房间
-            </button>
-            <span className="text-sm text-muted-foreground">免注册，选角即玩</span>
+            <span className="text-sm text-muted-foreground">免注册，选角即玩 · 右边填好就能开局</span>
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          {highlights.map(({ icon: Icon, label, text }) => (
-            <article key={label} className="studio-panel p-4">
-              <Icon className="size-5 text-primary" />
-              <h2 className="mt-3 font-display text-xl text-foreground">{label}</h2>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">{text}</p>
-            </article>
+        <ol className="home-steps grid gap-3 sm:grid-cols-3">
+          {steps.map(({ icon: Icon, label, text }, i) => (
+            <li key={label} className="home-step studio-panel relative p-4">
+              <div className="flex items-center gap-2">
+                <span className="home-step-num grid size-8 shrink-0 place-items-center rounded-full border-2 border-[var(--ink)] bg-primary font-display text-lg text-primary-foreground">
+                  {i + 1}
+                </span>
+                <Icon className="size-5 shrink-0 text-primary" />
+                <h2 className="min-w-0 truncate font-display text-xl text-foreground">{label}</h2>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p>
+            </li>
           ))}
-        </div>
+        </ol>
       </section>
 
       <aside className="studio-panel p-4 sm:p-5">
         <div className="relative overflow-hidden rounded-md border-2 border-[var(--ink)] bg-[var(--wash)] p-4">
           <span className="absolute -right-2 -top-2 text-3xl opacity-25">✦</span>
           <p className="font-display text-2xl text-primary">准备开玩</p>
-          <p className="mt-1 text-sm text-muted-foreground">填好就可以开局。</p>
+          <p className="mt-1 text-sm text-muted-foreground">填名字、选角色，然后开房或输入朋友的号码。</p>
         </div>
 
         <div className="mt-4 space-y-4">
@@ -300,14 +294,50 @@ function Index() {
                   validateName();
                   return;
                 }
-                focusControl(themeRef.current);
+                focusControl(tab === "create" ? themeRef.current : codeRef.current);
               }}
               placeholder="画画人"
               className={field}
             />
           </div>
 
-          <div>
+          <CharacterPicker value={avatarSvg} onChange={setAvatarSvg} name={trimmedName || "画画人"} compact />
+
+          <div role="tablist" aria-label="开房或加入" className="home-tabs grid grid-cols-2 gap-2 rounded-md border-2 border-[var(--ink)] bg-card/70 p-1">
+            {(["create", "join"] as const).map((key) => (
+              <button
+                key={key}
+                role="tab"
+                type="button"
+                id={`tab-${key}`}
+                aria-selected={tab === key}
+                aria-controls={`panel-${key}`}
+                tabIndex={tab === key ? 0 : -1}
+                onClick={() => setTab(key)}
+                onKeyDown={(e) => {
+                  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+                  e.preventDefault();
+                  setTab(key === "create" ? "join" : "create");
+                }}
+                className={`press rounded-sm px-3 py-2 font-display text-lg transition-colors ${
+                  tab === key
+                    ? "border-2 border-[var(--ink)] bg-primary text-primary-foreground"
+                    : "border-2 border-transparent text-muted-foreground"
+                }`}
+              >
+                {key === "create" ? "开新房" : "加入房"}
+              </button>
+            ))}
+          </div>
+
+          <div
+            role="tabpanel"
+            id="panel-create"
+            aria-labelledby="tab-create"
+            hidden={tab !== "create"}
+            className="space-y-4"
+          >
+            <div>
             <label className="mb-2 block text-sm font-semibold" htmlFor="room-theme">
               主题房
             </label>
@@ -335,9 +365,7 @@ function Index() {
             <p className="mt-2 rounded-md border-2 border-border bg-card/70 px-3 py-2 text-sm leading-6 text-muted-foreground">
               {activeTheme.description}
             </p>
-          </div>
-
-          <CharacterPicker value={avatarSvg} onChange={setAvatarSvg} name={trimmedName || "画画人"} compact />
+            </div>
 
           <button
             ref={createButtonRef}
@@ -349,14 +377,9 @@ function Index() {
             {busy ? "准备中…" : "创建房间"}
             <ArrowRight className="size-5" />
           </button>
-
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="h-px flex-1 bg-border" />
-            加入朋友局
-            <span className="h-px flex-1 bg-border" />
           </div>
 
-          <div>
+          <div role="tabpanel" id="panel-join" aria-labelledby="tab-join" hidden={tab !== "join"}>
             <div className="grid grid-cols-[minmax(0,1fr)_96px] gap-2">
               <input
                 ref={codeRef}
@@ -414,18 +437,6 @@ function Index() {
               {codeMessage?.text ?? `跟朋友要 ${CODE_LENGTH} 位号码，例如 K7M3D。`}
             </p>
           </div>
-        </div>
-
-        <div className="mt-5 grid grid-cols-3 gap-2 rounded-md border-2 border-border bg-card/60 p-3">
-          {flow.map(({ icon: Icon, title, text }) => (
-            <div key={title} className="min-w-0 text-center">
-              <span className="mx-auto grid size-9 place-items-center rounded-md border-2 border-[var(--ink)] bg-secondary">
-                <Icon className="size-4" />
-              </span>
-              <span className="mt-2 block font-display text-lg leading-none text-primary">{title}</span>
-              <span className="mt-1 block text-xs leading-5 text-muted-foreground">{text}</span>
-            </div>
-          ))}
         </div>
 
         <Link to="/how-to-play" className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-primary underline underline-offset-4">

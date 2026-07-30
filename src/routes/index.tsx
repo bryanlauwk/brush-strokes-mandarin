@@ -178,7 +178,7 @@ function Index() {
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,320px)]">
           <div className="title-backing relative inline-block min-w-0 rounded-2xl border-2 border-[var(--ink)]/15 bg-[var(--card)]/72 p-5 shadow-[4px_4px_0_0_var(--ink)] backdrop-blur-sm sm:p-6">
             <div className="absolute -right-3 -top-3 hidden text-5xl opacity-30 sm:block">✦</div>
-            <h1 className="ink-title font-display text-5xl leading-none text-primary sm:text-6xl lg:text-7xl xl:text-8xl whitespace-nowrap">
+            <h1 className="ink-title font-display text-5xl leading-none text-primary sm:text-6xl xl:text-7xl whitespace-nowrap">
               {"画啦猜啦".split("").map((char, i) => (
                 <span
                   key={i}

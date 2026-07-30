@@ -88,6 +88,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:description", content: appDescription },
       { property: "og:image", content: previewImage },
       { name: "twitter:image", content: previewImage },
+      { title: "画啦猜啦" },
+      { property: "og:title", content: "画啦猜啦" },
+      { name: "twitter:title", content: "画啦猜啦" },
+      { name: "description", content: "Skribbl Chinese Edition is a Pictionary-style drawing and guessing game for Chinese words." },
+      { property: "og:description", content: "Skribbl Chinese Edition is a Pictionary-style drawing and guessing game for Chinese words." },
+      { name: "twitter:description", content: "Skribbl Chinese Edition is a Pictionary-style drawing and guessing game for Chinese words." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/c67aaef9-fd2f-4240-8875-3482b53a62ae/id-preview-4730d43a--f16726b3-91c3-4723-b062-f6b732d5c207.lovable.app-1785400873669.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/c67aaef9-fd2f-4240-8875-3482b53a62ae/id-preview-4730d43a--f16726b3-91c3-4723-b062-f6b732d5c207.lovable.app-1785400873669.png" },
     ],
     links: [
       {
@@ -100,7 +108,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=ZCOOL+KuaiLe&display=swap",
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
   }),
   shellComponent: RootShell,

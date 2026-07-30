@@ -76,6 +76,7 @@ function Index() {
   const themeRef = useRef<HTMLSelectElement | null>(null);
   const codeRef = useRef<HTMLInputElement | null>(null);
   const createButtonRef = useRef<HTMLButtonElement | null>(null);
+  const codeHintTimer = useRef<number | null>(null);
 
   useEffect(() => {
     setName(loadNickname());
@@ -126,8 +127,19 @@ function Index() {
   const handleCodeChange = (raw: string) => {
     const { clean, dropped } = sanitizeCode(raw);
     setCode(clean);
-    setCodeHint(dropped ? "号码只用字母和数字，不含 I、O、0、1。" : null);
+    if (codeHintTimer.current) window.clearTimeout(codeHintTimer.current);
+    if (!dropped) {
+      setCodeHint(null);
+      return;
+    }
+    // 提示要停留一下，不然下一个按键就把它冲掉了。
+    setCodeHint("号码只用字母和数字，不含 I、O、0、1。");
+    codeHintTimer.current = window.setTimeout(() => setCodeHint(null), 2600);
   };
+
+  useEffect(() => () => {
+    if (codeHintTimer.current) window.clearTimeout(codeHintTimer.current);
+  }, []);
 
   const focusControl = (target: HTMLElement | null) => {
     target?.scrollIntoView({ behavior: "smooth", block: "center" });

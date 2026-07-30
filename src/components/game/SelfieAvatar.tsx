@@ -272,16 +272,22 @@ function buildCuteAvatar(palette: Palette, seed: number) {
   const flip = seed % 2 === 0;
   const smile = seed % 3;
   const hairTop = flip
-    ? "M26 54c4-28 25-44 53-40 20 3 34 17 35 40-14-12-31-15-49-11-15 3-27 7-39 11Z"
-    : "M20 55c5-29 29-46 57-40 22 4 34 20 31 43-13-14-32-19-52-13-14 4-25 8-36 10Z";
+    ? "M25 56c2-28 25-46 55-42 23 4 36 20 35 45-15-13-33-18-52-13-15 4-27 8-38 10Z"
+    : "M18 58c5-31 31-49 60-43 24 5 36 23 31 47-12-15-32-21-53-15-15 4-26 8-38 11Z";
   const fringe = flip
-    ? "M39 40c8 13 23 17 44 12M48 34c-6 11-14 18-25 22"
-    : "M34 46c16-1 31-6 47-17M84 38c8 8 13 15 18 26";
+    ? "M35 41c11 12 28 16 50 9M50 32c-7 13-18 22-31 27M73 31c4 9 13 17 29 24"
+    : "M29 48c18-1 34-8 51-20M86 37c9 9 15 18 20 31M54 31c-5 12-16 21-33 27";
   const hand = flip
-    ? "<path d=\"M14 89c12-3 19 4 18 16M18 91l-9-13M25 91l-2-16\" fill=\"none\" stroke=\"#1b1b1b\" stroke-width=\"4\" stroke-linecap=\"round\"/>"
-    : "<path d=\"M114 91c-12-3-19 4-18 16M110 93l9-13M103 93l2-16\" fill=\"none\" stroke=\"#1b1b1b\" stroke-width=\"4\" stroke-linecap=\"round\"/>";
+    ? "<path d=\"M17 99c11-7 21-3 22 10M18 96l-9-15M25 94l-1-18M31 97l7-14\" fill=\"none\" stroke=\"#1b1b1b\" stroke-width=\"4\" stroke-linecap=\"round\"/>"
+    : "<path d=\"M111 99c-11-7-21-3-22 10M110 96l9-15M103 94l1-18M97 97l-7-14\" fill=\"none\" stroke=\"#1b1b1b\" stroke-width=\"4\" stroke-linecap=\"round\"/>";
+  const mouth =
+    smile === 0
+      ? "<path d=\"M53 84c4 10 18 10 22 0\" fill=\"#d9362e\" stroke=\"#1b1b1b\" stroke-width=\"4\" stroke-linejoin=\"round\"/><path d=\"M58 91c4 3 9 3 13 0\" fill=\"none\" stroke=\"#fff\" stroke-width=\"2\" stroke-linecap=\"round\" opacity=\".75\"/>"
+      : smile === 1
+        ? "<path d=\"M54 84c6 7 15 7 20 0\" fill=\"none\" stroke=\"#1b1b1b\" stroke-width=\"4\" stroke-linecap=\"round\"/>"
+        : "<path d=\"M55 84c5 5 13 5 18 0\" fill=\"none\" stroke=\"#1b1b1b\" stroke-width=\"4\" stroke-linecap=\"round\"/>";
 
-  return `<svg viewBox="0 0 128 128" role="img"><rect width="128" height="128" rx="38" fill="#9bdcff"/><circle cx="64" cy="50" r="44" fill="#fff7df" opacity=".2"/><path d="M0 108c20-18 39-21 58-9 20-13 45-11 70 8v21H0Z" fill="${palette.accent}" opacity=".2"/><path d="M32 126c4-28 17-42 32-42s31 14 35 42" fill="${palette.shirt}" stroke="#1b1b1b" stroke-width="4" stroke-linecap="round"/><circle cx="31" cy="67" r="10" fill="${palette.skin}" stroke="#1b1b1b" stroke-width="4"/><circle cx="97" cy="67" r="10" fill="${palette.skin}" stroke="#1b1b1b" stroke-width="4"/><circle cx="64" cy="63" r="35" fill="${palette.skin}" stroke="#1b1b1b" stroke-width="4"/><path d="${hairTop}" fill="${palette.hair}" stroke="#1b1b1b" stroke-width="4" stroke-linejoin="round"/><path d="${fringe}" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity=".5"/><ellipse cx="48" cy="67" rx="5" ry="7" fill="#111"/><ellipse cx="80" cy="67" rx="5" ry="7" fill="#111"/><circle cx="46" cy="64" r="2" fill="#fff"/><circle cx="78" cy="64" r="2" fill="#fff"/><circle cx="44" cy="78" r="6" fill="${palette.cheek}" opacity=".48"/><circle cx="84" cy="78" r="6" fill="${palette.cheek}" opacity=".48"/><path d="${smile === 0 ? "M55 84c5 7 15 7 20 0" : smile === 1 ? "M55 85c6 4 13 4 19 0" : "M56 86h17"}" fill="none" stroke="#1b1b1b" stroke-width="4" stroke-linecap="round"/><circle cx="56" cy="76" r="1.4" fill="#b66a45"/><circle cx="72" cy="76" r="1.4" fill="#b66a45"/>${hand}<path d="M43 103c13 6 29 6 42 0" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity=".7"/></svg>`;
+  return `<svg viewBox="0 0 128 128" role="img"><rect width="128" height="128" rx="64" fill="#1b1b1b"/><circle cx="64" cy="64" r="61" fill="#38b6ff"/><path d="M12 31c13-12 29-12 43 0M79 28c12-10 27-9 39 2M7 91c15-9 33-9 49 2" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".75"/><path d="M66 10v16M42 17l8 14M90 17l-8 14" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".65"/><path d="M29 126c3-28 18-43 35-43s32 15 35 43" fill="${palette.shirt}" stroke="#1b1b1b" stroke-width="4" stroke-linecap="round"/><circle cx="31" cy="68" r="10" fill="${palette.skin}" stroke="#1b1b1b" stroke-width="4"/><circle cx="97" cy="68" r="10" fill="${palette.skin}" stroke="#1b1b1b" stroke-width="4"/><circle cx="64" cy="64" r="37" fill="${palette.skin}" stroke="#1b1b1b" stroke-width="4"/><path d="${hairTop}" fill="${palette.hair}" stroke="#1b1b1b" stroke-width="4" stroke-linejoin="round"/><path d="${fringe}" fill="none" stroke="#fff5d7" stroke-width="2" stroke-linecap="round" opacity=".58"/><ellipse cx="49" cy="68" rx="5" ry="8" fill="#111"/><ellipse cx="79" cy="68" rx="5" ry="8" fill="#111"/><circle cx="47" cy="64" r="2" fill="#fff"/><circle cx="77" cy="64" r="2" fill="#fff"/><path d="M39 80h10M80 80h10" stroke="${palette.cheek}" stroke-width="5" stroke-linecap="round" opacity=".58"/><circle cx="57" cy="77" r="1.3" fill="#b66a45"/><circle cx="71" cy="77" r="1.3" fill="#b66a45"/>${mouth}<path d="M39 108c14 7 36 7 50 0" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".75"/>${hand}<path d="M38 116c13 8 39 8 52 0" fill="none" stroke="#1b1b1b" stroke-width="4" stroke-linecap="round" opacity=".3"/></svg>`;
 }
 
 function averageRegion(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, fallback: Rgb) {

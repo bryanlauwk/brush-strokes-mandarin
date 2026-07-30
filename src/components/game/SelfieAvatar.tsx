@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { Camera, ImagePlus, RefreshCcw, Sparkles, X } from "lucide-react";
 import { svgToDataUrl } from "@/components/game/PlayerAvatar";
 import { cn } from "@/lib/utils";
@@ -199,11 +199,10 @@ function createAvatarFromSource(source: CanvasImageSource, name: string) {
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) return createDefaultAvatar(name);
 
-  const sourceWidth = "videoWidth" in source ? source.videoWidth : "naturalWidth" in source ? source.naturalWidth : size;
-  const sourceHeight = "videoHeight" in source ? source.videoHeight : "naturalHeight" in source ? source.naturalHeight : size;
-  const side = Math.min(sourceWidth || size, sourceHeight || size);
-  const sx = Math.max(0, ((sourceWidth || size) - side) / 2);
-  const sy = Math.max(0, ((sourceHeight || size) - side) / 2);
+  const { width: sourceWidth, height: sourceHeight } = getSourceSize(source, size);
+  const side = Math.min(sourceWidth, sourceHeight);
+  const sx = Math.max(0, (sourceWidth - side) / 2);
+  const sy = Math.max(0, (sourceHeight - side) / 2);
   ctx.drawImage(source, sx, sy, side, side, 0, 0, size, size);
 
   const seed = hash(name + Date.now().toString(36));
@@ -216,6 +215,25 @@ function createAvatarFromSource(source: CanvasImageSource, name: string) {
   };
 
   return buildCuteAvatar(palette, seed);
+}
+
+function getSourceSize(source: CanvasImageSource, fallback: number) {
+  if (source instanceof HTMLVideoElement) {
+    return { width: source.videoWidth || fallback, height: source.videoHeight || fallback };
+  }
+  if (source instanceof HTMLImageElement) {
+    return { width: source.naturalWidth || source.width || fallback, height: source.naturalHeight || source.height || fallback };
+  }
+  if (source instanceof SVGImageElement) {
+    return { width: source.width.baseVal.value || fallback, height: source.height.baseVal.value || fallback };
+  }
+  if (source instanceof HTMLCanvasElement || source instanceof OffscreenCanvas) {
+    return { width: source.width || fallback, height: source.height || fallback };
+  }
+  if (source instanceof ImageBitmap) {
+    return { width: source.width || fallback, height: source.height || fallback };
+  }
+  return { width: fallback, height: fallback };
 }
 
 function buildCuteAvatar(palette: Palette, seed: number) {
@@ -250,7 +268,7 @@ function averageRegion(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1
   return { r: Math.round(r / count), g: Math.round(g / count), b: Math.round(b / count) };
 }
 
-function stopCamera(streamRef: React.MutableRefObject<MediaStream | null>) {
+function stopCamera(streamRef: MutableRefObject<MediaStream | null>) {
   streamRef.current?.getTracks().forEach((track) => track.stop());
   streamRef.current = null;
 }
@@ -262,7 +280,9 @@ function hash(input: string) {
 }
 
 function toHex({ r, g, b }: Rgb) {
-  return `#${[r, g, b].map((value) => Math.max(0, Math.min(255, value)).toString(16).padStart(2, "0")).join("")}`;
+  return `#${[r, g, b]
+    .map((value) => Math.round(Math.max(0, Math.min(255, value))).toString(16).padStart(2, "0"))
+    .join("")}`;
 }
 
 function hexToRgb(hex: string): Rgb {

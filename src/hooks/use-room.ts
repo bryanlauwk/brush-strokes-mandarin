@@ -237,7 +237,7 @@ export function useRoom(code: string, identity: RoomIdentity) {
 
   // Free doodling in the lobby: never persisted, only shared over the channel.
   const appendScratchStroke = useCallback((stroke: Stroke) => {
-    setScratch((prev) => (prev.some((x) => x.id === s.id) ? prev : [...prev, s]));
+    setScratch((prev) => (prev.some((x) => x.id === stroke.id) ? prev : [...prev, stroke]));
     void channelRef.current?.send({ type: "broadcast", event: "scratch", payload: stroke });
   }, []);
 

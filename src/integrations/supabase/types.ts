@@ -175,6 +175,7 @@ export type Database = {
           id: string
           masked_word: string | null
           revealed_word: string | null
+          room_theme: string
           round_ends_at: string | null
           round_started_at: string | null
           status: string
@@ -194,6 +195,7 @@ export type Database = {
           id?: string
           masked_word?: string | null
           revealed_word?: string | null
+          room_theme?: string
           round_ends_at?: string | null
           round_started_at?: string | null
           status?: string
@@ -213,6 +215,7 @@ export type Database = {
           id?: string
           masked_word?: string | null
           revealed_word?: string | null
+          room_theme?: string
           round_ends_at?: string | null
           round_started_at?: string | null
           status?: string
@@ -363,8 +366,8 @@ export type TablesUpdate<
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
+    schema: keyof DatabaseWithoutInternals
+  }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
@@ -407,10 +410,12 @@ export type CompositeTypes<
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
     : never
+  : never
 
 export const Constants = {
   public: {

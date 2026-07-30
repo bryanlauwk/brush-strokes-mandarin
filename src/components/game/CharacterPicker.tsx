@@ -131,6 +131,6 @@ export function CharacterPicker({ value, onChange, name = "画画人", compact }
 }
 
 function groupCharacters(avatars: CharacterAvatar[]) {
-  const order = ["哥妹俩风", "动漫风", "超英风"] as const;
+  const order = ["圆脸漫画风", "动漫风", "超英风"] as const;
   return order.map((group) => [group, avatars.filter((avatar) => avatar.group === group)] as const);
 }

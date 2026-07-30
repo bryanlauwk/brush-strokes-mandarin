@@ -14,6 +14,7 @@ type DrawingHint = {
   imageUrl: string | null;
   source: "ai" | "unavailable";
   prompt: string;
+  reason?: "no-key" | "blocked" | "timeout" | "error";
 };
 
 type Props = {
@@ -53,6 +54,19 @@ export function DrawingHintPanel({ auth, turnIndex, word, compact }: Props) {
 
   const imageReady = hint?.source === "ai" && !!hint.imageUrl;
   const badge = imageReady ? "AI 生成" : status === "loading" ? "准备中" : "AI 未出图";
+  const failText = (() => {
+    if (status === "loading") return null;
+    switch (hint?.reason) {
+      case "no-key":
+        return { title: "AI 还没接上", hint: "稍后再试一次。" };
+      case "blocked":
+        return { title: "这题被模型挡下来了", hint: "点重试，换个画面再生成。" };
+      case "timeout":
+        return { title: "生图太慢了", hint: "网络慢了，点一下重试。" };
+      default:
+        return { title: "AI 图没生成", hint: "点一下重试。" };
+    }
+  })();
 
   return (
     <section className={cn("studio-panel overflow-hidden", compact ? "p-2" : "p-3")}>
@@ -76,9 +90,9 @@ export function DrawingHintPanel({ auth, turnIndex, word, compact }: Props) {
           <div className="flex h-full flex-col items-center justify-center gap-2 bg-[radial-gradient(circle_at_30%_20%,#ffe0a3_0_14%,transparent_15%),linear-gradient(135deg,#fff7df,#f8e6bf)] px-4 text-center text-muted-foreground">
             <ImageIcon className={cn("text-primary", compact ? "size-6" : "size-8")} />
             <p className="text-xs font-semibold text-foreground">
-              {status === "loading" ? "正在生图…" : "AI 图没生成"}
+              {status === "loading" ? "正在生图…" : failText?.title}
             </p>
-            {status !== "loading" && <p className="text-[11px] leading-4">点一下重试。</p>}
+            {failText && <p className="text-[11px] leading-4">{failText.hint}</p>}
           </div>
         )}
       </div>

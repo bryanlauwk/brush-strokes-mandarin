@@ -97,6 +97,7 @@ function RoomPage() {
     useRoom(upper, identity?.playerId ?? null);
 
   const auth = identity ? { code: upper, playerId: identity.playerId, token: identity.token } : null;
+  const roomJoinReady = nickname.trim().length > 0 && !!avatarSvg;
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 250);
@@ -144,10 +145,20 @@ function RoomPage() {
   );
 
   const doJoin = async () => {
+    const trimmedName = nickname.trim();
+    if (!trimmedName) {
+      toast.error("先输入你的名字");
+      return;
+    }
+    if (!avatarSvg) {
+      toast.error("先拍照或上传照片，生成入场画像");
+      return;
+    }
+
     setJoining(true);
     try {
-      const res = await joinFn({ data: { code: upper, name: nickname, avatarSvg } });
-      saveNickname(nickname.trim());
+      const res = await joinFn({ data: { code: upper, name: trimmedName, avatarSvg } });
+      saveNickname(trimmedName);
       saveAvatarSvg(avatarSvg);
       saveIdentity(res);
       setIdentity({ playerId: res.playerId, token: res.token });
@@ -185,27 +196,29 @@ function RoomPage() {
       <Shell>
         <div className="panel w-full max-w-sm p-6">
           <h1 className="font-display text-2xl">加入 {upper}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">先做好入场画像，再进房跟朋友开画。</p>
           <label className="mt-4 block text-sm font-medium" htmlFor="nick">
-            你的名字
+            1. 你的名字
           </label>
           <input
             id="nick"
             value={nickname}
             maxLength={12}
             onChange={(e) => setNickname(e.target.value)}
-            placeholder="画画人"
+            placeholder="例如：Bryan"
             className="mt-1 w-full rounded-md border-2 border-[var(--ink)] bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-primary"
           />
           <div className="mt-4">
-            <SelfieAvatar value={avatarSvg} onChange={setAvatarSvg} name={nickname} compact />
+            <p className="mb-2 text-sm font-medium">2. 拍照生成画像</p>
+            <SelfieAvatar value={avatarSvg} onChange={setAvatarSvg} name={nickname} compact required />
           </div>
           <button
             type="button"
             onClick={doJoin}
-            disabled={joining}
-            className="mt-4 w-full rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-2 font-display text-lg text-primary-foreground shadow-[3px_3px_0_0_var(--ink)] disabled:opacity-60"
+            disabled={joining || !roomJoinReady}
+            className="mt-4 w-full rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-2 font-display text-lg text-primary-foreground shadow-[3px_3px_0_0_var(--ink)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {joining ? "加入中…" : "加入这一局"}
+            {joining ? "加入中…" : roomJoinReady ? "加入这一局" : "完成画像后加入"}
           </button>
         </div>
       </Shell>

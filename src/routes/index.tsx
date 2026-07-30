@@ -7,6 +7,7 @@ import { SelfieAvatar } from "@/components/game/SelfieAvatar";
 import { createRoom } from "@/lib/game.functions";
 import { ROOM_THEME_OPTIONS, type RoomTheme } from "@/lib/game-themes";
 import { homeEntryPreviewImage } from "@/lib/home-assets";
+import homeUkiyoBg from "@/assets/home-ukiyo-bg.png.asset.json";
 import { loadAvatarSvg, loadNickname, saveAvatarSvg, saveIdentity, saveNickname } from "@/lib/player-identity";
 import "@/styles/home-ukiyo.css";
 

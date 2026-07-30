@@ -9,7 +9,7 @@ import { DrawingHintPanel } from "@/components/game/DrawingHintPanel";
 import { GameFeedback, type GameFeedbackEvent, type GameFeedbackKind } from "@/components/game/GameFeedback";
 import { PlayerAvatar } from "@/components/game/PlayerAvatar";
 import { Scoreboard } from "@/components/game/Scoreboard";
-import { SelfieAvatar } from "@/components/game/SelfieAvatar";
+import { SelfieAvatar, createDefaultAvatar } from "@/components/game/SelfieAvatar";
 import { useRoom } from "@/hooks/use-room";
 import { DIFFICULTIES, ROOM_THEME_OPTIONS, normalizeRoomTheme, type Difficulty, type Player, type RoomTheme, type Stroke } from "@/lib/game-types";
 import { cn } from "@/lib/utils";
@@ -107,7 +107,7 @@ function RoomPage() {
     useRoom(upper, identity);
 
   const auth = identity ? { code: upper, playerId: identity.playerId, token: identity.token } : null;
-  const roomJoinReady = nickname.trim().length > 0 && !!avatarSvg;
+  const roomJoinReady = nickname.trim().length > 0;
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 250);

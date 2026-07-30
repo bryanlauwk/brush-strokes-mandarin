@@ -1,36 +1,40 @@
-## 已确认的根因
+## 问题诊断
 
-查了线上数据库的表结构：`players` 表只有 `id, room_id, name, score, round_score, has_guessed, is_host, avatar, joined_at, last_seen` — **没有 `avatar_svg` 这一列**（`rooms` 也没有 `room_theme`）。
+首页目前有两组内容在讲同一件事：
 
-但代码在建房/加入时都会写入 `avatar_svg`：
+- 左栏 `highlights`：选角登场 / 主题开局 / 开画抢答
+- 右栏底部 `flow`：选角 / 开房 / 开画
 
-```
-insertPlayer(supabaseAdmin, { room_id, name, avatar, avatar_svg })
-→ 数据库报「column avatar_svg does not exist」
-→ 代码 throw new Error("加入失败")
-```
+两者都是「三步曲」，措辞几乎重复，占了大量首屏空间，却没有推进用户动作。另外首屏还有两套 CTA：标题卡里的「创建房间／加入房间」按钮只是滚动定位到右栏表单，右栏本身又有真正的「创建房间」「加入」按钮——同一个动作出现两次，容易让人误以为点了没反应。
 
-`insertRoom` 有缺列回退逻辑，`insertPlayer` 没有 —— 所以每一次建房/加入都必然报「加入失败」。这也解释了为什么头像看起来"没生成"：即便前端拍照成功，头像也永远存不进房间。
+## 重新规划
 
-## 修复计划
+### 1. 去重，只保留一条流程叙事
+- 删除右栏底部的 `flow` 三宫格。
+- 左栏 `highlights` 改成真正的「三步曲」：1 填名选角 → 2 开房分享号码 → 3 开画抢答，带序号徽标（①②③）和连接线，视觉上成为一条流程，而不是三张并列卖点卡。
 
-1. **补数据库字段（主修）**
-   - migration：`players` 加 `avatar_svg text`，`rooms` 加 `room_theme text`（代码已有回退，但补上更干净）。
-   - 不改动现有 RLS / GRANT 策略。
+### 2. CTA 收敛为一套
+- 标题卡内的两个大按钮不再只做「滚动聚焦」：
+  - 桌面（右栏表单已经可见）：改为一句简短引导 + 单个次要链接「怎么玩」，主操作交给右栏面板。
+  - 移动端（表单在下方）：保留一个「开始玩」按钮做滚动定位。
+- 用 CSS 断点控制显示，避免出现两个看起来一样的主按钮。
 
-2. **让插入失败不再变成一句无信息的「加入失败」**
-   - 给 `insertPlayer` 加和 `insertRoom` 一样的缺列回退：写 `avatar_svg` 失败时，去掉该字段重试，玩家仍能进房。
-   - 错误提示带上真实原因（例如「房间数据没准备好，请再试一次」），方便下次排查。
+### 3. 右栏面板改为「一步一步」的表单节奏
+当前是：名字 → 主题 → 角色 → 创建按钮 → 分隔线 → 加入号码。创建和加入混在一列，视觉权重不清。改为顶部两个 tab：**「开新房」/「加入房」**。
+- 名字 + 角色是共用区，永远显示在 tab 上方。
+- 「开新房」tab：主题选择 + 创建按钮。
+- 「加入房」tab：号码输入 + 自动校验状态 + 加入按钮。
+- 现有的号码校验逻辑、状态文案、禁用规则全部保留，只是换了容器。
 
-3. **头像改为非强制（按你的选择）**
-   - 首页与房间加入页：没有拍照时，用名字生成默认卡通头像（`createDefaultAvatar` 已存在）直接进房，不再拦截。
-   - 「必填」标签改为「可选」，按钮不再因没头像而 disabled；进房后仍可随时重拍替换。
-
-4. **前端拍照链路核查**
-   - 确认相机拍照 / 上传后预览圈能正确显示（`svgToDataUrl` 渲染），若发现取色区域越界导致灰白头像，一并修正。
-   - 用浏览器脚本走一遍：拍照 → 建房 → 进房 → 计分板显示头像，确认端到端可用。
+### 4. 首屏密度与层级
+- 标题卡瘦身：标题 + 一行副标题 + 三步流程，去掉重复装饰。
+- 顶部两枚 label chip 合并成一枚（「马来西亚华语画猜」），减少噪音。
+- 保持浮世绘背景与米纸柔光层不变。
 
 ## 技术细节
 
-- 涉及文件：新 migration、`src/lib/game.functions.ts`（insertPlayer 回退 + 头像可选）、`src/routes/index.tsx`、`src/routes/room.$code.tsx`、`src/components/game/SelfieAvatar.tsx`。
-- 不改游戏轮次、聊天、RLS 逻辑。
+- 改动集中在 `src/routes/index.tsx`（结构 + tab 状态）与 `src/styles/home-ukiyo.css`（步骤条、tab 样式）。
+- 不动 `game.functions.ts`、`use-room.ts` 或任何后端逻辑；`createRoom` / `roomExists` 调用方式不变。
+- 保留现有无障碍处理：`aria-live` 状态播报、`aria-invalid`、focus-visible 轮廓；tab 用 `role="tablist"` + 键盘左右切换。
+- 保留 `prefers-reduced-motion` 分支与标题逐字入场动画。
+- head() metadata 不变。

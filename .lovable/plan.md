@@ -1,48 +1,36 @@
-# Plan: Homepage "画啦猜啦" headline fix & visual upgrade
+## 已确认的根因
 
-## What we saw
+查了线上数据库的表结构：`players` 表只有 `id, room_id, name, score, round_score, has_guessed, is_host, avatar, joined_at, last_seen` — **没有 `avatar_svg` 这一列**（`rooms` 也没有 `room_theme`）。
 
-The desktop screenshot at 1280 px shows **"画啦猜啦" breaking into two lines** ("画啦猜" / "啦"). Root cause: the left column is forced by `xl:grid-cols-[minmax(0,1fr)_300px]` to be narrower than the 8xl title, so the last character wraps. The user wants the title **always one line**, and the homepage **more fun / less flat** (animation level 4/5).
+但代码在建房/加入时都会写入 `avatar_svg`：
 
-## Proposed changes
+```
+insertPlayer(supabaseAdmin, { room_id, name, avatar, avatar_svg })
+→ 数据库报「column avatar_svg does not exist」
+→ 代码 throw new Error("加入失败")
+```
 
-### 1. Headline: force single-line, size it per breakpoint
+`insertRoom` 有缺列回退逻辑，`insertPlayer` 没有 —— 所以每一次建房/加入都必然报「加入失败」。这也解释了为什么头像看起来"没生成"：即便前端拍照成功，头像也永远存不进房间。
 
-- Add `whitespace-nowrap` to the `<h1>`.
-- Scale down the font on the breakpoints that currently wrap: `text-5xl sm:text-6xl lg:text-7xl xl:text-8xl`.
-- Slightly widen the left column on XL so the title + preview card sit comfortably side-by-side without squeezing.
+## 修复计划
 
-### 2. Title block: add a readable "paper" backing
+1. **补数据库字段（主修）**
+   - migration：`players` 加 `avatar_svg text`，`rooms` 加 `room_theme text`（代码已有回退，但补上更干净）。
+   - 不改动现有 RLS / GRANT 策略。
 
-- Wrap the title + subtitle in a small semi-transparent card / gradient blob so the text no longer floats directly on the busy Ukiyo-e illustration.
-- Keep the brush style: preserve the existing `ink-title` text shadow.
+2. **让插入失败不再变成一句无信息的「加入失败」**
+   - 给 `insertPlayer` 加和 `insertRoom` 一样的缺列回退：写 `avatar_svg` 失败时，去掉该字段重试，玩家仍能进房。
+   - 错误提示带上真实原因（例如「房间数据没准备好，请再试一次」），方便下次排查。
 
-### 3. Lively animations (level 4 — fun but not overwhelming)
+3. **头像改为非强制（按你的选择）**
+   - 首页与房间加入页：没有拍照时，用名字生成默认卡通头像（`createDefaultAvatar` 已存在）直接进房，不再拦截。
+   - 「必填」标签改为「可选」，按钮不再因没头像而 disabled；进房后仍可随时重拍替换。
 
-- **Staggered title entrance**: each character of "画啦猜啦" pops in with a slight delay, using the existing `pop-in` keyframe.
-- **Brush-stroke underline**: an animated stroke appears under the title on load (SVG or CSS pseudo-element).
-- **Floating decorations**: slow CSS-only floating ink dots / sakura petals around the hero section.
-- **Sparkle badge**: the top "马来西亚华语画猜" chip gets a gentle pulse.
-- **Button micro-interactions**: enhance the existing `press` utility with a small bounce and color shift on hover.
+4. **前端拍照链路核查**
+   - 确认相机拍照 / 上传后预览圈能正确显示（`svgToDataUrl` 渲染），若发现取色区域越界导致灰白头像，一并修正。
+   - 用浏览器脚本走一遍：拍照 → 建房 → 进房 → 计分板显示头像，确认端到端可用。
 
-### 4. Hero layout balance
+## 技术细节
 
-- Adjust the XL grid ratio so the title column is not starved for space.
-- On tablet/mobile, keep the title + subtitle on top, then the preview card, then the form — the current mobile order is fine but spacing will be tightened.
-
-### 5. Form panel polish
-
-- Restyle the "准备开玩" header into a bolder stamp/badge look with the paper texture.
-- Add a small theme color/icon hint next to each theme option (or just the selected one) to make the theme selector feel less like a plain dropdown.
-
-## Files to edit
-
-- `src/routes/index.tsx` — headline sizing, title backing wrapper, animation classes, form header.
-- `src/styles/home-ukiyo.css` — floating ink/petal decorations, title-area veil, responsive adjustments.
-- `src/styles.css` — extend `ink-title` / `press` utilities and add any new keyframes needed.
-
-## Out of scope
-
-- No backend changes.
-- No game logic changes.
-- No new routes or dependencies.
+- 涉及文件：新 migration、`src/lib/game.functions.ts`（insertPlayer 回退 + 头像可选）、`src/routes/index.tsx`、`src/routes/room.$code.tsx`、`src/components/game/SelfieAvatar.tsx`。
+- 不改游戏轮次、聊天、RLS 逻辑。

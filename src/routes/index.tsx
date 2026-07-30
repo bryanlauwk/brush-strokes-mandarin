@@ -3,8 +3,9 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { ArrowRight, Brush, Clock3, DoorOpen, Gauge, Link2, Sparkles, UsersRound } from "lucide-react";
+import { SelfieAvatar } from "@/components/game/SelfieAvatar";
 import { createRoom } from "@/lib/game.functions";
-import { loadNickname, saveIdentity, saveNickname } from "@/lib/player-identity";
+import { loadAvatarSvg, loadNickname, saveAvatarSvg, saveIdentity, saveNickname } from "@/lib/player-identity";
 
 const appTitle = "画啦猜啦 · 马来西亚华语画猜派对";
 const appDescription = "开一局、分享号码、轮流画画，用华语猜答案。题目收录本地吃喝、地方、节庆和日常生活。";
@@ -24,7 +25,7 @@ export const Route = createFileRoute("/")({
 const highlights = [
   { icon: Brush, label: "顺手画", text: "笔触即时同步，朋友看得到你的每一笔。" },
   { icon: UsersRound, label: "朋友局", text: "复制号码就能进来，不用注册。" },
-  { icon: Sparkles, label: "本地题目", text: "吃喝、地方、节庆、校园和日常随机出现。" },
+  { icon: Sparkles, label: "自拍角色", text: "进房前把照片变成可爱小角色。" },
 ];
 
 const flow = [
@@ -37,18 +38,25 @@ function Index() {
   const navigate = useNavigate();
   const createFn = useServerFn(createRoom);
   const [name, setName] = useState("");
+  const [avatarSvg, setAvatarSvg] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     setName(loadNickname());
+    setAvatarSvg(loadAvatarSvg());
   }, []);
+
+  const rememberProfile = () => {
+    saveNickname(name.trim());
+    saveAvatarSvg(avatarSvg);
+  };
 
   const create = async () => {
     setBusy(true);
     try {
-      const res = await createFn({ data: { name } });
-      saveNickname(name.trim());
+      const res = await createFn({ data: { name, avatarSvg } });
+      rememberProfile();
       saveIdentity(res);
       void navigate({ to: "/room/$code", params: { code: res.code } });
     } catch (e) {
@@ -63,7 +71,7 @@ function Index() {
       toast.error("请输入号码");
       return;
     }
-    saveNickname(name.trim());
+    rememberProfile();
     void navigate({ to: "/room/$code", params: { code: c } });
   };
 
@@ -88,7 +96,7 @@ function Index() {
               画啦猜啦
             </h1>
             <p className="mt-4 max-w-xl text-lg leading-8 text-muted-foreground">
-              像大家围着一张大画纸：一人画，朋友用华语猜。题目会突然从椰浆饭跳到双峰塔，也可能冒出一道高手题。
+              像大家围着一张大画纸：一人画，朋友用华语猜。进房前先把自拍变成可爱角色，题目也可能从椰浆饭跳到双峰塔。
             </p>
           </div>
 
@@ -158,6 +166,8 @@ function Index() {
             placeholder="画画人"
             className={field}
           />
+
+          <SelfieAvatar value={avatarSvg} onChange={setAvatarSvg} name={name} />
 
           <button
             type="button"

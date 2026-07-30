@@ -194,6 +194,11 @@ function RoomPage() {
     triggerFeedback("correct", "猜中了！", latestCorrect.text ?? "有人答对了");
   }, [messages, triggerFeedback]);
 
+  // Lobby doodles are throwaway: wipe them the moment a real round begins.
+  useEffect(() => {
+    if (room && room.status !== "waiting") clearScratch();
+  }, [room?.status, clearScratch]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleStroke = useCallback(
     (stroke: Stroke) => {
       if (!auth) return;

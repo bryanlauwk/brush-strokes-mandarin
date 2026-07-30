@@ -372,28 +372,62 @@ function Index() {
             <span className="h-px flex-1 bg-border" />
           </div>
 
-          <div className="grid grid-cols-[minmax(0,1fr)_96px] gap-2">
-            <input
-              ref={codeRef}
-              value={code}
-              maxLength={8}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                e.preventDefault();
-                requestEntry("join");
-              }}
-              placeholder="输入号码"
-              className={`${field} tracking-[0.28em]`}
-            />
-            <button
-              type="button"
-              onClick={() => requestEntry("join")}
-              disabled={busy || !trimmedName}
-              className="press rounded-md border-2 border-[var(--ink)] bg-accent px-4 font-display text-lg text-accent-foreground shadow-[4px_4px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
+          <div>
+            <div className="grid grid-cols-[minmax(0,1fr)_96px] gap-2">
+              <input
+                ref={codeRef}
+                id="room-code"
+                value={code}
+                maxLength={CODE_LENGTH}
+                inputMode="text"
+                autoCapitalize="characters"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label="房间号码"
+                aria-invalid={codeMessage?.tone === "error"}
+                aria-describedby="room-code-status"
+                onChange={(e) => handleCodeChange(e.target.value)}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  handleCodeChange(e.clipboardData.getData("text"));
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  requestEntry("join");
+                }}
+                placeholder="输入号码"
+                className={`${field} tracking-[0.28em] ${
+                  codeMessage?.tone === "error"
+                    ? "border-destructive focus:ring-destructive"
+                    : codeMessage?.tone === "ok"
+                      ? "border-[var(--teal)] focus:ring-[var(--teal)]"
+                      : ""
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => requestEntry("join")}
+                disabled={busy || !trimmedName || !codeComplete || codeStatus === "missing"}
+                className="press rounded-md border-2 border-[var(--ink)] bg-accent px-4 font-display text-lg text-accent-foreground shadow-[4px_4px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
+              >
+                加入
+              </button>
+            </div>
+            <p
+              id="room-code-status"
+              role="status"
+              aria-live="polite"
+              className={`mt-2 text-sm leading-6 ${
+                codeMessage?.tone === "error"
+                  ? "font-semibold text-destructive"
+                  : codeMessage?.tone === "ok"
+                    ? "font-semibold text-[var(--teal)]"
+                    : "text-muted-foreground"
+              }`}
             >
-              加入
-            </button>
+              {codeMessage?.text ?? `跟朋友要 ${CODE_LENGTH} 位号码，例如 K7M3D。`}
+            </p>
           </div>
         </div>
 

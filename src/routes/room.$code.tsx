@@ -5,11 +5,12 @@ import { toast } from "sonner";
 import { Copy, LogOut, MessageCircle, X } from "lucide-react";
 import { DrawBoard } from "@/components/game/DrawBoard";
 import { ChatPanel } from "@/components/game/ChatPanel";
+import { CharacterPicker } from "@/components/game/CharacterPicker";
 import { DrawingHintPanel } from "@/components/game/DrawingHintPanel";
 import { GameFeedback, type GameFeedbackEvent, type GameFeedbackKind } from "@/components/game/GameFeedback";
 import { PlayerAvatar } from "@/components/game/PlayerAvatar";
 import { Scoreboard } from "@/components/game/Scoreboard";
-import { SelfieAvatar, createDefaultAvatar } from "@/components/game/SelfieAvatar";
+import { createDefaultAvatar, isPresetCharacterAvatar } from "@/lib/character-avatars";
 import { useRoom } from "@/hooks/use-room";
 import { DIFFICULTIES, ROOM_THEME_OPTIONS, normalizeRoomTheme, type Difficulty, type Player, type RoomTheme, type Stroke } from "@/lib/game-types";
 import { cn } from "@/lib/utils";
@@ -97,9 +98,11 @@ function RoomPage() {
 
   useEffect(() => {
     const stored = loadIdentity(upper);
+    const savedName = loadNickname();
+    const savedAvatar = loadAvatarSvg();
     if (stored) setIdentity({ playerId: stored.playerId, token: stored.token });
-    setNickname(loadNickname());
-    setAvatarSvg(loadAvatarSvg());
+    setNickname(savedName);
+    setAvatarSvg(isPresetCharacterAvatar(savedAvatar) ? savedAvatar : createDefaultAvatar(savedName || "画画人"));
     setReady(true);
   }, [upper]);
 
@@ -234,23 +237,27 @@ function RoomPage() {
   if (!identity) {
     return (
       <Shell>
-        <div className="panel w-full max-w-sm p-6">
+        <div className="panel w-full max-w-md p-5 sm:p-6">
           <h1 className="font-display text-2xl">加入 {upper}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">先做好入场画像，再进房跟朋友开画。</p>
+          <p className="mt-1 text-sm text-muted-foreground">输入名字，选个角色，就可以进房。</p>
           <label className="mt-4 block text-sm font-medium" htmlFor="nick">
-            1. 你的名字
+            你的名字
           </label>
           <input
             id="nick"
             value={nickname}
             maxLength={12}
             onChange={(e) => setNickname(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              if (roomJoinReady) void doJoin();
+            }}
             placeholder="例如：Bryan"
             className="mt-1 w-full rounded-md border-2 border-[var(--ink)] bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-primary"
           />
           <div className="mt-4">
-            <p className="mb-2 text-sm font-medium">2. 拍照生成画像（可选）</p>
-            <SelfieAvatar value={avatarSvg} onChange={setAvatarSvg} name={nickname} compact />
+            <CharacterPicker value={avatarSvg} onChange={setAvatarSvg} name={nickname || "画画人"} compact />
           </div>
           <button
             type="button"

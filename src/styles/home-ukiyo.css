@@ -59,6 +59,20 @@
   }
 
   .ukiyo-veil {
-    background: radial-gradient(ellipse at 50% 40%, oklch(0.99 0.02 88 / 0.9) 0 40%, oklch(0.98 0.03 84 / 0.5) 62%, transparent 85%);
+    background: radial-gradient(ellipse at 50% 32%, oklch(0.99 0.02 88 / 0.92) 0 34%, oklch(0.98 0.03 84 / 0.55) 56%, transparent 85%);
+  }
+
+  .home-shell::before {
+    top: 10%;
+    left: 4%;
+    font-size: 1.5rem;
+  }
+
+  .home-shell::after {
+    display: none;
+  }
+
+  .title-backing {
+    padding: 1rem;
   }
 }

@@ -580,16 +580,23 @@ function Shell({ children }: { children: React.ReactNode }) {
   return <main className="flex min-h-screen items-center justify-center p-6">{children}</main>;
 }
 
-function Overlay({ children }: { children: React.ReactNode }) {
+function Overlay({ children, transparent }: { children: React.ReactNode; transparent?: boolean }) {
+  // `transparent` keeps the canvas usable underneath (lobby doodling).
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-background/85 p-4 backdrop-blur-[2px]">
-      {children}
+    <div
+      className={cn(
+        "absolute inset-0 flex items-center justify-center p-4",
+        transparent ? "pointer-events-none" : "bg-background/85 backdrop-blur-[2px]",
+      )}
+    >
+      <div className={cn(transparent && "pointer-events-auto")}>{children}</div>
     </div>
   );
 }
 
 function WaitingCard({
   canStart,
+  playerCount,
   isHost,
   code,
   totalRounds,
@@ -600,6 +607,7 @@ function WaitingCard({
   onStart,
 }: {
   canStart: boolean;
+  playerCount: number;
   isHost: boolean;
   code: string;
   totalRounds: number;
@@ -702,8 +710,13 @@ function WaitingCard({
         </label>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
-        {isHost ? "全部难度会随机出题；主题和设置会自动保存" : "等主持人调整主题和设置"}
+        {playerCount < 2
+          ? `还差 ${2 - playerCount} 人才能开始（现在 ${playerCount}/2）`
+          : isHost
+            ? "全部难度会随机出题；主题和设置会自动保存"
+            : "等主持人调整主题和设置"}
       </p>
+      <p className="mt-1 text-xs text-muted-foreground">画纸现在可以自由涂鸦，开局会自动清空。</p>
       {isHost ? (
         <button
           type="button"
@@ -711,7 +724,7 @@ function WaitingCard({
           disabled={!canStart}
           className="mt-4 w-full rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-2 font-display text-lg text-primary-foreground shadow-[3px_3px_0_0_var(--ink)] disabled:opacity-50"
         >
-          {canStart ? "开始这一局" : "至少 2 人"}
+          {canStart ? "开始这一局" : `还差 ${Math.max(1, 2 - playerCount)} 人才能开始`}
         </button>
       ) : (
         <p className="mt-4 text-sm text-muted-foreground">等主持人开始…</p>

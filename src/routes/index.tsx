@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowRight, Brush, Camera, Clock3, DoorOpen, Gauge, Link2, MapPin, Sparkles, Tv, UsersRound } from "lucide-react";
+import { ArrowRight, Brush, Camera, ChevronDown, DoorOpen, Link2, MapPin, Sparkles, Tv, X } from "lucide-react";
 import { SelfieAvatar } from "@/components/game/SelfieAvatar";
 import { createRoom } from "@/lib/game.functions";
 import { ROOM_THEME_OPTIONS, type RoomTheme } from "@/lib/game-themes";
@@ -11,6 +11,8 @@ import { loadAvatarSvg, loadNickname, saveAvatarSvg, saveIdentity, saveNickname 
 
 const appTitle = "画啦猜啦 · 马来西亚华语画猜派对";
 const appDescription = "拍照生成入场画像，开主题房、分享号码、轮流画画，用华语猜本地题目。";
+
+type EntryIntent = "create" | "join";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -25,16 +27,15 @@ export const Route = createFileRoute("/")({
 });
 
 const highlights = [
-  { icon: Camera, label: "先拍入场照", text: "名字和画像准备好，朋友才知道谁来了。" },
+  { icon: Camera, label: "先拍入场照", text: "进房前才生成，朋友一眼认得你。" },
   { icon: MapPin, label: "主题房", text: "槟城、马六甲、TVB 或全主题混搭。" },
   { icon: Brush, label: "顺手画", text: "笔触即时同步，朋友看得到你的每一笔。" },
 ];
 
 const flow = [
-  { icon: DoorOpen, title: "准备入场", text: "输入名字，自拍或上传照片生成画像。" },
-  { icon: Tv, title: "选主题房", text: "题库跟着主题走，难度和字数继续随机。" },
-  { icon: Gauge, title: "开局猜答案", text: "越快猜中分数越高，画的人也有分。" },
-  { icon: Clock3, title: "轮着画", text: "每一轮换一个人画，大家都有机会出题。" },
+  { icon: DoorOpen, title: "填名", text: "先决定怎样登场。" },
+  { icon: Camera, title: "画像", text: "进房前拍一张。" },
+  { icon: Tv, title: "开画", text: "主题题库随机来。" },
 ];
 
 function Index() {
@@ -45,6 +46,7 @@ function Index() {
   const [roomTheme, setRoomTheme] = useState<RoomTheme>("全部主题");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
+  const [entryIntent, setEntryIntent] = useState<EntryIntent | null>(null);
 
   useEffect(() => {
     setName(loadNickname());
@@ -52,30 +54,46 @@ function Index() {
   }, []);
 
   const trimmedName = name.trim();
-  const profileReady = trimmedName.length > 0 && !!avatarSvg;
+  const activeTheme = ROOM_THEME_OPTIONS.find((theme) => theme.value === roomTheme) ?? ROOM_THEME_OPTIONS[0];
 
   const rememberProfile = () => {
     saveNickname(trimmedName);
     saveAvatarSvg(avatarSvg);
   };
 
-  const ensureProfile = () => {
+  const validateName = () => {
     if (!trimmedName) {
       toast.error("先输入你的名字");
-      return false;
-    }
-    if (!avatarSvg) {
-      toast.error("先拍照或上传照片，生成入场画像");
       return false;
     }
     return true;
   };
 
-  const create = async () => {
-    if (!ensureProfile()) return;
+  const validateJoinCode = () => {
+    const c = code.trim().toUpperCase();
+    if (c.length < 4) {
+      toast.error("请输入号码");
+      return false;
+    }
+    return true;
+  };
+
+  const requestEntry = (intent: EntryIntent) => {
+    if (!validateName()) return;
+    if (intent === "join" && !validateJoinCode()) return;
+    if (!avatarSvg) {
+      setEntryIntent(intent);
+      return;
+    }
+    if (intent === "create") void createWithProfile();
+    else joinWithProfile();
+  };
+
+  const createWithProfile = async () => {
+    if (!validateName() || !avatarSvg) return;
     setBusy(true);
     try {
-      const res = await createFn({ data: { name, avatarSvg, roomTheme } });
+      const res = await createFn({ data: { name: trimmedName, avatarSvg, roomTheme } });
       rememberProfile();
       saveIdentity(res);
       void navigate({ to: "/room/$code", params: { code: res.code } });
@@ -85,15 +103,21 @@ function Index() {
     }
   };
 
-  const join = () => {
-    if (!ensureProfile()) return;
-    const c = code.trim().toUpperCase();
-    if (c.length < 4) {
-      toast.error("请输入号码");
+  const joinWithProfile = () => {
+    if (!validateName() || !validateJoinCode() || !avatarSvg) return;
+    rememberProfile();
+    void navigate({ to: "/room/$code", params: { code: code.trim().toUpperCase() } });
+  };
+
+  const continueEntry = () => {
+    if (!avatarSvg) {
+      toast.error("先拍照或上传照片，生成入场画像");
       return;
     }
-    rememberProfile();
-    void navigate({ to: "/room/$code", params: { code: c } });
+    const intent = entryIntent;
+    setEntryIntent(null);
+    if (intent === "create") void createWithProfile();
+    if (intent === "join") joinWithProfile();
   };
 
   const field =
@@ -135,7 +159,7 @@ function Index() {
                 />
               </div>
               <div className="absolute bottom-4 left-4 right-4 grid grid-cols-3 gap-2 text-xs">
-                {["自拍", "变画像", "开玩"].map((item) => (
+                {["填名", "拍照", "进房"].map((item) => (
                   <span key={item} className="rounded-md border-2 border-[var(--ink)] bg-card py-1 text-center font-display text-lg">
                     {item}
                   </span>
@@ -158,60 +182,68 @@ function Index() {
 
       <aside className="studio-panel p-4 sm:p-5">
         <div className="rounded-md border-2 border-[var(--ink)] bg-[var(--wash)] p-3">
-          <p className="font-display text-2xl text-primary">先做好入场证</p>
-          <p className="mt-1 text-sm text-muted-foreground">名字、画像、主题、房号，一步一步来。</p>
+          <p className="font-display text-2xl text-primary">准备开玩</p>
+          <p className="mt-1 text-sm text-muted-foreground">名字和主题先选好，画像进房前再拍。</p>
         </div>
 
         <div className="mt-4 space-y-4">
-          <label className="block text-sm font-semibold" htmlFor="name">
-            1. 你的名字
-          </label>
-          <input
-            id="name"
-            value={name}
-            maxLength={12}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="画画人"
-            className={field}
-          />
-
           <div>
-            <p className="mb-2 text-sm font-semibold">2. 拍照生成画像</p>
-            <SelfieAvatar value={avatarSvg} onChange={setAvatarSvg} name={name} required />
+            <label className="mb-2 block text-sm font-semibold" htmlFor="name">
+              你的名字
+            </label>
+            <input
+              id="name"
+              value={name}
+              maxLength={12}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="画画人"
+              className={field}
+            />
           </div>
 
           <div>
-            <p className="mb-2 text-sm font-semibold">3. 选择主题房</p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {ROOM_THEME_OPTIONS.map((theme) => {
-                const active = roomTheme === theme.value;
-                return (
-                  <button
-                    key={theme.value}
-                    type="button"
-                    onClick={() => setRoomTheme(theme.value)}
-                    className={`press rounded-md border-2 border-[var(--ink)] p-3 text-left shadow-[3px_3px_0_0_var(--ink)] ${
-                      active ? "bg-primary text-primary-foreground" : "bg-card hover:bg-accent"
-                    }`}
-                    aria-pressed={active}
-                  >
-                    <span className="block font-display text-lg leading-none">{theme.label}</span>
-                    <span className={`mt-1 block text-xs leading-5 ${active ? "text-primary-foreground/85" : "text-muted-foreground"}`}>
-                      {theme.description}
-                    </span>
-                  </button>
-                );
-              })}
+            <label className="mb-2 block text-sm font-semibold" htmlFor="room-theme">
+              主题房
+            </label>
+            <div className="relative">
+              <select
+                id="room-theme"
+                value={roomTheme}
+                onChange={(event) => setRoomTheme(event.target.value as RoomTheme)}
+                className={`${field} appearance-none pr-10 font-semibold`}
+              >
+                {ROOM_THEME_OPTIONS.map((theme) => (
+                  <option key={theme.value} value={theme.value}>
+                    {theme.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-primary" />
             </div>
+            <p className="mt-2 rounded-md border-2 border-border bg-card/70 px-3 py-2 text-sm leading-6 text-muted-foreground">
+              {activeTheme.description}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-[48px_minmax(0,1fr)] gap-3 rounded-md border-2 border-[var(--ink)] bg-card/80 p-3">
+            <span className="grid size-12 place-items-center overflow-hidden rounded-full border-2 border-[var(--ink)] bg-secondary">
+              {avatarSvg ? <img src={`data:image/svg+xml;utf8,${encodeURIComponent(avatarSvg)}`} alt="你的入场画像" className="h-full w-full object-cover" /> : <Camera className="size-5 text-primary" />}
+            </span>
+            <span className="min-w-0 self-center">
+              <span className="block font-display text-lg leading-none text-primary">入场画像</span>
+              <span className="mt-1 block text-sm leading-5 text-muted-foreground">
+                {avatarSvg ? "已准备好，可以直接进房。" : "进房前会要求自拍或上传。"}
+              </span>
+            </span>
           </div>
 
           <button
             type="button"
-            onClick={create}
-            disabled={busy || !profileReady}
+            onClick={() => requestEntry("create")}
+            disabled={busy || !trimmedName}
             className="press flex w-full items-center justify-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
           >
-            {busy ? "准备中…" : profileReady ? "4. 开一局" : "完成画像后开局"}
+            {busy ? "准备中…" : "开主题房"}
             <ArrowRight className="size-5" />
           </button>
 
@@ -231,8 +263,8 @@ function Index() {
             />
             <button
               type="button"
-              onClick={join}
-              disabled={busy || !profileReady}
+              onClick={() => requestEntry("join")}
+              disabled={busy || !trimmedName}
               className="press rounded-md border-2 border-[var(--ink)] bg-accent px-4 font-display text-lg text-accent-foreground shadow-[4px_4px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
             >
               加入
@@ -240,16 +272,14 @@ function Index() {
           </div>
         </div>
 
-        <div className="mt-5 grid gap-2">
+        <div className="mt-5 grid grid-cols-3 gap-2 rounded-md border-2 border-border bg-card/60 p-3">
           {flow.map(({ icon: Icon, title, text }) => (
-            <div key={title} className="grid grid-cols-[36px_minmax(0,1fr)] gap-3 rounded-md border-2 border-border bg-card/70 p-3">
-              <span className="grid size-9 place-items-center rounded-md border-2 border-[var(--ink)] bg-secondary">
+            <div key={title} className="min-w-0 text-center">
+              <span className="mx-auto grid size-9 place-items-center rounded-md border-2 border-[var(--ink)] bg-secondary">
                 <Icon className="size-4" />
               </span>
-              <span>
-                <span className="block font-display text-lg leading-none text-primary">{title}</span>
-                <span className="mt-1 block text-sm leading-6 text-muted-foreground">{text}</span>
-              </span>
+              <span className="mt-2 block font-display text-lg leading-none text-primary">{title}</span>
+              <span className="mt-1 block text-xs leading-5 text-muted-foreground">{text}</span>
             </div>
           ))}
         </div>
@@ -259,6 +289,54 @@ function Index() {
           <ArrowRight className="size-3.5" />
         </Link>
       </aside>
+
+      {entryIntent && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-[var(--ink)]/55 px-4 py-6 backdrop-blur-sm">
+          <div className="studio-panel max-h-full w-full max-w-md overflow-y-auto p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-display text-3xl leading-none text-primary">进房前，拍一张</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  我们会把照片转成圆脸漫画入场画像，风格参考首页示例。
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEntryIntent(null)}
+                className="press grid size-10 shrink-0 place-items-center rounded-md border-2 border-[var(--ink)] bg-card shadow-[2px_2px_0_0_var(--ink)]"
+                aria-label="关闭入场画像"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-md border-2 border-[var(--ink)] bg-[var(--wash)] p-3">
+              <img
+                src={homeEntryPreviewImage}
+                alt="入场画像风格参考"
+                className="size-24 rounded-full border-4 border-[var(--ink)] object-cover shadow-[3px_3px_0_0_var(--ink)]"
+              />
+              <div className="self-center text-sm leading-6 text-muted-foreground">
+                名字会先保留，画像生成好后才正式进入房间。
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <SelfieAvatar value={avatarSvg} onChange={setAvatarSvg} name={name} compact required />
+            </div>
+
+            <button
+              type="button"
+              onClick={continueEntry}
+              disabled={busy || !avatarSvg}
+              className="press mt-4 flex w-full items-center justify-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
+            >
+              {entryIntent === "create" ? "生成好了，开房" : "生成好了，进房"}
+              <ArrowRight className="size-5" />
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

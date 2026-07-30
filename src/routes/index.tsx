@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { ArrowRight, Brush, Camera, ChevronDown, DoorOpen, Link2, MapPin, Sparkles, Tv, X } from "lucide-react";
 import { SelfieAvatar } from "@/components/game/SelfieAvatar";
-import { createRoom } from "@/lib/game.functions";
+import { createRoom, roomExists } from "@/lib/game.functions";
 import { ROOM_THEME_OPTIONS, type RoomTheme } from "@/lib/game-themes";
 import { homeEntryPreviewImage } from "@/lib/home-assets";
 import homeUkiyoBg from "@/assets/home-ukiyo-bg.png.asset.json";
@@ -15,6 +15,26 @@ const appTitle = "画啦猜啦 · 马来西亚华语画猜派对";
 const appDescription = "用漫画角色登场，开主题房、分享号码、轮流画画，用华语猜本地题目。";
 
 type EntryIntent = "create" | "join";
+
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const CODE_LENGTH = 5;
+
+type CodeStatus = "idle" | "checking" | "found" | "missing" | "error";
+
+function sanitizeCode(raw: string) {
+  const upper = raw.toUpperCase().replace(/\s+/g, "");
+  let clean = "";
+  let dropped = false;
+  for (const ch of upper) {
+    if (CODE_ALPHABET.includes(ch)) {
+      if (clean.length < CODE_LENGTH) clean += ch;
+      else dropped = true;
+    } else {
+      dropped = true;
+    }
+  }
+  return { clean, dropped };
+}
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -43,16 +63,20 @@ const flow = [
 function Index() {
   const navigate = useNavigate();
   const createFn = useServerFn(createRoom);
+  const roomExistsFn = useServerFn(roomExists);
   const [name, setName] = useState("");
   const [avatarSvg, setAvatarSvg] = useState<string | null>(null);
   const [roomTheme, setRoomTheme] = useState<RoomTheme>("全部主题");
   const [code, setCode] = useState("");
+  const [codeHint, setCodeHint] = useState<string | null>(null);
+  const [codeStatus, setCodeStatus] = useState<CodeStatus>("idle");
   const [busy, setBusy] = useState(false);
   const [entryIntent, setEntryIntent] = useState<EntryIntent | null>(null);
   const nameRef = useRef<HTMLInputElement | null>(null);
   const themeRef = useRef<HTMLSelectElement | null>(null);
   const codeRef = useRef<HTMLInputElement | null>(null);
   const createButtonRef = useRef<HTMLButtonElement | null>(null);
+  const codeHintTimer = useRef<number | null>(null);
 
   useEffect(() => {
     setName(loadNickname());
@@ -61,6 +85,58 @@ function Index() {
 
   const trimmedName = name.trim();
   const activeTheme = ROOM_THEME_OPTIONS.find((theme) => theme.value === roomTheme) ?? ROOM_THEME_OPTIONS[0];
+  const codeComplete = code.length === CODE_LENGTH;
+
+  // 自动校验：号码输满后，去后台确认这个房间还在不在。
+  useEffect(() => {
+    if (!codeComplete) {
+      setCodeStatus("idle");
+      return;
+    }
+    let cancelled = false;
+    setCodeStatus("checking");
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await roomExistsFn({ data: { code } });
+          if (!cancelled) setCodeStatus(res.exists ? "found" : "missing");
+        } catch {
+          if (!cancelled) setCodeStatus("error");
+        }
+      })();
+    }, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [code, codeComplete, roomExistsFn]);
+
+  const codeMessage = (() => {
+    if (codeHint) return { tone: "error" as const, text: codeHint };
+    if (!code) return null;
+    if (!codeComplete)
+      return { tone: "hint" as const, text: `号码是 ${CODE_LENGTH} 位，还差 ${CODE_LENGTH - code.length} 位。` };
+    if (codeStatus === "checking") return { tone: "hint" as const, text: "查看这局还在不在…" };
+    if (codeStatus === "found") return { tone: "ok" as const, text: "找到这一局了，可以进去。" };
+    if (codeStatus === "missing")
+      return { tone: "error" as const, text: "找不到这个号码，可能已经结束或打错了。" };
+    if (codeStatus === "error") return { tone: "error" as const, text: "网络不稳，等下再试一次。" };
+    return null;
+  })();
+
+  const handleCodeChange = (raw: string) => {
+    const { clean, dropped } = sanitizeCode(raw);
+    setCode(clean);
+    // 提示要停留一下，不然下一个按键就把它冲掉了。
+    if (!dropped) return;
+    if (codeHintTimer.current) window.clearTimeout(codeHintTimer.current);
+    setCodeHint("号码只用字母和数字，不含 I、O、0、1。");
+    codeHintTimer.current = window.setTimeout(() => setCodeHint(null), 2600);
+  };
+
+  useEffect(() => () => {
+    if (codeHintTimer.current) window.clearTimeout(codeHintTimer.current);
+  }, []);
 
   const focusControl = (target: HTMLElement | null) => {
     target?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -86,9 +162,18 @@ function Index() {
   };
 
   const validateJoinCode = () => {
-    const c = code.trim().toUpperCase();
-    if (c.length < 4) {
-      toast.error("请输入号码");
+    if (!code) {
+      toast.error("先输入房间号码");
+      focusControl(codeRef.current);
+      return false;
+    }
+    if (!codeComplete) {
+      toast.error(`房间号码是 ${CODE_LENGTH} 位`);
+      focusControl(codeRef.current);
+      return false;
+    }
+    if (codeStatus === "missing") {
+      toast.error("找不到这个号码，检查一下再试。");
       focusControl(codeRef.current);
       return false;
     }
@@ -123,7 +208,7 @@ function Index() {
   const joinWithProfile = () => {
     if (!validateName() || !validateJoinCode() || !avatarSvg) return;
     rememberProfile();
-    void navigate({ to: "/room/$code", params: { code: code.trim().toUpperCase() } });
+    void navigate({ to: "/room/$code", params: { code } });
   };
 
   const continueEntry = () => {
@@ -296,28 +381,63 @@ function Index() {
             <span className="h-px flex-1 bg-border" />
           </div>
 
-          <div className="grid grid-cols-[minmax(0,1fr)_96px] gap-2">
-            <input
-              ref={codeRef}
-              value={code}
-              maxLength={8}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                e.preventDefault();
-                requestEntry("join");
-              }}
-              placeholder="输入号码"
-              className={`${field} tracking-[0.28em]`}
-            />
-            <button
-              type="button"
-              onClick={() => requestEntry("join")}
-              disabled={busy || !trimmedName}
-              className="press rounded-md border-2 border-[var(--ink)] bg-accent px-4 font-display text-lg text-accent-foreground shadow-[4px_4px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
+          <div>
+            <div className="grid grid-cols-[minmax(0,1fr)_96px] gap-2">
+              <input
+                ref={codeRef}
+                id="room-code"
+                value={code}
+                maxLength={CODE_LENGTH}
+                inputMode="text"
+                autoCapitalize="characters"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label="房间号码"
+                aria-invalid={codeMessage?.tone === "error"}
+                aria-describedby="room-code-status"
+                onChange={(e) => handleCodeChange(e.target.value)}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  handleCodeChange(e.clipboardData.getData("text"));
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  requestEntry("join");
+                }}
+                placeholder="输入号码"
+                style={
+                  codeMessage?.tone === "error"
+                    ? { borderColor: "var(--destructive)" }
+                    : codeMessage?.tone === "ok"
+                      ? { borderColor: "var(--teal)" }
+                      : undefined
+                }
+                className={`${field} tracking-[0.28em]`}
+              />
+              <button
+                type="button"
+                onClick={() => requestEntry("join")}
+                disabled={busy || !trimmedName || !codeComplete || codeStatus === "missing"}
+                className="press rounded-md border-2 border-[var(--ink)] bg-accent px-4 font-display text-lg text-accent-foreground shadow-[4px_4px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
+              >
+                加入
+              </button>
+            </div>
+            <p
+              id="room-code-status"
+              role="status"
+              aria-live="polite"
+              className={`mt-2 text-sm leading-6 ${
+                codeMessage?.tone === "error"
+                  ? "font-semibold text-destructive"
+                  : codeMessage?.tone === "ok"
+                    ? "font-semibold text-[var(--teal)]"
+                    : "text-muted-foreground"
+              }`}
             >
-              加入
-            </button>
+              {codeMessage?.text ?? `跟朋友要 ${CODE_LENGTH} 位号码，例如 K7M3D。`}
+            </p>
           </div>
         </div>
 

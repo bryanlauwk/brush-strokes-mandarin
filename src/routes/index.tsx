@@ -141,7 +141,12 @@ function Index() {
   };
 
   const focusEntry = (intent: EntryIntent) => {
-    focusControl(intent === "create" ? nameRef.current : codeRef.current);
+    setTab(intent);
+    if (!trimmedName) {
+      focusControl(nameRef.current);
+      return;
+    }
+    window.setTimeout(() => focusControl(intent === "create" ? themeRef.current : codeRef.current), 0);
   };
 
   const validateName = () => {

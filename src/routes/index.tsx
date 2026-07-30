@@ -294,7 +294,7 @@ function Index() {
                   validateName();
                   return;
                 }
-                focusControl(themeRef.current);
+                focusControl(tab === "create" ? themeRef.current : codeRef.current);
               }}
               placeholder="画画人"
               className={field}

@@ -273,7 +273,7 @@ function Index() {
         <div className="relative overflow-hidden rounded-md border-2 border-[var(--ink)] bg-[var(--wash)] p-4">
           <span className="absolute -right-2 -top-2 text-3xl opacity-25">✦</span>
           <p className="font-display text-2xl text-primary">准备开玩</p>
-          <p className="mt-1 text-sm text-muted-foreground">填好就可以开局。</p>
+          <p className="mt-1 text-sm text-muted-foreground">填名字、选角色，然后开房或输入朋友的号码。</p>
         </div>
 
         <div className="mt-4 space-y-4">

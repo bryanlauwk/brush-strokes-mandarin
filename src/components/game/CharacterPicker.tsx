@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, ChevronDown, Shuffle, Sparkles } from "lucide-react";
 import { InlineSvgAvatar } from "@/components/game/PlayerAvatar";
-import { CHARACTER_AVATARS, createDefaultAvatar, type CharacterAvatar } from "@/lib/character-avatars";
+import { CHARACTER_AVATARS, createDefaultAvatar } from "@/lib/character-avatars";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -14,8 +14,6 @@ type Props = {
 export function CharacterPicker({ value, onChange, name = "画画人", compact }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const active = CHARACTER_AVATARS.find((avatar) => avatar.svg === value) ?? null;
-  const groups = groupCharacters(CHARACTER_AVATARS);
   const currentSvg = value ?? createDefaultAvatar(name);
 
   useEffect(() => {
@@ -71,7 +69,7 @@ export function CharacterPicker({ value, onChange, name = "画画人", compact }
         <span className="min-w-0 flex-1">
           <span className="block font-display text-lg leading-none text-primary">已选角色</span>
           <span className="mt-1 inline-flex items-center gap-1 rounded-full border-2 border-[var(--ink)] bg-accent px-2 py-0.5 text-[11px] font-semibold">
-            <Sparkles className="size-3" /> {active?.group ?? "漫画风"}
+            <Sparkles className="size-3" /> 点击更换
           </span>
         </span>
         <ChevronDown className={cn("size-5 shrink-0 text-primary transition-transform", open && "rotate-180")} />
@@ -90,47 +88,39 @@ export function CharacterPicker({ value, onChange, name = "画画人", compact }
             </button>
           </div>
 
-          <div className="max-h-[min(55vh,420px)] space-y-3 overflow-y-auto pr-1" role="radiogroup" aria-label="选择入场角色">
-            {groups.map(([group, avatars]) => (
-              <section key={group}>
-                <p className="mb-2 text-xs font-semibold text-muted-foreground">{group}</p>
-                <div className={cn("grid gap-2", compact ? "grid-cols-5" : "grid-cols-5")}>
-                  {avatars.map((avatar, index) => {
-                    const selected = avatar.svg === value;
-                    return (
-                      <button
-                        key={avatar.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={selected}
-                        aria-label={`${group}角色 ${index + 1}`}
-                        title={`${group}角色 ${index + 1}`}
-                        onClick={() => selectAvatar(avatar.svg)}
-                        className={cn(
-                          "press relative aspect-square min-w-0 overflow-hidden rounded-full border-2 border-[var(--ink)] bg-secondary shadow-[2px_2px_0_0_var(--ink)] transition-transform hover:-translate-y-0.5 focus-visible:z-10",
-                          selected && "ring-4 ring-primary ring-offset-2 ring-offset-card",
-                        )}
-                      >
-                        <InlineSvgAvatar svg={avatar.svg} label={`${group}角色 ${index + 1}`} />
-                        {selected && (
-                          <span className="absolute right-0 top-0 grid size-5 place-items-center rounded-full border-2 border-[var(--ink)] bg-[var(--success)] text-white">
-                            <CheckCircle2 className="size-3" />
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            ))}
+          <div
+            className={cn("grid max-h-[min(55vh,420px)] gap-2 overflow-y-auto pr-1", compact ? "grid-cols-5" : "grid-cols-5")}
+            role="radiogroup"
+            aria-label="选择入场角色"
+          >
+            {CHARACTER_AVATARS.map((avatar, index) => {
+              const selected = avatar.svg === value;
+              return (
+                <button
+                  key={avatar.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  aria-label={`角色 ${index + 1}`}
+                  title={`角色 ${index + 1}`}
+                  onClick={() => selectAvatar(avatar.svg)}
+                  className={cn(
+                    "press relative aspect-square min-w-0 overflow-hidden rounded-full border-2 border-[var(--ink)] bg-secondary shadow-[2px_2px_0_0_var(--ink)] transition-transform hover:-translate-y-0.5 focus-visible:z-10",
+                    selected && "ring-4 ring-primary ring-offset-2 ring-offset-card",
+                  )}
+                >
+                  <InlineSvgAvatar svg={avatar.svg} label={`角色 ${index + 1}`} />
+                  {selected && (
+                    <span className="absolute right-0 top-0 grid size-5 place-items-center rounded-full border-2 border-[var(--ink)] bg-[var(--success)] text-white">
+                      <CheckCircle2 className="size-3" />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
     </div>
   );
-}
-
-function groupCharacters(avatars: CharacterAvatar[]) {
-  const order = ["圆脸漫画风", "动漫风", "超英风"] as const;
-  return order.map((group) => [group, avatars.filter((avatar) => avatar.group === group)] as const);
 }

@@ -8,6 +8,8 @@ type Props = {
   strokes: Stroke[];
   live: Record<string, LiveStroke>;
   canDraw: boolean;
+  lockReason?: string;
+  modeLabel?: string;
   onStroke: (stroke: Stroke) => void;
   onLive: (stroke: LiveStroke) => void;
   onLiveEnd: (id: string) => void;
@@ -63,7 +65,17 @@ function shouldAddPoint(points: [number, number][], point: [number, number]) {
   return Math.hypot(point[0] - last[0], point[1] - last[1]) >= MIN_POINT_DISTANCE;
 }
 
-export function DrawBoard({ strokes, live, canDraw, onStroke, onLive, onLiveEnd, overlay }: Props) {
+export function DrawBoard({
+  strokes,
+  live,
+  canDraw,
+  lockReason,
+  modeLabel,
+  onStroke,
+  onLive,
+  onLiveEnd,
+  overlay,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef<LiveStroke | null>(null);
   const lastSentRef = useRef(0);

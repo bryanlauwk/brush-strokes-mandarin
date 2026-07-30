@@ -19,6 +19,8 @@
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
+  --px: 0px;
+  --py: 0px;
   background:
     radial-gradient(circle at 73% 47%, oklch(0.74 0.17 42 / 0.58) 0 4.7rem, transparent 4.85rem),
     radial-gradient(circle at 72% 47%, oklch(0.84 0.12 70 / 0.23) 0 10rem, transparent 10.2rem),
@@ -42,10 +44,45 @@
   background-size: cover;
   background-repeat: no-repeat;
   opacity: 0.95;
+  transform: scale(1.06) translate3d(var(--px), var(--py), 0);
+  transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: ukiyo-drift 18s ease-in-out infinite;
+}
+
+/* Bottom wave band gets a stronger, slower parallax float */
+.ukiyo-wave {
+  inset: 0;
+  background-position: center bottom;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: 0.55;
+  mask-image: linear-gradient(180deg, transparent 0 58%, #000 74% 100%);
+  transform: scale(1.1) translate3d(calc(var(--px) * -2), calc(var(--py) * -1.6), 0);
+  transition: transform 800ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: ukiyo-wave-float 9s ease-in-out infinite;
+}
+
+@keyframes ukiyo-drift {
+  0%, 100% { background-position: center bottom; }
+  50% { background-position: 52% bottom; }
+}
+
+@keyframes ukiyo-wave-float {
+  0%, 100% { margin-bottom: 0; }
+  50% { margin-bottom: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ukiyo-art,
+  .ukiyo-wave {
+    animation: none;
+    transform: none;
+  }
 }
 
 .ukiyo-veil {
   inset: 0;
+  z-index: 1;
   background:
     radial-gradient(ellipse at 24% 44%, oklch(0.99 0.02 88 / 0.86) 0 26%, oklch(0.98 0.03 84 / 0.45) 48%, transparent 72%),
     radial-gradient(ellipse at 62% 42%, oklch(0.99 0.02 88 / 0.7) 0 30%, transparent 70%),

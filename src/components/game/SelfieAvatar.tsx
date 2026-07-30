@@ -137,12 +137,16 @@ export function SelfieAvatar({ value, onChange, name = "画画人", compact, req
             <div>
               <p className="font-display text-lg leading-none">拍照生成入场画像</p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                名字和画像准备好，才可以进房。照片只在浏览器处理，进房保存生成后的小画像。
+                照片只在浏览器处理，进房只保存生成后的小画像。不拍照也可以，我们会用名字生成一个。
               </p>
             </div>
-            {required && (
+            {required ? (
               <span className="shrink-0 rounded-full border-2 border-[var(--ink)] bg-accent px-2 py-0.5 text-[10px] font-semibold">
                 必填
+              </span>
+            ) : (
+              <span className="shrink-0 rounded-full border-2 border-[var(--ink)] bg-secondary px-2 py-0.5 text-[10px] font-semibold">
+                可选
               </span>
             )}
           </div>

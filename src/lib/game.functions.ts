@@ -16,7 +16,10 @@ const profile = z.object({
   avatarSvg: z.string().max(5000).nullable().optional(),
   roomTheme: roomTheme.optional(),
 });
-const avatarRequiredMessage = "先拍照或上传照片，生成入场画像";
+function insertPlayerMessage(error: { message?: string } | null) {
+  const detail = (error?.message ?? "").trim();
+  return detail ? `加入失败：${detail}` : "加入失败，请再试一次";
+}
 
 type PlayerInsert = Record<string, unknown>;
 
@@ -65,7 +68,12 @@ async function updateRoomSettings(supabaseAdmin: SupabaseAdmin, roomId: string, 
 }
 
 async function insertPlayer(supabaseAdmin: SupabaseAdmin, payload: PlayerInsert) {
-  return supabaseAdmin.from("players").insert(payload as never).select("*").single();
+  const withAvatar = await supabaseAdmin.from("players").insert(payload as never).select("*").single();
+  if (!withAvatar.error || !isMissingColumn(withAvatar.error, "avatar_svg")) return withAvatar;
+
+  // Older databases may not have the avatar column yet — still let the player in.
+  const { avatar_svg: _avatarSvg, ...fallbackPayload } = payload;
+  return supabaseAdmin.from("players").insert(fallbackPayload as never).select("*").single();
 }
 
 async function parkRoomForLowPlayers(
@@ -103,7 +111,6 @@ export const createRoom = createServerFn({ method: "POST" })
     const name = g.cleanName(data.name);
     const avatarSvg = cleanAvatarSvg(data.avatarSvg);
     const selectedTheme = normalizeRoomTheme(data.roomTheme);
-    if (!avatarSvg) throw new Error(avatarRequiredMessage);
 
     let code = g.makeCode();
     for (let i = 0; i < 6; i++) {
@@ -122,7 +129,7 @@ export const createRoom = createServerFn({ method: "POST" })
       avatar: Math.floor(Math.random() * 8),
       avatar_svg: avatarSvg,
     });
-    if (pErr || !player) throw new Error("加入失败");
+    if (pErr || !player) throw new Error(insertPlayerMessage(pErr));
 
     const token = g.makeToken();
     await supabaseAdmin.from("player_tokens").insert({ player_id: player.id, token });
@@ -149,7 +156,6 @@ export const joinRoom = createServerFn({ method: "POST" })
     let name = g.cleanName(data.name);
     if (players.some((p) => p.name === name)) name = `${name}2`.slice(0, 12);
     const avatarSvg = cleanAvatarSvg(data.avatarSvg);
-    if (!avatarSvg) throw new Error(avatarRequiredMessage);
 
     const { data: player, error } = await insertPlayer(supabaseAdmin, {
       room_id: room.id,
@@ -157,7 +163,7 @@ export const joinRoom = createServerFn({ method: "POST" })
       avatar: Math.floor(Math.random() * 8),
       avatar_svg: avatarSvg,
     });
-    if (error || !player) throw new Error("加入失败");
+    if (error || !player) throw new Error(insertPlayerMessage(error));
 
     const token = g.makeToken();
     await supabaseAdmin.from("player_tokens").insert({ player_id: player.id, token });

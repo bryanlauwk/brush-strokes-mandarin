@@ -298,6 +298,14 @@ function RoomPage() {
     ? Math.max(0, Math.ceil((Date.parse(room.round_ends_at) - now) / 1000))
     : 0;
   const inGame = room.status !== "waiting" && room.status !== "ended";
+  const isLobby = room.status === "waiting";
+  const lockReason = (() => {
+    if (isLobby) return "等开局，先随便涂两笔";
+    if (room.status === "choosing") return "画画人在选题目…";
+    if (room.status === "drawing") return `轮到 ${drawer?.name ?? "画画人"} 画，你负责猜`;
+    if (room.status === "turn_end") return "这一回合结束了";
+    return "这一局结束了";
+  })();
   const guessed = !!me?.has_guessed;
 
   const wordDisplay = iAmDrawer && priv.word ? [...priv.word].join(" ") : (room.masked_word ?? "");

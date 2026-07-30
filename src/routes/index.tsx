@@ -8,6 +8,7 @@ import { createRoom } from "@/lib/game.functions";
 import { ROOM_THEME_OPTIONS, type RoomTheme } from "@/lib/game-themes";
 import { homeEntryPreviewImage } from "@/lib/home-assets";
 import { loadAvatarSvg, loadNickname, saveAvatarSvg, saveIdentity, saveNickname } from "@/lib/player-identity";
+import "@/styles/home-ukiyo.css";
 
 const appTitle = "画啦猜啦 · 马来西亚华语画猜派对";
 const appDescription = "拍照生成入场画像，开主题房、分享号码、轮流画画，用华语猜本地题目。";
@@ -124,7 +125,16 @@ function Index() {
     "w-full rounded-md border-2 border-[var(--ink)] bg-card px-3 py-3 outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-primary";
 
   return (
-    <main className="mx-auto grid min-h-screen w-full max-w-6xl items-center gap-5 px-5 py-6 sm:px-8 lg:grid-cols-[minmax(0,1fr)_440px]">
+    <main className="home-shell mx-auto grid min-h-screen w-full max-w-6xl items-center gap-5 px-5 py-6 sm:px-8 lg:grid-cols-[minmax(0,1fr)_440px]">
+      <div aria-hidden="true" className="home-ukiyo-bg">
+        <span className="ukiyo-ink-swipe" />
+        <span className="ukiyo-shophouses" />
+        <span className="ukiyo-clouds" />
+        <span className="ukiyo-cards" />
+        <span className="ukiyo-lantern" />
+        <span className="ukiyo-dots" />
+      </div>
+
       <section className="space-y-5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="label-chip text-xs font-semibold text-primary">

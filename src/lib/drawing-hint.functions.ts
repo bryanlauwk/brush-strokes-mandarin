@@ -8,15 +8,18 @@ const identity = z.object({
   turnIndex: z.number().int().min(0).max(10000),
 });
 
+type HintReason = "no-key" | "blocked" | "timeout" | "error";
+
 type DrawingHint = {
   imageUrl: string | null;
   source: "ai" | "unavailable";
   prompt: string;
+  reason?: HintReason;
 };
 
-type OpenAIImageResponse = {
+type GatewayImageResponse = {
   data?: Array<{ b64_json?: string }>;
-  error?: { message?: string };
+  error?: { message?: string; code?: string };
 };
 
 export const generateDrawingHint = createServerFn({ method: "POST" })
@@ -39,45 +42,62 @@ export const generateDrawingHint = createServerFn({ method: "POST" })
     if (!word) throw new Error("还没有题目");
 
     const prompt = buildPrompt(word);
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return unavailableHint(prompt);
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) {
+      console.error("[drawing-hint] missing LOVABLE_API_KEY");
+      return unavailableHint(prompt, "no-key");
+    }
 
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 18000);
-      const response = await fetch("https://api.openai.com/v1/images/generations", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-2",
-          prompt,
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
+      let response: Response;
+      try {
+        response = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3.1-flash-image",
+            messages: [{ role: "user", content: prompt }],
+            modalities: ["image", "text"],
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
 
-      if (!response.ok) return unavailableHint(prompt);
-      const json = (await response.json()) as OpenAIImageResponse;
+      if (!response.ok) {
+        const body = await response.text().catch(() => "");
+        console.error("[drawing-hint] gateway error", response.status, body.slice(0, 400));
+        return unavailableHint(prompt, response.status === 400 ? "blocked" : "error");
+      }
+
+      const json = (await response.json()) as GatewayImageResponse;
       const image = json.data?.[0]?.b64_json;
-      if (!image) return unavailableHint(prompt);
+      if (!image) {
+        console.error("[drawing-hint] no image in response", JSON.stringify(json).slice(0, 400));
+        return unavailableHint(prompt, "blocked");
+      }
 
       return {
         imageUrl: `data:image/png;base64,${image}`,
         source: "ai",
         prompt,
       };
-    } catch {
-      return unavailableHint(prompt);
+    } catch (e) {
+      const aborted = e instanceof Error && e.name === "AbortError";
+      console.error("[drawing-hint] request failed", aborted ? "timeout" : e);
+      return unavailableHint(prompt, aborted ? "timeout" : "error");
     }
   });
 
 function buildPrompt(word: string) {
   return [
-    "Private reference image for the drawer in a casual Malaysian Mandarin draw-and-guess party game.",
-    `Secret word: ${word}.`,
+    `Illustrate: ${word}.`,
     "Create one clear visual hint that is easy to copy by hand: strong silhouette, simple readable shapes, no clutter.",
     "Visual style: Japanese ukiyo-e print mixed with warm modern anime illustration, ink-brush outlines, washi paper texture, soft watercolor washes, lively but not photorealistic.",
     "When the subject allows, place it in a Malaysian everyday scene with tropical light, kopitiam, shophouse, pasar malam, sea breeze, or local street details.",
@@ -86,10 +106,11 @@ function buildPrompt(word: string) {
   ].join(" ");
 }
 
-function unavailableHint(prompt: string): DrawingHint {
+function unavailableHint(prompt: string, reason: HintReason): DrawingHint {
   return {
     imageUrl: null,
     source: "unavailable",
     prompt,
+    reason,
   };
 }

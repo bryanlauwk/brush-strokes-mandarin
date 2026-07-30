@@ -1,27 +1,35 @@
-## 诊断（已核实）
+## 诊断（已查证）
 
-不是 OpenAI 出问题，是这个功能根本没打到任何模型。
+查了你正在看的房间 `FACFM`，数据库里的实际状态是：
 
-`src/lib/drawing-hint.functions.ts:42` 读 `process.env.OPENAI_API_KEY`，读不到就直接 `return unavailableHint(prompt)`——沙箱里确认 `OPENAI_API_KEY` 未配置，而 `LOVABLE_API_KEY` 是有的。所以每次都走「AI 图没生成」这条静默分支，前端 `DrawingHintPanel` 只看到 `source: "unavailable"`，无法区分「没配 key」「模型报错」「超时」。
+- `status = waiting`（还没开局）
+- `drawer_id = 空`
+- 房里只有 **1 位玩家**
 
-## 修改计划
+代码里画布的开关是 `canDraw = 我是画画人 && room.status === "drawing"`（`src/routes/room.$code.tsx`），而 `DrawBoard` 在 `canDraw` 为 false 时会直接忽略所有笔触事件，同时整块工具栏（颜色／笔刷／橡皮）也不渲染。
 
-### 1. 改用 Lovable AI 出图（不需要用户自备 key）
-- 把 `fetch("https://api.openai.com/v1/images/generations")` 换成 `https://ai.gateway.lovable.dev/v1/images/generations`，用 `LOVABLE_API_KEY`。
-- 模型选 `google/gemini-3.1-flash-image`（Nano Banana 2，出图快、质量够用，适合一局游戏里 18 秒内要拿到图），请求体用 Gemini 的 `messages` + `modalities` 形状，非流式（服务端一次性拿 `data[0].b64_json` 返回给前端）。
-- 保留现有的 18 秒超时与 `AbortController`。
+所以「画不到」不是画布坏了，而是：**游戏还没开始**。开局按钮又要求至少 2 人（`players.length >= 2`），你一个人在房里，永远停在等待状态 → 画布全程锁死，而界面并没有把这件事讲清楚。
 
-### 2. 失败原因要能看见
-- `DrawingHint` 增加一个 `reason` 字段（`no-key` / `blocked` / `timeout` / `error`）。
-- 服务端在每个失败分支记录 `console.error`，方便用日志排查。
-- 前端把「AI 图没生成」换成对应的中文提示，例如「这题被模型挡下来了，换个说法再试」「网络慢了，点重试」。
+## 要做的改动
 
-### 3. 提示词微调
-现在的 prompt 明确禁止出现文字，这对 Gemini 图像模型同样适用，保留。只把开头一句改得更像图像指令（去掉 "Private reference image for..." 这种元描述），减少模型把它当成对话来回答的概率。
+1. **等待厅自由涂鸦**
+   `status === "waiting"` 时开放画布给所有人随便画（本地 + 实时广播，不计分、不写入正式回合记录），开局时自动清空。这样一进房就有得画，不会觉得「坏了」。
+
+2. **锁定原因写清楚**
+   画布顶栏的提示文字按状态分开：
+   - 等待中 → 「等开局，先随便涂两笔」
+   - 选题中 → 「画画人在选题目…」
+   - 别人在画 → 「轮到 XXX 画，你负责猜」
+
+3. **开局条件提示**
+   等待卡片上，人数不足时显示「还差 1 人才能开始（现在 1/2）」，并把开始按钮的禁用原因讲明白，而不是只是灰掉。
+
+4. **工具栏常驻**
+   工具栏不再随 `canDraw` 整块消失，改成不可用时保留但置灰，避免界面忽然少一块让人以为出错。
 
 ## 技术细节
 
-- 只改 `src/lib/drawing-hint.functions.ts` 与 `src/components/game/DrawingHintPanel.tsx`。
-- `process.env.LOVABLE_API_KEY` 在 `.handler()` 内读，不在模块顶层。
-- 现有的房主/回合校验（`authPlayer`、`drawer_id`、`turn_index`）与 `room_secrets` 读取逻辑完全不动。
-- 改完后在房间里实跑一次，确认返回 `source: "ai"` 且图能渲染，再看服务端日志确认没有 400。
+- `src/components/game/DrawBoard.tsx`：把 `canDraw` 拆成 `canDraw`（可落笔）与 `lockReason`（提示文案）；工具栏改用 `disabled` 状态而非条件渲染。
+- `src/routes/room.$code.tsx`：`waiting` 状态下传 `canDraw={true}`，笔触只走 `broadcastLive` / 本地 `appendLocalStroke`，**不**调用 `pushStroke` 服务端函数；`startGame` 成功后清空本地涂鸦。
+- 等待卡片（同文件内 `WaitingCard`）加人数进度文案。
+- 不动数据库、不动 RLS、不动计分逻辑。

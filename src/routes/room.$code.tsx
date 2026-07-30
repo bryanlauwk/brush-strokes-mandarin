@@ -280,8 +280,8 @@ function RoomPage() {
   const guessed = !!me?.has_guessed;
 
   const wordDisplay = iAmDrawer && priv.word ? [...priv.word].join(" ") : (room.masked_word ?? "");
-  const order = (room.turn_order ?? []).filter((id) => players.some((p) => p.id === id));
-  const turnsPerRound = Math.max(order.length || players.length, 1);
+  const frozenOrder = Array.isArray(room.turn_order) ? room.turn_order.filter(Boolean) : [];
+  const turnsPerRound = Math.max(frozenOrder.length || players.length, 1);
   const turnInRound = (room.turn_index % turnsPerRound) + 1;
   const urgent = inGame && room.status === "drawing" && secondsLeft <= 10;
   const withLocalAvatar = (player: Player) =>
@@ -334,7 +334,7 @@ function RoomPage() {
         {inGame && (
           <>
             <span className="rounded-full border-2 border-[var(--ink)] bg-card px-3 py-1 text-xs sm:text-sm">
-              第 {room.current_round}/{room.total_rounds} 轮 · 这一轮 {turnInRound}/{turnsPerRound} 人
+              第 {room.current_round}/{room.total_rounds} 轮 · 这一轮 {turnInRound}/{turnsPerRound} 位
             </span>
             <span
               className={cn(

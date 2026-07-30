@@ -43,7 +43,8 @@ export function DrawingHintPanel({ auth, turnIndex, word, compact }: Props) {
       setHint(null);
       setStatus("error");
     }
-  }, [auth.code, auth.playerId, auth.token, generateFn, turnIndex]);
+  // generateFn is provided by useServerFn; the actual request should be keyed to room identity and turn only.
+  }, [auth.code, auth.playerId, auth.token, turnIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setHint(null);

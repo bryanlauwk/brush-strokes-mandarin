@@ -1,3 +1,6 @@
+export const DIFFICULTIES = ["全部", "容易", "普通", "挑战", "高手"] as const;
+export type Difficulty = (typeof DIFFICULTIES)[number];
+
 export type Room = {
   id: string;
   code: string;

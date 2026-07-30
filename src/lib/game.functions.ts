@@ -67,6 +67,33 @@ async function insertPlayer(supabaseAdmin: SupabaseAdmin, payload: PlayerInsert)
   return supabaseAdmin.from("players").insert(payload).select("*").single();
 }
 
+async function parkRoomForLowPlayers(
+  supabaseAdmin: SupabaseAdmin,
+  roomId: string,
+  hostId: string | null,
+  round: number,
+) {
+  const g = await import("./game.server");
+  await supabaseAdmin
+    .from("rooms")
+    .update({
+      host_id: hostId,
+      status: "waiting",
+      drawer_id: null,
+      masked_word: null,
+      word_length: null,
+      revealed_word: null,
+      round_started_at: null,
+      round_ends_at: null,
+    })
+    .eq("id", roomId);
+  await supabaseAdmin
+    .from("room_secrets")
+    .update({ word: null, choices: [], drawer_id: null })
+    .eq("room_id", roomId);
+  await g.say(roomId, round, "system", "人数不足，先回到等人");
+}
+
 export const createRoom = createServerFn({ method: "POST" })
   .inputValidator((d) => profile.parse(d))
   .handler(async ({ data }) => {
@@ -301,6 +328,19 @@ export const tick = createServerFn({ method: "POST" })
       .from("players")
       .update({ last_seen: new Date().toISOString() })
       .eq("id", player.id);
+
+    if (room.status === "choosing" || room.status === "drawing") {
+      const players = await g.listPlayers(room.id);
+      if (players.length < 2) {
+        await parkRoomForLowPlayers(supabaseAdmin, room.id, room.host_id, room.current_round);
+        return { ok: true };
+      }
+      if (!room.drawer_id || !players.some((p) => p.id === room.drawer_id)) {
+        await g.endTurn(room, null);
+        return { ok: true };
+      }
+    }
+
     await g.advance(room);
     return { ok: true };
   });
@@ -327,24 +367,7 @@ export const leaveRoom = createServerFn({ method: "POST" })
     }
 
     if (rest.length < 2) {
-      await supabaseAdmin
-        .from("rooms")
-        .update({
-          host_id: nextHost?.id ?? room.host_id,
-          status: "waiting",
-          drawer_id: null,
-          masked_word: null,
-          word_length: null,
-          revealed_word: null,
-          round_started_at: null,
-          round_ends_at: null,
-        })
-        .eq("id", room.id);
-      await supabaseAdmin
-        .from("room_secrets")
-        .update({ word: null, choices: [], drawer_id: null })
-        .eq("room_id", room.id);
-      await g.say(room.id, room.current_round, "system", "人数不足，先回到等人");
+      await parkRoomForLowPlayers(supabaseAdmin, room.id, nextHost?.id ?? room.host_id, room.current_round);
       return { ok: true };
     }
 

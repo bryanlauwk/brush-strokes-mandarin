@@ -6,6 +6,7 @@ import { ArrowRight, Brush, Camera, Clock3, DoorOpen, Gauge, Link2, MapPin, Spar
 import { SelfieAvatar } from "@/components/game/SelfieAvatar";
 import { createRoom } from "@/lib/game.functions";
 import { ROOM_THEME_OPTIONS, type RoomTheme } from "@/lib/game-themes";
+import { homeEntryPreviewImage } from "@/lib/home-assets";
 import { loadAvatarSvg, loadNickname, saveAvatarSvg, saveIdentity, saveNickname } from "@/lib/player-identity";
 
 const appTitle = "画啦猜啦 · 马来西亚华语画猜派对";
@@ -120,23 +121,24 @@ function Index() {
             </p>
           </div>
 
-          <div className="studio-panel hidden min-h-64 p-4 xl:block">
+          <div className="studio-panel hidden min-h-72 p-4 xl:block">
             <div className="paper relative h-full overflow-hidden rounded-md border-2 border-[var(--ink)] p-4">
-              <div className="absolute right-4 top-4 rounded-full border-2 border-[var(--ink)] bg-accent px-3 py-1 text-xs font-semibold">
-                主题房
+              <div className="absolute right-4 top-4 z-10 rounded-full border-2 border-[var(--ink)] bg-accent px-3 py-1 text-xs font-semibold shadow-[2px_2px_0_0_var(--ink)]">
+                入场画像
               </div>
-              <svg viewBox="0 0 260 160" className="mt-8 h-40 w-full" aria-hidden="true">
-                <circle cx="130" cy="72" r="58" fill="#9bdcff" stroke="var(--ink)" strokeWidth="6" />
-                <circle cx="130" cy="78" r="34" fill="#f7c8a4" stroke="var(--ink)" strokeWidth="5" />
-                <path d="M96 64c8-27 38-39 68-24 12 7 20 18 21 33-24-18-55-20-89-9Z" fill="#1f1712" stroke="var(--ink)" strokeWidth="5" />
-                <ellipse cx="116" cy="78" rx="5" ry="8" fill="var(--ink)" />
-                <ellipse cx="144" cy="78" rx="5" ry="8" fill="var(--ink)" />
-                <path d="M118 96c7 6 17 6 24 0" fill="none" stroke="var(--ink)" strokeWidth="5" strokeLinecap="round" />
-                <path d="M80 132c18-27 35-39 50-39s33 12 50 39" fill="var(--primary)" stroke="var(--ink)" strokeWidth="5" />
-                <path d="M54 118l17-22M70 118l6-26" stroke="var(--ink)" strokeWidth="5" strokeLinecap="round" />
-              </svg>
+              <div className="absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgba(57,192,200,.28),rgba(255,255,255,0))]" />
+              <div className="relative mx-auto mt-7 grid size-44 place-items-center rounded-full border-[7px] border-[var(--ink)] bg-[var(--ink)] shadow-[6px_6px_0_0_var(--ink)]">
+                <img
+                  src={homeEntryPreviewImage}
+                  alt="入场画像示例"
+                  className="size-full rounded-full object-cover"
+                />
+              </div>
+              <p className="relative mx-auto mt-4 max-w-56 text-center text-sm leading-6 text-muted-foreground">
+                拍一张照，变成明亮圆脸漫画头像，再进主题房。
+              </p>
               <div className="absolute bottom-4 left-4 right-4 grid grid-cols-3 gap-2 text-xs">
-                {["自拍", "主题", "开玩"].map((item) => (
+                {["自拍", "变画像", "开玩"].map((item) => (
                   <span key={item} className="rounded-md border-2 border-[var(--ink)] bg-card py-1 text-center font-display text-lg">
                     {item}
                   </span>

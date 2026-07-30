@@ -175,7 +175,7 @@ function Index() {
           </span>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,320px)]">
+        <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(0,300px)]">
           <div className="title-backing relative block w-full min-w-0 rounded-2xl border-2 border-[var(--ink)]/15 bg-[var(--card)]/72 p-5 shadow-[4px_4px_0_0_var(--ink)] backdrop-blur-sm sm:p-6">
             <div className="absolute -right-3 -top-3 hidden text-5xl opacity-30 sm:block">✦</div>
             <h1 className="ink-title font-display text-5xl leading-none text-primary sm:text-6xl xl:text-7xl whitespace-nowrap">
@@ -215,7 +215,7 @@ function Index() {
             </div>
           </div>
 
-          <div className="studio-panel hidden min-h-72 p-4 xl:block">
+          <div className="studio-panel hidden min-h-72 p-4 2xl:block">
             <div className="paper relative h-full overflow-hidden rounded-md border-2 border-[var(--ink)] p-4">
               <div className="absolute right-4 top-4 z-10 rounded-full border-2 border-[var(--ink)] bg-accent px-3 py-1 text-xs font-semibold shadow-[2px_2px_0_0_var(--ink)]">
                 入场画像

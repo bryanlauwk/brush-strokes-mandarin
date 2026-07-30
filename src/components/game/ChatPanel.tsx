@@ -41,7 +41,7 @@ export function ChatPanel({ messages, disabled, placeholder, onSend }: Props) {
           <MessageCircle className="size-4 text-primary" />
         </span>
         <div className="min-w-0">
-          <p className="font-display text-lg leading-none">猜词频道</p>
+          <p className="font-display text-lg leading-none">猜答案区</p>
           <p className="text-xs text-muted-foreground">答案、提示和欢呼都在这里</p>
         </div>
       </div>
@@ -58,8 +58,8 @@ export function ChatPanel({ messages, disabled, placeholder, onSend }: Props) {
           {messages.length === 0 ? (
             <div className="flex h-full min-h-32 flex-col items-center justify-center rounded-md border-2 border-dashed border-border bg-card/55 px-4 text-center text-muted-foreground">
               <MessageCircle className="mb-2 size-6 text-primary" />
-              <p className="font-medium text-foreground">频道还很安静</p>
-              <p className="mt-1 text-xs">等第一位玩家开口或猜中答案。</p>
+              <p className="font-medium text-foreground">这里还很安静</p>
+              <p className="mt-1 text-xs">等第一位朋友开口或猜中答案。</p>
             </div>
           ) : (
             messages.map((m) => <MessageRow key={m.id} message={m} />)

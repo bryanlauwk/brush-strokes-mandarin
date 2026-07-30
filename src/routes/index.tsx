@@ -134,9 +134,6 @@ function Index() {
                   className="size-full rounded-full object-cover"
                 />
               </div>
-              <p className="relative mx-auto mt-4 max-w-56 text-center text-sm leading-6 text-muted-foreground">
-                拍一张照，变成明亮圆脸漫画头像，再进主题房。
-              </p>
               <div className="absolute bottom-4 left-4 right-4 grid grid-cols-3 gap-2 text-xs">
                 {["自拍", "变画像", "开玩"].map((item) => (
                   <span key={item} className="rounded-md border-2 border-[var(--ink)] bg-card py-1 text-center font-display text-lg">

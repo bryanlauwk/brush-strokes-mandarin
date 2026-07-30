@@ -127,12 +127,9 @@ function Index() {
   const handleCodeChange = (raw: string) => {
     const { clean, dropped } = sanitizeCode(raw);
     setCode(clean);
-    if (codeHintTimer.current) window.clearTimeout(codeHintTimer.current);
-    if (!dropped) {
-      setCodeHint(null);
-      return;
-    }
     // 提示要停留一下，不然下一个按键就把它冲掉了。
+    if (!dropped) return;
+    if (codeHintTimer.current) window.clearTimeout(codeHintTimer.current);
     setCodeHint("号码只用字母和数字，不含 I、O、0、1。");
     codeHintTimer.current = window.setTimeout(() => setCodeHint(null), 2600);
   };

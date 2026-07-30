@@ -1,4 +1,4 @@
-import { Check, Crown, Pencil } from "lucide-react";
+import { Check, Crown, Pencil, Trophy, UsersRound } from "lucide-react";
 import { AVATARS, type Player } from "@/lib/game-types";
 import { cn } from "@/lib/utils";
 
@@ -12,54 +12,71 @@ export function Scoreboard({
   meId: string | null;
 }) {
   const ranked = [...players].sort((a, b) => b.score - a.score);
-  const medals = ["🥇", "🥈", "🥉"];
+  const topScore = ranked[0]?.score ?? 0;
+
   return (
-    <div className="panel flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-2 border-b-2 border-[var(--ink)] bg-secondary px-3 py-2 font-display text-lg">
-        <span>🏆 玩家</span>
-        <span className="ml-auto rounded-full border-2 border-[var(--ink)] bg-card px-2 text-sm tabular-nums">
-          {players.length}
+    <div className="studio-panel flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="flex shrink-0 items-center gap-2 border-b-2 border-[var(--ink)] bg-secondary px-3 py-2">
+        <span className="grid size-8 place-items-center rounded-md border-2 border-[var(--ink)] bg-card">
+          <Trophy className="size-4 text-primary" />
         </span>
+        <div className="min-w-0">
+          <p className="font-display text-lg leading-none">玩家排行</p>
+          <p className="flex items-center gap-1 text-xs text-muted-foreground">
+            <UsersRound className="size-3" /> {players.length} 人在线
+          </p>
+        </div>
       </div>
-      <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
-        {ranked.map((p, i) => (
-          <li
-            key={p.id}
-            title={p.name}
-            className={cn(
-              "grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-2 transition-colors",
-              p.has_guessed && "bg-[var(--success)]/12",
-              p.id === drawerId && "bg-accent/50",
-              p.id === meId && "font-semibold",
-            )}
-          >
-            <span className="w-4 shrink-0 text-center text-xs text-muted-foreground">
-              {medals[i] ?? i + 1}
-            </span>
-            <span
+
+      <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
+        {ranked.map((p, i) => {
+          const scoreWidth = topScore > 0 ? Math.max(12, Math.round((p.score / topScore) * 100)) : 0;
+          return (
+            <li
+              key={p.id}
+              title={p.name}
               className={cn(
-                "grid size-8 shrink-0 place-items-center rounded-full border-2 border-[var(--ink)] bg-background text-lg",
-                p.id === drawerId && "bg-primary/15",
+                "relative overflow-hidden rounded-md border-2 border-border bg-card px-2 py-2 transition-colors",
+                p.has_guessed && "border-[var(--success)]/60 bg-[var(--success)]/10",
+                p.id === drawerId && "border-primary/70 bg-accent/55",
+                p.id === meId && "border-[var(--ink)]",
               )}
             >
-              {AVATARS[p.avatar % AVATARS.length]}
-            </span>
-            <span className="min-w-0 text-sm leading-tight break-words [overflow-wrap:anywhere] line-clamp-2">
-              {p.name}
-              {p.id === meId && <span className="text-muted-foreground">（你）</span>}
-            </span>
-            <span className="flex shrink-0 items-center gap-1">
-              {p.is_host && <Crown className="size-3.5 text-primary" aria-label="房主" />}
-              {p.id === drawerId && (
-                <Pencil className="size-3.5 origin-bottom animate-wiggle text-primary" aria-label="画者" />
+              {scoreWidth > 0 && (
+                <span
+                  className="absolute inset-y-0 left-0 bg-primary/10"
+                  style={{ width: `${scoreWidth}%` }}
+                />
               )}
-              {p.has_guessed && p.id !== drawerId && (
-                <Check className="size-3.5 text-[var(--success)]" aria-label="已猜对" />
-              )}
-              <span className="tabular-nums text-sm">{p.score}</span>
-            </span>
-          </li>
-        ))}
+              <div className="relative grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2">
+                <span className="w-5 shrink-0 text-center font-display text-sm text-primary">{i + 1}</span>
+                <span
+                  className={cn(
+                    "grid size-9 shrink-0 place-items-center rounded-full border-2 border-[var(--ink)] bg-background text-lg",
+                    i === 0 && "bg-[var(--gold)]/60",
+                    p.id === drawerId && "bg-primary/15",
+                  )}
+                >
+                  {AVATARS[p.avatar % AVATARS.length]}
+                </span>
+                <span className="min-w-0 text-sm leading-tight break-words [overflow-wrap:anywhere] line-clamp-2">
+                  {p.name}
+                  {p.id === meId && <span className="text-muted-foreground">（你）</span>}
+                </span>
+                <span className="flex shrink-0 items-center gap-1">
+                  {p.is_host && <Crown className="size-3.5 text-primary" aria-label="房主" />}
+                  {p.id === drawerId && (
+                    <Pencil className="size-3.5 origin-bottom animate-wiggle text-primary" aria-label="画者" />
+                  )}
+                  {p.has_guessed && p.id !== drawerId && (
+                    <Check className="size-3.5 text-[var(--success)]" aria-label="已猜对" />
+                  )}
+                  <span className="tabular-nums text-sm font-semibold">{p.score}</span>
+                </span>
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

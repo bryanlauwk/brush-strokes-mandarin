@@ -379,3 +379,82 @@ export const leaveRoom = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
+export const roomExists = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ code: z.string().min(4).max(8) }).parse(d))
+  .handler(async ({ data }) => {
+    const g = await import("./game.server");
+    const room = await g.getRoomByCode(data.code);
+    return { exists: Boolean(room) };
+  });
+
+export const getRoomSnapshot = createServerFn({ method: "POST" })
+  .inputValidator((d) => identity.parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const g = await import("./game.server");
+    const { room } = await g.authPlayer(data.code, data.playerId, data.token);
+
+    const players = await g.listPlayers(room.id);
+    const [{ data: strokes }, { data: messages }] = await Promise.all([
+      supabaseAdmin
+        .from("strokes")
+        .select("payload")
+        .eq("room_id", room.id)
+        .eq("turn_index", room.turn_index)
+        .order("id", { ascending: true }),
+      supabaseAdmin
+        .from("guesses")
+        .select("id, round, player_id, player_name, text, kind, created_at")
+        .eq("room_id", room.id)
+        .order("id", { ascending: true })
+        .limit(200),
+    ]);
+
+    return {
+      room,
+      players,
+      strokes: ((strokes ?? []) as { payload: unknown }[]).map((r) => r.payload),
+      messages: messages ?? [],
+    };
+  });
+
+const legacyLeave = async () => {
+  return { ok: true };
+};
+void legacyLeave;
+
+const _unusedLeave = createServerFn({ method: "POST" })
+  .inputValidator((d) => identity.parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const g = await import("./game.server");
+    const { room, player } = await g.authPlayer(data.code, data.playerId, data.token);
+
+    await supabaseAdmin.from("players").delete().eq("id", player.id);
+    await g.say(room.id, room.current_round, "system", `${player.name} 离开这局`);
+
+    const rest = await g.listPlayers(room.id);
+    if (rest.length === 0) {
+      await supabaseAdmin.from("rooms").delete().eq("id", room.id);
+      return { ok: true };
+    }
+
+    const nextHost = room.host_id === player.id ? rest[0] : null;
+    if (nextHost) {
+      await supabaseAdmin.from("players").update({ is_host: true }).eq("id", nextHost.id);
+    }
+
+    if (rest.length < 2) {
+      await parkRoomForLowPlayers(supabaseAdmin, room.id, nextHost?.id ?? room.host_id, room.current_round);
+      return { ok: true };
+    }
+
+    if (nextHost) {
+      await supabaseAdmin.from("rooms").update({ host_id: nextHost.id }).eq("id", room.id);
+    }
+    if (room.drawer_id === player.id && room.status !== "waiting" && room.status !== "ended") {
+      await g.endTurn(room, null);
+    }
+    return { ok: true };
+  });

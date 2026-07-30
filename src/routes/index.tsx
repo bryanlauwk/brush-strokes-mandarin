@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { ArrowRight, Brush, Clock3, DoorOpen, Gauge, Link2, Sparkles, UsersRound } from "lucide-react";
 import { createRoom } from "@/lib/game.functions";
 import { loadNickname, saveIdentity, saveNickname } from "@/lib/player-identity";
 
@@ -20,11 +21,16 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const highlights = ["中文词库", "实时画布", "免注册开局"];
-const steps = [
-  { title: "开房", text: "输入昵称，一键生成房号。" },
-  { title: "轮流画", text: "画者选词，其他玩家抢答。" },
-  { title: "看排名", text: "越快猜中，分数越高。" },
+const highlights = [
+  { icon: Brush, label: "实时画布", text: "低延迟同步笔触" },
+  { icon: UsersRound, label: "好友房", text: "复制房号立刻开局" },
+  { icon: Sparkles, label: "中文词库", text: "为汉字猜词设计" },
+];
+
+const flow = [
+  { icon: DoorOpen, title: "开房", text: "昵称进场，房号自动生成。" },
+  { icon: Gauge, title: "抢答", text: "线索逐步揭开，越快越赚。" },
+  { icon: Clock3, title: "轮换", text: "每个人都有一轮上台作画。" },
 ];
 
 function Index() {
@@ -62,40 +68,86 @@ function Index() {
   };
 
   const field =
-    "w-full rounded-md border-2 border-[var(--ink)] bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-primary";
+    "w-full rounded-md border-2 border-[var(--ink)] bg-card px-3 py-3 outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-primary";
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col justify-center gap-6 p-5 sm:p-8">
-      <section className="grid items-center gap-6 lg:grid-cols-[1fr_400px]">
-        <div className="space-y-5 text-center lg:text-left">
+    <main className="mx-auto grid min-h-screen w-full max-w-6xl items-center gap-5 px-5 py-6 sm:px-8 lg:grid-cols-[minmax(0,1fr)_420px]">
+      <section className="space-y-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="label-chip text-xs font-semibold text-primary">
+            <Sparkles className="size-3.5" /> 中文画猜派对
+          </span>
+          <span className="label-chip text-xs font-semibold">
+            <Link2 className="size-3.5 text-[var(--teal)]" /> 免注册开局
+          </span>
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
           <div>
-            <h1 className="font-display text-5xl leading-tight text-primary sm:text-6xl">你画我猜</h1>
-            <p className="mt-2 text-base text-muted-foreground sm:text-lg">中文多人在线 · 画图 + 汉字抢答</p>
+            <h1 className="ink-title font-display text-6xl leading-none text-primary sm:text-7xl lg:text-8xl">
+              你画我猜
+            </h1>
+            <p className="mt-4 max-w-xl text-lg leading-8 text-muted-foreground">
+              像围在一张大画纸旁边玩游戏：一人作画，大家用中文抢答，答案、分数和节奏都实时同步。
+            </p>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-2 lg:justify-start">
-            {highlights.map((item) => (
-              <span
-                key={item}
-                className="rounded-md border-2 border-[var(--ink)] bg-secondary px-3 py-1 text-sm font-medium shadow-[2px_2px_0_0_var(--ink)]"
-              >
-                {item}
-              </span>
-            ))}
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            {steps.map((step, index) => (
-              <article key={step.title} className="panel p-4 text-left">
-                <p className="font-display text-xl text-primary">{index + 1}. {step.title}</p>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">{step.text}</p>
-              </article>
-            ))}
+          <div className="studio-panel hidden min-h-64 p-4 xl:block">
+            <div className="paper relative h-full overflow-hidden rounded-md border-2 border-[var(--ink)] p-4">
+              <div className="absolute right-4 top-4 rounded-full border-2 border-[var(--ink)] bg-accent px-3 py-1 text-xs font-semibold">
+                第 2 回合
+              </div>
+              <svg viewBox="0 0 260 160" className="mt-10 h-36 w-full" aria-hidden="true">
+                <path
+                  d="M28 112 C64 58 106 134 142 78 C164 44 196 54 222 34"
+                  fill="none"
+                  stroke="var(--primary)"
+                  strokeWidth="12"
+                  strokeLinecap="round"
+                  className="animate-draw-dash"
+                />
+                <path
+                  d="M52 126 C82 102 105 107 126 130 C151 155 184 138 205 116"
+                  fill="none"
+                  stroke="var(--teal)"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  className="animate-draw-dash"
+                  style={{ animationDelay: "160ms" }}
+                />
+                <circle cx="74" cy="54" r="14" fill="var(--gold)" stroke="var(--ink)" strokeWidth="4" />
+                <circle cx="188" cy="92" r="18" fill="oklch(0.55 0.13 255)" stroke="var(--ink)" strokeWidth="4" />
+              </svg>
+              <div className="absolute bottom-4 left-4 right-4 grid grid-cols-3 gap-2 text-xs">
+                {['山', '_', '_'].map((item, i) => (
+                  <span key={`${item}-${i}`} className="rounded-md border-2 border-[var(--ink)] bg-card py-1 text-center font-display text-lg">
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="panel w-full p-6">
-          <label className="block text-sm font-medium" htmlFor="name">
+        <div className="grid gap-3 sm:grid-cols-3">
+          {highlights.map(({ icon: Icon, label, text }) => (
+            <article key={label} className="studio-panel p-4">
+              <Icon className="size-5 text-primary" />
+              <h2 className="mt-3 font-display text-xl text-foreground">{label}</h2>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">{text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <aside className="studio-panel p-4 sm:p-5">
+        <div className="rounded-md border-2 border-[var(--ink)] bg-[var(--wash)] p-3">
+          <p className="font-display text-2xl text-primary">开局控制台</p>
+          <p className="mt-1 text-sm text-muted-foreground">创建新房或带房号加入。</p>
+        </div>
+
+        <div className="mt-4 space-y-4">
+          <label className="block text-sm font-semibold" htmlFor="name">
             昵称
           </label>
           <input
@@ -104,45 +156,63 @@ function Index() {
             maxLength={12}
             onChange={(e) => setName(e.target.value)}
             placeholder="小画家"
-            className={`mt-1 ${field}`}
+            className={field}
           />
 
           <button
             type="button"
             onClick={create}
             disabled={busy}
-            className="mt-4 w-full rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-3 font-display text-xl text-primary-foreground shadow-[4px_4px_0_0_var(--ink)] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60"
+            className="press flex w-full items-center justify-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-60"
           >
             {busy ? "创建中…" : "创建房间"}
+            <ArrowRight className="size-5" />
           </button>
 
-          <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="h-px flex-1 bg-border" />或<span className="h-px flex-1 bg-border" />
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />
+            或加入好友房
+            <span className="h-px flex-1 bg-border" />
           </div>
 
-          <div className="flex gap-2">
+          <div className="grid grid-cols-[minmax(0,1fr)_96px] gap-2">
             <input
               value={code}
               maxLength={8}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="输入房号"
-              className={`${field} tracking-[0.3em]`}
+              className={`${field} tracking-[0.28em]`}
             />
             <button
               type="button"
               onClick={join}
               disabled={busy}
-              className="shrink-0 rounded-md border-2 border-[var(--ink)] bg-accent px-5 font-display text-lg text-accent-foreground shadow-[3px_3px_0_0_var(--ink)] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60"
+              className="press rounded-md border-2 border-[var(--ink)] bg-accent px-4 font-display text-lg text-accent-foreground shadow-[4px_4px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-60"
             >
               加入
             </button>
           </div>
         </div>
-      </section>
 
-      <Link to="/how-to-play" className="self-center text-sm text-primary underline underline-offset-4">
-        玩法说明
-      </Link>
+        <div className="mt-5 grid gap-2">
+          {flow.map(({ icon: Icon, title, text }) => (
+            <div key={title} className="grid grid-cols-[36px_minmax(0,1fr)] gap-3 rounded-md border-2 border-border bg-card/70 p-3">
+              <span className="grid size-9 place-items-center rounded-md border-2 border-[var(--ink)] bg-secondary">
+                <Icon className="size-4" />
+              </span>
+              <span>
+                <span className="block font-display text-lg leading-none text-primary">{title}</span>
+                <span className="mt-1 block text-sm leading-6 text-muted-foreground">{text}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <Link to="/how-to-play" className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-primary underline underline-offset-4">
+          玩法说明
+          <ArrowRight className="size-3.5" />
+        </Link>
+      </aside>
     </main>
   );
 }

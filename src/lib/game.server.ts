@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { DEFAULT_ROOM_THEME, normalizeRoomTheme, type RoomTheme } from "@/lib/game-themes";
 
 export const CHOOSE_SECONDS = 15;
 export const TURN_END_SECONDS = 6;
@@ -159,6 +160,113 @@ const LOCAL_WORD_BANK: WordEntry[] = [
   ["周末早茶", "本地生活", "挑战"],
 ].map(([word, category, difficulty]) => ({ word, category, difficulty })) as WordEntry[];
 
+const THEME_WORD_BANKS: Record<Exclude<RoomTheme, "全部主题" | "马来西亚日常">, WordEntry[]> = {
+  我爱槟城: [
+    ["乔治市", "我爱槟城", "普通"],
+    ["姓周桥", "我爱槟城", "普通"],
+    ["升旗山", "我爱槟城", "普通"],
+    ["极乐寺", "我爱槟城", "普通"],
+    ["槟城渡轮", "我爱槟城", "挑战"],
+    ["壁画街", "我爱槟城", "普通"],
+    ["光大", "我爱槟城", "容易"],
+    ["海墘", "我爱槟城", "容易"],
+    ["新关仔角", "我爱槟城", "挑战"],
+    ["峇都丁宜", "我爱槟城", "挑战"],
+    ["槟城大桥", "我爱槟城", "挑战"],
+    ["亚依淡", "我爱槟城", "普通"],
+    ["浮罗山背", "我爱槟城", "挑战"],
+    ["槟城叻沙", "我爱槟城", "挑战"],
+    ["炒粿条", "我爱槟城", "普通"],
+    ["福建面", "我爱槟城", "普通"],
+    ["煎蕊", "我爱槟城", "容易"],
+    ["豆蔻汁", "我爱槟城", "普通"],
+    ["白咖喱面", "我爱槟城", "挑战"],
+    ["扁担饭", "我爱槟城", "普通"],
+    ["娘惹糕", "我爱槟城", "普通"],
+    ["咸鱼骨", "我爱槟城", "普通"],
+    ["老厝", "我爱槟城", "容易"],
+    ["骑楼", "我爱槟城", "容易"],
+    ["五脚基", "我爱槟城", "普通"],
+    ["三轮车", "我爱槟城", "普通"],
+    ["街边壁画", "我爱槟城", "高手"],
+    ["海边日落", "我爱槟城", "挑战"],
+    ["庙会香炉", "我爱槟城", "高手"],
+    ["古迹酒店", "我爱槟城", "挑战"],
+    ["周末塞车", "我爱槟城", "挑战"],
+    ["早市咖啡", "我爱槟城", "挑战"],
+  ],
+  我爱马六甲: [
+    ["红屋", "我爱马六甲", "容易"],
+    ["鸡场街", "我爱马六甲", "普通"],
+    ["马六甲河", "我爱马六甲", "挑战"],
+    ["圣保罗山", "我爱马六甲", "挑战"],
+    ["荷兰广场", "我爱马六甲", "挑战"],
+    ["海事博物馆", "我爱马六甲", "高手"],
+    ["旋转塔", "我爱马六甲", "普通"],
+    ["三轮花车", "我爱马六甲", "挑战"],
+    ["娘惹屋", "我爱马六甲", "普通"],
+    ["青云亭", "我爱马六甲", "普通"],
+    ["峇峇娘惹", "我爱马六甲", "挑战"],
+    ["娘惹餐", "我爱马六甲", "普通"],
+    ["鸡饭粒", "我爱马六甲", "普通"],
+    ["椰糖煎蕊", "我爱马六甲", "挑战"],
+    ["沙爹朱律", "我爱马六甲", "挑战"],
+    ["葡式蛋挞", "我爱马六甲", "挑战"],
+    ["榴莲煎蕊", "我爱马六甲", "挑战"],
+    ["古城鸡饭", "我爱马六甲", "挑战"],
+    ["周末夜市", "我爱马六甲", "挑战"],
+    ["河边咖啡", "我爱马六甲", "挑战"],
+    ["古城墙", "我爱马六甲", "普通"],
+    ["炮台", "我爱马六甲", "容易"],
+    ["纪念品店", "我爱马六甲", "挑战"],
+    ["木屐", "我爱马六甲", "容易"],
+    ["花砖", "我爱马六甲", "容易"],
+    ["老街招牌", "我爱马六甲", "挑战"],
+    ["河上游船", "我爱马六甲", "挑战"],
+    ["游客合照", "我爱马六甲", "挑战"],
+    ["古董店", "我爱马六甲", "普通"],
+    ["娘惹珠鞋", "我爱马六甲", "挑战"],
+  ],
+  我爱TVB: [
+    ["茶餐厅", "我爱TVB", "普通"],
+    ["奶茶", "我爱TVB", "容易"],
+    ["菠萝包", "我爱TVB", "普通"],
+    ["烧腊饭", "我爱TVB", "普通"],
+    ["云吞面", "我爱TVB", "普通"],
+    ["鱼蛋档", "我爱TVB", "普通"],
+    ["警署", "我爱TVB", "容易"],
+    ["法庭", "我爱TVB", "容易"],
+    ["新闻直播", "我爱TVB", "挑战"],
+    ["记者会", "我爱TVB", "普通"],
+    ["鉴证科", "我爱TVB", "普通"],
+    ["消防局", "我爱TVB", "普通"],
+    ["医院病房", "我爱TVB", "挑战"],
+    ["律师楼", "我爱TVB", "普通"],
+    ["大家族", "我爱TVB", "普通"],
+    ["豪门晚宴", "我爱TVB", "挑战"],
+    ["天台谈心", "我爱TVB", "挑战"],
+    ["电梯巧遇", "我爱TVB", "挑战"],
+    ["失忆桥段", "我爱TVB", "挑战"],
+    ["卧底身份", "我爱TVB", "挑战"],
+    ["追车戏", "我爱TVB", "普通"],
+    ["办公室恋情", "我爱TVB", "高手"],
+    ["家族争产", "我爱TVB", "挑战"],
+    ["经典对白", "我爱TVB", "挑战"],
+    ["片尾曲", "我爱TVB", "普通"],
+    ["港铁月台", "我爱TVB", "挑战"],
+    ["庙街夜市", "我爱TVB", "挑战"],
+    ["霓虹招牌", "我爱TVB", "挑战"],
+    ["红色的士", "我爱TVB", "挑战"],
+    ["茶餐厅伙计", "我爱TVB", "高手"],
+    ["港剧反派", "我爱TVB", "挑战"],
+    ["大结局", "我爱TVB", "普通"],
+  ],
+} as const;
+
+function themeWords() {
+  return Object.values(THEME_WORD_BANKS).flat();
+}
+
 export function makeCode() {
   let out = "";
   for (let i = 0; i < 5; i++) {
@@ -217,6 +325,7 @@ export type RoomRow = {
   total_rounds: number;
   draw_seconds: number;
   difficulty: string;
+  room_theme?: string | null;
   current_round: number;
   turn_index: number;
   drawer_id: string | null;
@@ -386,16 +495,31 @@ async function saveTurnChoices(roomId: string, payload: Record<string, unknown>,
   return supabaseAdmin.from("room_secrets").upsert(fallbackPayload);
 }
 
-async function pickChoices(difficulty: string, excludedWords: Set<string>) {
+function entryMatchesTheme(entry: WordEntry, theme: RoomTheme) {
+  if (theme === "全部主题") return true;
+  if (theme === "马来西亚日常") return LOCAL_CATEGORIES.has(entry.category) || entry.category.startsWith("本地");
+  const keyword = theme.replace("我爱", "");
+  return entry.category === theme || entry.category.includes(keyword) || entry.word.includes(keyword);
+}
+
+function themedWords(localWords: WordEntry[], dbWords: WordEntry[], theme: RoomTheme) {
+  const localPool = theme === "全部主题" ? localWords : localWords.filter((entry) => entryMatchesTheme(entry, theme));
+  const dbPool = dbWords.filter((entry) => entryMatchesTheme(entry, theme));
+  return dedupeWords([...localPool, ...dbPool]);
+}
+
+async function pickChoices(difficulty: string, excludedWords: Set<string>, roomTheme?: string | null) {
   const selectedDifficulty = normalizeDifficulty(difficulty);
+  const selectedTheme = normalizeRoomTheme(roomTheme ?? DEFAULT_ROOM_THEME);
   const { data } = await supabaseAdmin.from("words").select("word, category, difficulty");
   const dbWords = ((data ?? []) as { word?: string | null; category?: string | null; difficulty?: string | null }[])
     .map(toWordEntry)
     .filter((entry): entry is WordEntry => Boolean(entry));
 
-  const pool = dedupeWords([...LOCAL_WORD_BANK, ...dbWords]).filter(
-    (entry) => (selectedDifficulty === "全部" || entry.difficulty === selectedDifficulty) && !excludedWords.has(entry.word),
-  );
+  const allLocalWords = dedupeWords([...LOCAL_WORD_BANK, ...themeWords()]);
+  const basePool = themedWords(allLocalWords, dbWords, selectedTheme).filter((entry) => !excludedWords.has(entry.word));
+  const difficultyPool = basePool.filter((entry) => selectedDifficulty === "全部" || entry.difficulty === selectedDifficulty);
+  const pool = difficultyPool.length >= 3 || selectedDifficulty === "全部" ? difficultyPool : basePool;
   const picked: WordEntry[] = [];
 
   const takeFrom = (candidates: WordEntry[]) => {
@@ -404,11 +528,14 @@ async function pickChoices(difficulty: string, excludedWords: Set<string>) {
     if (choice) picked.push(choice);
   };
 
-  if (selectedDifficulty === "全部" && Math.random() < 0.65) {
+  if (selectedDifficulty === "全部" && selectedTheme === "全部主题" && Math.random() < 0.55) {
     takeFrom(pool.filter((entry) => LOCAL_CATEGORIES.has(entry.category)));
   }
-  if (Math.random() < 0.22) {
+  if (selectedDifficulty === "全部" && Math.random() < 0.28) {
     takeFrom(pool.filter((entry) => entry.difficulty === "挑战" || entry.difficulty === "高手" || [...entry.word].length >= 4));
+  }
+  if (selectedTheme !== "全部主题" && Math.random() < 0.35) {
+    takeFrom(pool.filter((entry) => [...entry.word].length >= 4));
   }
 
   while (picked.length < 3) {
@@ -482,7 +609,8 @@ export async function startTurn(room: RoomRow) {
   const drawer = alive.get(order[index % order.length])!;
   const resetHistory = room.current_round === 0 && index === 0;
   const { usedWords, supportsUsedWords } = await getUsedWords(room.id, resetHistory);
-  const choices = await pickChoices(room.difficulty, usedWords);
+  const selectedTheme = normalizeRoomTheme(room.room_theme);
+  const choices = await pickChoices(room.difficulty, usedWords, selectedTheme);
   if (choices.length === 0) {
     await endGame({ ...room, current_round: round });
     await say(room.id, round, "system", "题库这一局已经出完了，没有重复题，先看排名。");
@@ -527,7 +655,12 @@ export async function startTurn(room: RoomRow) {
     .delete()
     .eq("room_id", room.id)
     .lt("turn_index", room.turn_index);
-  await say(room.id, round, "system", `第 ${round} 轮 · ${drawer.name} 正在选题`);
+  await say(
+    room.id,
+    round,
+    "system",
+    `第 ${round} 轮 · ${drawer.name} 正在选题${selectedTheme === "全部主题" ? "" : ` · ${selectedTheme}`}`,
+  );
 }
 
 export async function lockWord(room: RoomRow, word: string) {

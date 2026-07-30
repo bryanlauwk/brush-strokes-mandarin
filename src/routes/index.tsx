@@ -63,6 +63,7 @@ function Index() {
   const [avatarSvg, setAvatarSvg] = useState<string | null>(null);
   const [roomTheme, setRoomTheme] = useState<RoomTheme>("全部主题");
   const [code, setCode] = useState("");
+  const [tab, setTab] = useState<EntryTab>("create");
   const [codeHint, setCodeHint] = useState<string | null>(null);
   const [codeStatus, setCodeStatus] = useState<CodeStatus>("idle");
   const [busy, setBusy] = useState(false);

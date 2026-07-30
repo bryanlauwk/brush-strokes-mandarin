@@ -81,7 +81,6 @@ export type Database = {
       players: {
         Row: {
           avatar: number
-          avatar_svg: string | null
           has_guessed: boolean
           id: string
           is_host: boolean
@@ -94,7 +93,6 @@ export type Database = {
         }
         Insert: {
           avatar?: number
-          avatar_svg?: string | null
           has_guessed?: boolean
           id?: string
           is_host?: boolean
@@ -107,7 +105,6 @@ export type Database = {
         }
         Update: {
           avatar?: number
-          avatar_svg?: string | null
           has_guessed?: boolean
           id?: string
           is_host?: boolean
@@ -175,7 +172,6 @@ export type Database = {
           id: string
           masked_word: string | null
           revealed_word: string | null
-          room_theme: string
           round_ends_at: string | null
           round_started_at: string | null
           status: string
@@ -195,7 +191,6 @@ export type Database = {
           id?: string
           masked_word?: string | null
           revealed_word?: string | null
-          room_theme?: string
           round_ends_at?: string | null
           round_started_at?: string | null
           status?: string
@@ -215,7 +210,6 @@ export type Database = {
           id?: string
           masked_word?: string | null
           revealed_word?: string | null
-          room_theme?: string
           round_ends_at?: string | null
           round_started_at?: string | null
           status?: string

@@ -29,6 +29,7 @@ export type Player = {
   has_guessed: boolean;
   is_host: boolean;
   avatar: number;
+  avatar_svg?: string | null;
   joined_at: string;
 };
 

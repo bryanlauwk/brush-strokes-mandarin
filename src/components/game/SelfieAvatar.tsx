@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
-import { Camera, ImagePlus, RefreshCcw, Sparkles, X } from "lucide-react";
+import { Camera, CheckCircle2, ImagePlus, RefreshCcw, Sparkles, X } from "lucide-react";
 import { svgToDataUrl } from "@/components/game/PlayerAvatar";
 import { cn } from "@/lib/utils";
 
@@ -8,6 +8,7 @@ type Props = {
   onChange: (svg: string | null) => void;
   name?: string;
   compact?: boolean;
+  required?: boolean;
 };
 
 type Rgb = { r: number; g: number; b: number };
@@ -22,7 +23,7 @@ type Palette = {
 
 const ACCENTS = ["#f4772e", "#39c0c8", "#f7c948", "#7b4bc4", "#d7263d", "#3f9142"];
 
-export function SelfieAvatar({ value, onChange, name = "画画人", compact }: Props) {
+export function SelfieAvatar({ value, onChange, name = "画画人", compact, required }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -76,6 +77,7 @@ export function SelfieAvatar({ value, onChange, name = "画画人", compact }: P
     const url = URL.createObjectURL(file);
     const image = new Image();
     setBusy(true);
+    setCameraError("");
     image.onload = () => {
       try {
         onChange(createAvatarFromSource(image, name));
@@ -92,10 +94,13 @@ export function SelfieAvatar({ value, onChange, name = "画画人", compact }: P
     image.src = url;
   };
 
-  const useDefault = () => onChange(createDefaultAvatar(name));
+  const reset = () => {
+    onChange(null);
+    setCameraError("");
+  };
 
   return (
-    <div className={cn("rounded-md border-2 border-[var(--ink)] bg-card/80 p-3", compact && "p-2")}>
+    <div className={cn("rounded-md border-2 border-[var(--ink)] bg-card/85 p-3", compact && "p-2")}>
       <input
         ref={inputRef}
         type="file"
@@ -105,19 +110,42 @@ export function SelfieAvatar({ value, onChange, name = "画画人", compact }: P
         onChange={(e) => onFile(e.target.files?.[0])}
       />
 
-      <div className="flex items-center gap-3">
-        <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-[var(--ink)] bg-secondary shadow-[2px_2px_0_0_var(--ink)]">
+      <div className={cn("grid gap-3", compact ? "grid-cols-[72px_minmax(0,1fr)]" : "grid-cols-[96px_minmax(0,1fr)]")}>
+        <div
+          className={cn(
+            "relative grid shrink-0 place-items-center overflow-hidden rounded-full border-2 border-[var(--ink)] bg-secondary shadow-[3px_3px_0_0_var(--ink)]",
+            compact ? "size-[72px]" : "size-24",
+          )}
+        >
           {value ? (
-            <img src={svgToDataUrl(value)} alt="你的可爱角色" className="h-full w-full object-cover" />
+            <>
+              <img src={svgToDataUrl(value)} alt="你的入场画像" className="h-full w-full object-cover" />
+              <span className="absolute right-0 bottom-0 grid size-7 place-items-center rounded-full border-2 border-[var(--ink)] bg-[var(--success)] text-white">
+                <CheckCircle2 className="size-4" />
+              </span>
+            </>
           ) : (
-            <Sparkles className="size-6 text-primary" />
+            <div className="flex flex-col items-center gap-1 text-primary">
+              <Sparkles className="size-7" />
+              <span className="text-[10px] font-semibold">未生成</span>
+            </div>
           )}
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-display text-lg leading-none">自拍变角色</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            原照片只在你的浏览器处理，进房只会保存生成后的小角色。
-          </p>
+
+        <div className="min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="font-display text-lg leading-none">拍照生成入场画像</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                名字和画像准备好，才可以进房。照片只在浏览器处理，进房保存生成后的小画像。
+              </p>
+            </div>
+            {required && (
+              <span className="shrink-0 rounded-full border-2 border-[var(--ink)] bg-accent px-2 py-0.5 text-[10px] font-semibold">
+                必填
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -131,7 +159,7 @@ export function SelfieAvatar({ value, onChange, name = "画画人", compact }: P
               disabled={busy}
               className="press flex flex-1 items-center justify-center gap-1 rounded-md border-2 border-[var(--ink)] bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-[2px_2px_0_0_var(--ink)] disabled:opacity-60"
             >
-              <Camera className="size-4" /> 生成角色
+              <Camera className="size-4" /> 拍好，生成画像
             </button>
             <button
               type="button"
@@ -146,7 +174,7 @@ export function SelfieAvatar({ value, onChange, name = "画画人", compact }: P
       )}
 
       {!cameraOpen && (
-        <div className="mt-3 grid grid-cols-3 gap-2">
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
           <button
             type="button"
             onClick={startCamera}
@@ -165,15 +193,16 @@ export function SelfieAvatar({ value, onChange, name = "画画人", compact }: P
           </button>
           <button
             type="button"
-            onClick={value ? () => onChange(null) : useDefault}
-            disabled={busy}
-            className="press flex items-center justify-center gap-1 rounded-md border-2 border-[var(--ink)] bg-accent px-2 py-2 text-xs font-semibold shadow-[2px_2px_0_0_var(--ink)] disabled:opacity-60"
+            onClick={reset}
+            disabled={busy || !value}
+            className="press flex items-center justify-center gap-1 rounded-md border-2 border-[var(--ink)] bg-accent px-2 py-2 text-xs font-semibold shadow-[2px_2px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-45"
           >
-            <RefreshCcw className="size-4" /> {value ? "重做" : "随机"}
+            <RefreshCcw className="size-4" /> 重做
           </button>
         </div>
       )}
 
+      {busy && <p className="mt-2 text-xs text-muted-foreground">正在生成你的入场画像…</p>}
       {cameraError && <p className="mt-2 text-xs text-primary">{cameraError}</p>}
     </div>
   );
@@ -193,7 +222,7 @@ export function createDefaultAvatar(name: string) {
 
 function createAvatarFromSource(source: CanvasImageSource, name: string) {
   const canvas = document.createElement("canvas");
-  const size = 96;
+  const size = 128;
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -207,9 +236,9 @@ function createAvatarFromSource(source: CanvasImageSource, name: string) {
 
   const seed = hash(name + Date.now().toString(36));
   const palette: Palette = {
-    skin: toHex(averageRegion(ctx, 30, 26, 66, 67, { r: 229, g: 172, b: 127 })),
-    hair: darken(toHex(averageRegion(ctx, 22, 8, 74, 38, { r: 45, g: 31, b: 25 })), 0.22),
-    shirt: saturate(toHex(averageRegion(ctx, 24, 68, 72, 94, { r: 57, g: 132, b: 190 })), 0.2),
+    skin: toHex(averageRegion(ctx, 39, 34, 89, 90, { r: 229, g: 172, b: 127 })),
+    hair: darken(toHex(averageRegion(ctx, 28, 9, 100, 48, { r: 45, g: 31, b: 25 })), 0.24),
+    shirt: saturate(toHex(averageRegion(ctx, 28, 88, 100, 122, { r: 57, g: 132, b: 190 })), 0.25),
     accent: ACCENTS[seed % ACCENTS.length],
     cheek: "#ef7f90",
   };
@@ -240,14 +269,19 @@ function getSourceSize(source: CanvasImageSource, fallback: number) {
 }
 
 function buildCuteAvatar(palette: Palette, seed: number) {
-  const hairFlip = seed % 2 === 0;
+  const flip = seed % 2 === 0;
   const smile = seed % 3;
-  const blushY = smile === 0 ? 57 : 58;
-  const hairPath = hairFlip
-    ? "M24 42c2-19 16-31 35-28 15 2 25 12 26 28-10-8-21-10-34-8-11 1-20 4-27 8Z"
-    : "M18 43c3-19 19-32 38-29 16 3 26 14 24 30-8-9-21-13-36-10-10 2-18 5-26 9Z";
+  const hairTop = flip
+    ? "M26 54c4-28 25-44 53-40 20 3 34 17 35 40-14-12-31-15-49-11-15 3-27 7-39 11Z"
+    : "M20 55c5-29 29-46 57-40 22 4 34 20 31 43-13-14-32-19-52-13-14 4-25 8-36 10Z";
+  const fringe = flip
+    ? "M39 40c8 13 23 17 44 12M48 34c-6 11-14 18-25 22"
+    : "M34 46c16-1 31-6 47-17M84 38c8 8 13 15 18 26";
+  const hand = flip
+    ? "<path d=\"M14 89c12-3 19 4 18 16M18 91l-9-13M25 91l-2-16\" fill=\"none\" stroke=\"#1b1b1b\" stroke-width=\"4\" stroke-linecap=\"round\"/>"
+    : "<path d=\"M114 91c-12-3-19 4-18 16M110 93l9-13M103 93l2-16\" fill=\"none\" stroke=\"#1b1b1b\" stroke-width=\"4\" stroke-linecap=\"round\"/>";
 
-  return `<svg viewBox="0 0 96 96" role="img"><rect width="96" height="96" rx="28" fill="#fff7df"/><circle cx="18" cy="18" r="9" fill="${palette.accent}" opacity=".45"/><circle cx="80" cy="22" r="7" fill="#39c0c8" opacity=".35"/><path d="M24 92c3-20 15-31 25-31s23 11 25 31" fill="${palette.shirt}" stroke="#1b1b1b" stroke-width="3" stroke-linecap="round"/><circle cx="27" cy="52" r="8" fill="${palette.skin}" stroke="#1b1b1b" stroke-width="3"/><circle cx="69" cy="52" r="8" fill="${palette.skin}" stroke="#1b1b1b" stroke-width="3"/><circle cx="48" cy="49" r="26" fill="${palette.skin}" stroke="#1b1b1b" stroke-width="3"/><path d="${hairPath}" fill="${palette.hair}" stroke="#1b1b1b" stroke-width="3" stroke-linejoin="round"/><path d="M31 48c3-3 8-3 11 0M56 48c3-3 8-3 11 0" fill="none" stroke="#1b1b1b" stroke-width="3" stroke-linecap="round"/><circle cx="36" cy="54" r="3" fill="#1b1b1b"/><circle cx="60" cy="54" r="3" fill="#1b1b1b"/><circle cx="32" cy="${blushY}" r="4" fill="${palette.cheek}" opacity=".45"/><circle cx="64" cy="${blushY}" r="4" fill="${palette.cheek}" opacity=".45"/><path d="${smile === 0 ? "M42 64c3 4 9 4 12 0" : smile === 1 ? "M42 64c4 3 8 3 12 0" : "M43 65h10"}" fill="none" stroke="#1b1b1b" stroke-width="3" stroke-linecap="round"/><path d="M34 75c8 4 19 4 28 0" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity=".75"/></svg>`;
+  return `<svg viewBox="0 0 128 128" role="img"><rect width="128" height="128" rx="38" fill="#9bdcff"/><circle cx="64" cy="50" r="44" fill="#fff7df" opacity=".2"/><path d="M0 108c20-18 39-21 58-9 20-13 45-11 70 8v21H0Z" fill="${palette.accent}" opacity=".2"/><path d="M32 126c4-28 17-42 32-42s31 14 35 42" fill="${palette.shirt}" stroke="#1b1b1b" stroke-width="4" stroke-linecap="round"/><circle cx="31" cy="67" r="10" fill="${palette.skin}" stroke="#1b1b1b" stroke-width="4"/><circle cx="97" cy="67" r="10" fill="${palette.skin}" stroke="#1b1b1b" stroke-width="4"/><circle cx="64" cy="63" r="35" fill="${palette.skin}" stroke="#1b1b1b" stroke-width="4"/><path d="${hairTop}" fill="${palette.hair}" stroke="#1b1b1b" stroke-width="4" stroke-linejoin="round"/><path d="${fringe}" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity=".5"/><ellipse cx="48" cy="67" rx="5" ry="7" fill="#111"/><ellipse cx="80" cy="67" rx="5" ry="7" fill="#111"/><circle cx="46" cy="64" r="2" fill="#fff"/><circle cx="78" cy="64" r="2" fill="#fff"/><circle cx="44" cy="78" r="6" fill="${palette.cheek}" opacity=".48"/><circle cx="84" cy="78" r="6" fill="${palette.cheek}" opacity=".48"/><path d="${smile === 0 ? "M55 84c5 7 15 7 20 0" : smile === 1 ? "M55 85c6 4 13 4 19 0" : "M56 86h17"}" fill="none" stroke="#1b1b1b" stroke-width="4" stroke-linecap="round"/><circle cx="56" cy="76" r="1.4" fill="#b66a45"/><circle cx="72" cy="76" r="1.4" fill="#b66a45"/>${hand}<path d="M43 103c13 6 29 6 42 0" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity=".7"/></svg>`;
 }
 
 function averageRegion(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, fallback: Rgb) {

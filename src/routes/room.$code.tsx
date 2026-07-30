@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Copy, LogOut, MessageCircle, X } from "lucide-react";
 import { DrawBoard } from "@/components/game/DrawBoard";
 import { ChatPanel } from "@/components/game/ChatPanel";
+import { DrawingHintPanel } from "@/components/game/DrawingHintPanel";
 import { PlayerAvatar } from "@/components/game/PlayerAvatar";
 import { Scoreboard } from "@/components/game/Scoreboard";
 import { SelfieAvatar } from "@/components/game/SelfieAvatar";
@@ -228,6 +229,9 @@ function RoomPage() {
   const urgent = inGame && room.status === "drawing" && secondsLeft <= 10;
   const withLocalAvatar = (player: Player) =>
     player.id === identity.playerId && !player.avatar_svg && avatarSvg ? { ...player, avatar_svg: avatarSvg } : player;
+  const drawingHint = auth && iAmDrawer && room.status === "drawing" && priv.word ? (
+    <DrawingHintPanel auth={auth} turnIndex={room.turn_index} word={priv.word} compact />
+  ) : null;
 
   const chat = (
     <ChatPanel
@@ -302,7 +306,7 @@ function RoomPage() {
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3 lg:grid-cols-[220px_minmax(0,1fr)_290px] lg:grid-rows-1">
+      <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto_auto] gap-3 lg:grid-cols-[220px_minmax(0,1fr)_290px] lg:grid-rows-1">
         <div className="order-2 h-32 min-h-0 lg:order-1 lg:h-auto">
           <Scoreboard players={players} drawerId={room.drawer_id} meId={identity.playerId} meAvatarSvg={avatarSvg} />
         </div>
@@ -434,7 +438,15 @@ function RoomPage() {
           />
         </div>
 
-        <div className="order-3 hidden min-h-0 lg:block">{chat}</div>
+        <div
+          className={cn(
+            "order-3 min-h-0",
+            drawingHint ? "h-44 lg:flex lg:h-auto lg:flex-col lg:gap-3" : "hidden lg:block",
+          )}
+        >
+          {drawingHint && <div className="shrink-0">{drawingHint}</div>}
+          <div className={cn("hidden min-h-0 lg:block", drawingHint && "lg:flex-1")}>{chat}</div>
+        </div>
       </div>
 
       {/* Mobile: chat lives in a bottom sheet so it never pushes the canvas away */}

@@ -2,17 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowRight, Brush, Camera, ChevronDown, DoorOpen, Link2, MapPin, Sparkles, Tv, X } from "lucide-react";
-import { SelfieAvatar, createDefaultAvatar } from "@/components/game/SelfieAvatar";
+import { ArrowRight, Brush, ChevronDown, DoorOpen, Link2, MapPin, Sparkles, Tv, UserRound } from "lucide-react";
+import { CharacterPicker } from "@/components/game/CharacterPicker";
 import { createRoom, roomExists } from "@/lib/game.functions";
 import { ROOM_THEME_OPTIONS, type RoomTheme } from "@/lib/game-themes";
-import { homeEntryPreviewImage } from "@/lib/home-assets";
+import { createDefaultAvatar, isPresetCharacterAvatar } from "@/lib/character-avatars";
 import homeUkiyoBg from "@/assets/home-ukiyo-bg.png.asset.json";
 import { loadAvatarSvg, loadNickname, saveAvatarSvg, saveIdentity, saveNickname } from "@/lib/player-identity";
 import "@/styles/home-ukiyo.css";
 
 const appTitle = "画啦猜啦 · 马来西亚华语画猜派对";
-const appDescription = "用漫画角色登场，开主题房、分享号码、轮流画画，用华语猜本地题目。";
+const appDescription = "选角色、开主题房、轮流画画，用华语猜本地题目。";
 
 type EntryIntent = "create" | "join";
 
@@ -49,15 +49,15 @@ export const Route = createFileRoute("/")({
 });
 
 const highlights = [
-  { icon: Camera, label: "角色登场", text: "圆脸漫画头像，房间名单更有戏。" },
+  { icon: UserRound, label: "选角登场", text: "15 个漫画、动漫、超英风角色，开局更快。" },
   { icon: MapPin, label: "主题开局", text: "槟城、马六甲、TVB，全主题随机抽。" },
   { icon: Brush, label: "猜中有感", text: "音效、粒子和庆祝动画一起出场。" },
 ];
 
 const flow = [
-  { icon: DoorOpen, title: "开房", text: "选主题，发号码。" },
+  { icon: DoorOpen, title: "选角", text: "名字和角色。" },
   { icon: Tv, title: "开画", text: "题目随机来。" },
-  { icon: Sparkles, title: "猜中", text: "全场一起庆祝。" },
+  { icon: Sparkles, title: "猜中", text: "全场庆祝。" },
 ];
 
 function Index() {
@@ -71,7 +71,6 @@ function Index() {
   const [codeHint, setCodeHint] = useState<string | null>(null);
   const [codeStatus, setCodeStatus] = useState<CodeStatus>("idle");
   const [busy, setBusy] = useState(false);
-  const [entryIntent, setEntryIntent] = useState<EntryIntent | null>(null);
   const nameRef = useRef<HTMLInputElement | null>(null);
   const themeRef = useRef<HTMLSelectElement | null>(null);
   const codeRef = useRef<HTMLInputElement | null>(null);
@@ -79,8 +78,10 @@ function Index() {
   const codeHintTimer = useRef<number | null>(null);
 
   useEffect(() => {
-    setName(loadNickname());
-    setAvatarSvg(loadAvatarSvg());
+    const savedName = loadNickname();
+    const savedAvatar = loadAvatarSvg();
+    setName(savedName);
+    setAvatarSvg(isPresetCharacterAvatar(savedAvatar) ? savedAvatar : createDefaultAvatar(savedName || "画画人"));
   }, []);
 
   const trimmedName = name.trim();
@@ -178,10 +179,6 @@ function Index() {
   const requestEntry = (intent: EntryIntent) => {
     if (!validateName()) return;
     if (intent === "join" && !validateJoinCode()) return;
-    if (!avatarSvg) {
-      setEntryIntent(intent);
-      return;
-    }
     if (intent === "create") void createWithProfile();
     else joinWithProfile();
   };
@@ -204,16 +201,10 @@ function Index() {
 
   const joinWithProfile = () => {
     if (!validateName() || !validateJoinCode()) return;
+    const svg = avatarSvg ?? createDefaultAvatar(trimmedName);
     saveNickname(trimmedName);
-    saveAvatarSvg(avatarSvg ?? createDefaultAvatar(trimmedName));
+    saveAvatarSvg(svg);
     void navigate({ to: "/room/$code", params: { code } });
-  };
-
-  const continueEntry = () => {
-    const intent = entryIntent;
-    setEntryIntent(null);
-    if (intent === "create") void createWithProfile();
-    if (intent === "join") joinWithProfile();
   };
 
   const field =
@@ -247,7 +238,7 @@ function Index() {
           </h1>
           <div className="title-underline mt-2 h-2 max-w-[12rem] rounded-full bg-[var(--primary)]/80" />
           <p className="subtitle-paper mt-4 max-w-xl rounded-xl border-2 border-[var(--ink)]/20 bg-[var(--wash)]/92 px-4 py-3 text-lg leading-8 text-muted-foreground shadow-[3px_3px_0_0_color-mix(in_oklab,var(--ink)_35%,transparent)] backdrop-blur-sm">
-            输入名字、选主题房，马上和朋友轮流开画。题目从姓周桥、鸡场街到港剧名场面，猜中时全场有音效和庆祝反馈。
+            选好角色和主题，马上和朋友轮流开画。题目从姓周桥、鸡场街到港剧名场面，猜中时全场有音效和庆祝反馈。
           </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -269,7 +260,7 @@ function Index() {
               <Link2 className="size-5" />
               加入房间
             </button>
-            <span className="text-sm text-muted-foreground">免注册，30 秒开局</span>
+            <span className="text-sm text-muted-foreground">免注册，选角即玩</span>
           </div>
         </div>
 
@@ -288,7 +279,7 @@ function Index() {
         <div className="relative overflow-hidden rounded-md border-2 border-[var(--ink)] bg-[var(--wash)] p-4">
           <span className="absolute -right-2 -top-2 text-3xl opacity-25">✦</span>
           <p className="font-display text-2xl text-primary">准备开玩</p>
-          <p className="mt-1 text-sm text-muted-foreground">名字、主题、号码都在这里，手感更快。</p>
+          <p className="mt-1 text-sm text-muted-foreground">名字、主题、角色、号码都在这里。</p>
         </div>
 
         <div className="mt-4 space-y-4">
@@ -346,17 +337,7 @@ function Index() {
             </p>
           </div>
 
-          <div className="grid grid-cols-[48px_minmax(0,1fr)] gap-3 rounded-md border-2 border-[var(--ink)] bg-card/80 p-3">
-            <span className="grid size-12 place-items-center overflow-hidden rounded-full border-2 border-[var(--ink)] bg-secondary">
-              {avatarSvg ? <img src={`data:image/svg+xml;utf8,${encodeURIComponent(avatarSvg)}`} alt="你的入场画像" className="h-full w-full object-cover" /> : <Camera className="size-5 text-primary" />}
-            </span>
-            <span className="min-w-0 self-center">
-              <span className="block font-display text-lg leading-none text-primary">你的角色</span>
-              <span className="mt-1 block text-sm leading-5 text-muted-foreground">
-                {avatarSvg ? "已准备好，房间里更好认。" : "还没角色，开局时会带你生成。"}
-              </span>
-            </span>
-          </div>
+          <CharacterPicker value={avatarSvg} onChange={setAvatarSvg} name={trimmedName || "画画人"} compact />
 
           <button
             ref={createButtonRef}
@@ -452,60 +433,6 @@ function Index() {
           <ArrowRight className="size-3.5" />
         </Link>
       </aside>
-
-      {entryIntent && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-[var(--ink)]/55 px-4 py-6 backdrop-blur-sm">
-          <div className="studio-panel max-h-full w-full max-w-md overflow-y-auto p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-display text-3xl leading-none text-primary">做个角色</p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  拍照或上传一张，我们会转成圆脸漫画头像。不拍也行，会用名字自动生成一个。
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEntryIntent(null)}
-                className="press grid size-10 shrink-0 place-items-center rounded-md border-2 border-[var(--ink)] bg-card shadow-[2px_2px_0_0_var(--ink)]"
-                aria-label="关闭入场画像"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
-            <div className="mt-4 grid grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-md border-2 border-[var(--ink)] bg-[var(--wash)] p-3">
-              <img
-                src={homeEntryPreviewImage}
-                alt="入场画像风格参考"
-                className="size-24 rounded-full border-4 border-[var(--ink)] object-cover shadow-[3px_3px_0_0_var(--ink)]"
-              />
-              <div className="self-center text-sm leading-6 text-muted-foreground">
-                生成好后，你会带着这个角色登场。
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <SelfieAvatar value={avatarSvg} onChange={setAvatarSvg} name={name} compact />
-            </div>
-
-            <button
-              type="button"
-              onClick={continueEntry}
-              disabled={busy}
-              className="press mt-4 flex w-full items-center justify-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
-            >
-              {avatarSvg
-                ? entryIntent === "create"
-                  ? "角色好了，开房"
-                  : "角色好了，进房"
-                : entryIntent === "create"
-                  ? "先用默认角色开房"
-                  : "先用默认角色进房"}
-              <ArrowRight className="size-5" />
-            </button>
-          </div>
-        </div>
-      )}
     </main>
   );
 }

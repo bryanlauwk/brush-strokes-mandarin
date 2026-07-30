@@ -53,7 +53,7 @@ export function DrawingHintPanel({ auth, turnIndex, word, compact }: Props) {
   }, [load, word]);
 
   const imageReady = hint?.source === "ai" && !!hint.imageUrl;
-  const badge = imageReady ? "简笔图" : status === "loading" ? "准备中" : "未出图";
+  const badge = imageReady ? "AI" : status === "loading" ? "准备中" : "未出图";
   const failText = (() => {
     if (status === "loading") return null;
     switch (hint?.reason) {
@@ -75,7 +75,7 @@ export function DrawingHintPanel({ auth, turnIndex, word, compact }: Props) {
           <Pencil className="size-4 text-primary" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-display text-lg leading-none">简笔提示</p>
+          <p className="font-display text-lg leading-none">画图提示</p>
           <p className="mt-1 text-xs text-muted-foreground">只给画家看</p>
         </div>
         <span className="rounded-full border-2 border-[var(--ink)] bg-card px-2 py-0.5 text-[10px] font-semibold">
@@ -90,7 +90,7 @@ export function DrawingHintPanel({ auth, turnIndex, word, compact }: Props) {
         )}
       >
         {imageReady ? (
-          <img src={hint.imageUrl!} alt="AI 生成的简笔提示" className="h-full w-full bg-[#fffdf7] object-contain p-2" />
+          <img src={hint.imageUrl!} alt="AI 生成的画图提示" className="h-full w-full bg-[#fffdf7] object-contain p-2" />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 bg-[linear-gradient(#00000008_1px,transparent_1px),linear-gradient(90deg,#00000008_1px,transparent_1px)] bg-[size:22px_22px] px-4 text-center text-muted-foreground">
             <ImageIcon className={cn("text-primary", compact ? "size-6" : "size-8")} />

@@ -1,5 +1,6 @@
 import { Check, Crown, Pencil, Trophy, UsersRound } from "lucide-react";
-import { AVATARS, type Player } from "@/lib/game-types";
+import { PlayerAvatar } from "@/components/game/PlayerAvatar";
+import type { Player } from "@/lib/game-types";
 import { cn } from "@/lib/utils";
 
 export function Scoreboard({
@@ -50,15 +51,10 @@ export function Scoreboard({
               )}
               <div className="relative grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2">
                 <span className="w-5 shrink-0 text-center font-display text-sm text-primary">{i + 1}</span>
-                <span
-                  className={cn(
-                    "grid size-9 shrink-0 place-items-center rounded-full border-2 border-[var(--ink)] bg-background text-lg",
-                    i === 0 && "bg-[var(--gold)]/60",
-                    p.id === drawerId && "bg-primary/15",
-                  )}
-                >
-                  {AVATARS[p.avatar % AVATARS.length]}
-                </span>
+                <PlayerAvatar
+                  player={p}
+                  className={cn(i === 0 && "bg-[var(--gold)]/60", p.id === drawerId && "bg-primary/15")}
+                />
                 <span className="min-w-0 text-sm leading-tight break-words [overflow-wrap:anywhere] line-clamp-2">
                   {p.name}
                   {p.id === meId && <span className="text-muted-foreground">（你）</span>}

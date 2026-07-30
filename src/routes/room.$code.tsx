@@ -10,7 +10,7 @@ import { PlayerAvatar } from "@/components/game/PlayerAvatar";
 import { Scoreboard } from "@/components/game/Scoreboard";
 import { SelfieAvatar } from "@/components/game/SelfieAvatar";
 import { useRoom } from "@/hooks/use-room";
-import { DIFFICULTIES, type Difficulty, type Player, type Stroke } from "@/lib/game-types";
+import { DIFFICULTIES, ROOM_THEME_OPTIONS, normalizeRoomTheme, type Difficulty, type Player, type RoomTheme, type Stroke } from "@/lib/game-types";
 import { cn } from "@/lib/utils";
 import {
   chooseWord,
@@ -227,6 +227,7 @@ function RoomPage() {
 
   if (!room) return <Shell><p className="text-muted-foreground">正在连接这一局…</p></Shell>;
 
+  const currentRoomTheme = normalizeRoomTheme(room.room_theme);
   const drawer = players.find((p) => p.id === room.drawer_id) ?? null;
   const iAmDrawer = room.drawer_id === identity.playerId;
   const secondsLeft = room.round_ends_at
@@ -284,6 +285,9 @@ function RoomPage() {
           {upper}
           <Copy className="size-3.5" />
         </button>
+        <span className="rounded-full border-2 border-[var(--ink)] bg-accent px-3 py-1 text-xs font-semibold">
+          {currentRoomTheme}
+        </span>
         {inGame && (
           <>
             <span className="rounded-full border-2 border-[var(--ink)] bg-card px-3 py-1 text-xs sm:text-sm">
@@ -343,6 +347,7 @@ function RoomPage() {
                       totalRounds={room.total_rounds}
                       drawSeconds={room.draw_seconds}
                       difficulty={room.difficulty}
+                      roomTheme={currentRoomTheme}
                       onSettings={(s) =>
                         void settingsFn({ data: { ...auth!, ...s } }).catch((e) =>
                           toast.error(e instanceof Error ? e.message : "保存失败"),
@@ -514,6 +519,7 @@ function WaitingCard({
   totalRounds,
   drawSeconds,
   difficulty,
+  roomTheme,
   onSettings,
   onStart,
 }: {
@@ -523,10 +529,12 @@ function WaitingCard({
   totalRounds: number;
   drawSeconds: number;
   difficulty: string;
-  onSettings: (s: { totalRounds: number; drawSeconds: number; difficulty: Difficulty }) => void;
+  roomTheme: RoomTheme;
+  onSettings: (s: { totalRounds: number; drawSeconds: number; difficulty: Difficulty; roomTheme: RoomTheme }) => void;
   onStart: () => void;
 }) {
   const currentDifficulty = asDifficulty(difficulty);
+  const currentRoomTheme = normalizeRoomTheme(roomTheme);
   const select =
     "mt-1 w-full rounded-md border-2 border-[var(--ink)] bg-background px-2 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60";
   return (
@@ -535,34 +543,24 @@ function WaitingCard({
       <p className="mt-1 text-sm text-muted-foreground">
         把号码 <span className="font-semibold tracking-[0.2em]">{code}</span> 发给朋友
       </p>
-      <div className="mt-4 grid grid-cols-3 gap-2 text-left">
+      <div className="mt-4 grid grid-cols-2 gap-2 text-left">
         <label className="text-xs font-medium">
-          轮数
+          主题房
           <select
             className={select}
             disabled={!isHost}
-            value={totalRounds}
+            value={currentRoomTheme}
             onChange={(e) =>
-              onSettings({ totalRounds: Number(e.target.value), drawSeconds, difficulty: currentDifficulty })
+              onSettings({
+                totalRounds,
+                drawSeconds,
+                difficulty: currentDifficulty,
+                roomTheme: normalizeRoomTheme(e.target.value),
+              })
             }
           >
-            {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
-        </label>
-        <label className="text-xs font-medium">
-          每轮秒数
-          <select
-            className={select}
-            disabled={!isHost}
-            value={drawSeconds}
-            onChange={(e) =>
-              onSettings({ totalRounds, drawSeconds: Number(e.target.value), difficulty: currentDifficulty })
-            }
-          >
-            {[40, 60, 80, 100, 120].map((n) => (
-              <option key={n} value={n}>{n}</option>
+            {ROOM_THEME_OPTIONS.map((theme) => (
+              <option key={theme.value} value={theme.value}>{theme.label}</option>
             ))}
           </select>
         </label>
@@ -577,6 +575,7 @@ function WaitingCard({
                 totalRounds,
                 drawSeconds,
                 difficulty: asDifficulty(e.target.value),
+                roomTheme: currentRoomTheme,
               })
             }
           >
@@ -585,9 +584,49 @@ function WaitingCard({
             ))}
           </select>
         </label>
+        <label className="text-xs font-medium">
+          轮数
+          <select
+            className={select}
+            disabled={!isHost}
+            value={totalRounds}
+            onChange={(e) =>
+              onSettings({
+                totalRounds: Number(e.target.value),
+                drawSeconds,
+                difficulty: currentDifficulty,
+                roomTheme: currentRoomTheme,
+              })
+            }
+          >
+            {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs font-medium">
+          每轮秒数
+          <select
+            className={select}
+            disabled={!isHost}
+            value={drawSeconds}
+            onChange={(e) =>
+              onSettings({
+                totalRounds,
+                drawSeconds: Number(e.target.value),
+                difficulty: currentDifficulty,
+                roomTheme: currentRoomTheme,
+              })
+            }
+          >
+            {[40, 60, 80, 100, 120].map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        </label>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
-        {isHost ? "主持人的设置会自动保存" : "等主持人调整设置"}
+        {isHost ? "全部难度会随机出题；主题和设置会自动保存" : "等主持人调整主题和设置"}
       </p>
       {isHost ? (
         <button

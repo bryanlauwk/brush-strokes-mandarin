@@ -31,6 +31,34 @@
   background: oklch(0.99 0.014 90);
 }
 
+/* Step flow: numbered, connected, one single narrative */
+.home-steps {
+  counter-reset: home-step;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.home-step {
+  min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .home-step + .home-step::before {
+    content: "";
+    position: absolute;
+    left: -0.85rem;
+    top: 2.1rem;
+    width: 0.7rem;
+    height: 2px;
+    background: color-mix(in oklab, var(--ink) 45%, transparent);
+  }
+}
+
+.home-tabs button[role="tab"] {
+  min-width: 0;
+}
+
 .home-ukiyo-bg {
   position: fixed;
   inset: 0;

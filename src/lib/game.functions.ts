@@ -9,6 +9,7 @@ const identity = z.object({
 
 const difficulty = z.enum(["全部", "容易", "普通", "挑战", "高手", "简单", "中等", "困难"]);
 const profile = z.object({ name: z.string().max(30), avatarSvg: z.string().max(5000).nullable().optional() });
+const avatarRequiredMessage = "先拍照或上传照片，生成入场画像";
 
 type PlayerInsert = Record<string, unknown>;
 
@@ -51,6 +52,7 @@ export const createRoom = createServerFn({ method: "POST" })
     const g = await import("./game.server");
     const name = g.cleanName(data.name);
     const avatarSvg = cleanAvatarSvg(data.avatarSvg);
+    if (!avatarSvg) throw new Error(avatarRequiredMessage);
 
     let code = g.makeCode();
     for (let i = 0; i < 6; i++) {
@@ -100,6 +102,7 @@ export const joinRoom = createServerFn({ method: "POST" })
     let name = g.cleanName(data.name);
     if (players.some((p) => p.name === name)) name = `${name}2`.slice(0, 12);
     const avatarSvg = cleanAvatarSvg(data.avatarSvg);
+    if (!avatarSvg) throw new Error(avatarRequiredMessage);
 
     const { data: player, error } = await insertPlayer(supabaseAdmin, {
       room_id: room.id,

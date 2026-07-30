@@ -12,7 +12,7 @@ import { loadAvatarSvg, loadNickname, saveAvatarSvg, saveIdentity, saveNickname 
 import "@/styles/home-ukiyo.css";
 
 const appTitle = "画啦猜啦 · 马来西亚华语画猜派对";
-const appDescription = "选角色、开主题房、轮流画画，用华语猜本地题目。";
+const appDescription = "选角色、开房间、一起画画猜题。";
 
 type EntryIntent = "create" | "join";
 
@@ -49,15 +49,15 @@ export const Route = createFileRoute("/")({
 });
 
 const highlights = [
-  { icon: UserRound, label: "选角登场", text: "15 个漫画、动漫、超英风角色，开局更快。" },
-  { icon: MapPin, label: "主题开局", text: "槟城、马六甲、TVB，全主题随机抽。" },
-  { icon: Brush, label: "猜中有感", text: "音效、粒子和庆祝动画一起出场。" },
+  { icon: UserRound, label: "选角登场", text: "选一个角色，马上进场。" },
+  { icon: MapPin, label: "主题开局", text: "本地题目，朋友一起猜。" },
+  { icon: Brush, label: "开画抢答", text: "轮到谁，就大胆画。" },
 ];
 
 const flow = [
-  { icon: DoorOpen, title: "选角", text: "名字和角色。" },
-  { icon: Tv, title: "开画", text: "题目随机来。" },
-  { icon: Sparkles, title: "猜中", text: "全场庆祝。" },
+  { icon: DoorOpen, title: "选角", text: "填名选角色。" },
+  { icon: Tv, title: "开房", text: "分享号码。" },
+  { icon: Sparkles, title: "开画", text: "边画边猜。" },
 ];
 
 function Index() {
@@ -238,7 +238,7 @@ function Index() {
           </h1>
           <div className="title-underline mt-2 h-2 max-w-[12rem] rounded-full bg-[var(--primary)]/80" />
           <p className="subtitle-paper mt-4 max-w-xl rounded-xl border-2 border-[var(--ink)]/20 bg-[var(--wash)]/92 px-4 py-3 text-lg leading-8 text-muted-foreground shadow-[3px_3px_0_0_color-mix(in_oklab,var(--ink)_35%,transparent)] backdrop-blur-sm">
-            选好角色和主题，马上和朋友轮流开画。题目从姓周桥、鸡场街到港剧名场面，猜中时全场有音效和庆祝反馈。
+            开个主题房，朋友进来就画。
           </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -279,7 +279,7 @@ function Index() {
         <div className="relative overflow-hidden rounded-md border-2 border-[var(--ink)] bg-[var(--wash)] p-4">
           <span className="absolute -right-2 -top-2 text-3xl opacity-25">✦</span>
           <p className="font-display text-2xl text-primary">准备开玩</p>
-          <p className="mt-1 text-sm text-muted-foreground">名字、主题、角色、号码都在这里。</p>
+          <p className="mt-1 text-sm text-muted-foreground">填好就可以开局。</p>
         </div>
 
         <div className="mt-4 space-y-4">

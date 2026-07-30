@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowRight, Brush, Clock3, DoorOpen, Gauge, Link2, Sparkles, UsersRound } from "lucide-react";
+import { ArrowRight, Brush, Camera, Clock3, DoorOpen, Gauge, Link2, Sparkles, UsersRound } from "lucide-react";
 import { SelfieAvatar } from "@/components/game/SelfieAvatar";
 import { createRoom } from "@/lib/game.functions";
 import { loadAvatarSvg, loadNickname, saveAvatarSvg, saveIdentity, saveNickname } from "@/lib/player-identity";
 
 const appTitle = "画啦猜啦 · 马来西亚华语画猜派对";
-const appDescription = "开一局、分享号码、轮流画画，用华语猜答案。题目收录本地吃喝、地方、节庆和日常生活。";
+const appDescription = "拍照生成入场画像，开一局、分享号码、轮流画画，用华语猜本地题目。";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -23,14 +23,14 @@ export const Route = createFileRoute("/")({
 });
 
 const highlights = [
+  { icon: Camera, label: "先拍入场照", text: "名字和画像准备好，朋友才知道谁来了。" },
   { icon: Brush, label: "顺手画", text: "笔触即时同步，朋友看得到你的每一笔。" },
   { icon: UsersRound, label: "朋友局", text: "复制号码就能进来，不用注册。" },
-  { icon: Sparkles, label: "自拍角色", text: "进房前把照片变成可爱小角色。" },
 ];
 
 const flow = [
-  { icon: DoorOpen, title: "开一局", text: "填名字，系统马上给你一个号码。" },
-  { icon: Gauge, title: "猜答案", text: "越快猜中分数越高，画的人也有分。" },
+  { icon: DoorOpen, title: "准备入场", text: "输入名字，自拍或上传照片生成画像。" },
+  { icon: Gauge, title: "开局猜答案", text: "越快猜中分数越高，画的人也有分。" },
   { icon: Clock3, title: "轮着画", text: "每一轮换一个人画，大家都有机会出题。" },
 ];
 
@@ -47,12 +47,28 @@ function Index() {
     setAvatarSvg(loadAvatarSvg());
   }, []);
 
+  const trimmedName = name.trim();
+  const profileReady = trimmedName.length > 0 && !!avatarSvg;
+
   const rememberProfile = () => {
-    saveNickname(name.trim());
+    saveNickname(trimmedName);
     saveAvatarSvg(avatarSvg);
   };
 
+  const ensureProfile = () => {
+    if (!trimmedName) {
+      toast.error("先输入你的名字");
+      return false;
+    }
+    if (!avatarSvg) {
+      toast.error("先拍照或上传照片，生成入场画像");
+      return false;
+    }
+    return true;
+  };
+
   const create = async () => {
+    if (!ensureProfile()) return;
     setBusy(true);
     try {
       const res = await createFn({ data: { name, avatarSvg } });
@@ -66,6 +82,7 @@ function Index() {
   };
 
   const join = () => {
+    if (!ensureProfile()) return;
     const c = code.trim().toUpperCase();
     if (c.length < 4) {
       toast.error("请输入号码");
@@ -86,7 +103,7 @@ function Index() {
             <Sparkles className="size-3.5" /> 马来西亚华语画猜
           </span>
           <span className="label-chip text-xs font-semibold">
-            <Link2 className="size-3.5 text-[var(--teal)]" /> 免注册，马上玩
+            <Link2 className="size-3.5 text-[var(--teal)]" /> 拍照入场，马上玩
           </span>
         </div>
 
@@ -96,39 +113,28 @@ function Index() {
               画啦猜啦
             </h1>
             <p className="mt-4 max-w-xl text-lg leading-8 text-muted-foreground">
-              像大家围着一张大画纸：一人画，朋友用华语猜。进房前先把自拍变成可爱角色，题目也可能从椰浆饭跳到双峰塔。
+              先输入名字，把自拍变成圆脸动漫入场画像，再进房开画。朋友一眼认出你，题目也可能从椰浆饭跳到双峰塔。
             </p>
           </div>
 
           <div className="studio-panel hidden min-h-64 p-4 xl:block">
             <div className="paper relative h-full overflow-hidden rounded-md border-2 border-[var(--ink)] p-4">
               <div className="absolute right-4 top-4 rounded-full border-2 border-[var(--ink)] bg-accent px-3 py-1 text-xs font-semibold">
-                第 2 轮
+                入场画像
               </div>
-              <svg viewBox="0 0 260 160" className="mt-10 h-36 w-full" aria-hidden="true">
-                <path
-                  d="M28 112 C64 58 106 134 142 78 C164 44 196 54 222 34"
-                  fill="none"
-                  stroke="var(--primary)"
-                  strokeWidth="12"
-                  strokeLinecap="round"
-                  className="animate-draw-dash"
-                />
-                <path
-                  d="M52 126 C82 102 105 107 126 130 C151 155 184 138 205 116"
-                  fill="none"
-                  stroke="var(--teal)"
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  className="animate-draw-dash"
-                  style={{ animationDelay: "160ms" }}
-                />
-                <circle cx="74" cy="54" r="14" fill="var(--gold)" stroke="var(--ink)" strokeWidth="4" />
-                <circle cx="188" cy="92" r="18" fill="oklch(0.55 0.13 255)" stroke="var(--ink)" strokeWidth="4" />
+              <svg viewBox="0 0 260 160" className="mt-8 h-40 w-full" aria-hidden="true">
+                <circle cx="130" cy="72" r="58" fill="#9bdcff" stroke="var(--ink)" strokeWidth="6" />
+                <circle cx="130" cy="78" r="34" fill="#f7c8a4" stroke="var(--ink)" strokeWidth="5" />
+                <path d="M96 64c8-27 38-39 68-24 12 7 20 18 21 33-24-18-55-20-89-9Z" fill="#1f1712" stroke="var(--ink)" strokeWidth="5" />
+                <ellipse cx="116" cy="78" rx="5" ry="8" fill="var(--ink)" />
+                <ellipse cx="144" cy="78" rx="5" ry="8" fill="var(--ink)" />
+                <path d="M118 96c7 6 17 6 24 0" fill="none" stroke="var(--ink)" strokeWidth="5" strokeLinecap="round" />
+                <path d="M80 132c18-27 35-39 50-39s33 12 50 39" fill="var(--primary)" stroke="var(--ink)" strokeWidth="5" />
+                <path d="M54 118l17-22M70 118l6-26" stroke="var(--ink)" strokeWidth="5" strokeLinecap="round" />
               </svg>
               <div className="absolute bottom-4 left-4 right-4 grid grid-cols-3 gap-2 text-xs">
-                {['茶', '_', '_'].map((item, i) => (
-                  <span key={`${item}-${i}`} className="rounded-md border-2 border-[var(--ink)] bg-card py-1 text-center font-display text-lg">
+                {["名字", "拍照", "开玩"].map((item) => (
+                  <span key={item} className="rounded-md border-2 border-[var(--ink)] bg-card py-1 text-center font-display text-lg">
                     {item}
                   </span>
                 ))}
@@ -150,13 +156,13 @@ function Index() {
 
       <aside className="studio-panel p-4 sm:p-5">
         <div className="rounded-md border-2 border-[var(--ink)] bg-[var(--wash)] p-3">
-          <p className="font-display text-2xl text-primary">今晚玩哪一局？</p>
-          <p className="mt-1 text-sm text-muted-foreground">开新局，或输入朋友给你的号码。</p>
+          <p className="font-display text-2xl text-primary">先做好入场证</p>
+          <p className="mt-1 text-sm text-muted-foreground">名字、画像、房号，一步一步来。</p>
         </div>
 
         <div className="mt-4 space-y-4">
           <label className="block text-sm font-semibold" htmlFor="name">
-            你的名字
+            1. 你的名字
           </label>
           <input
             id="name"
@@ -167,15 +173,18 @@ function Index() {
             className={field}
           />
 
-          <SelfieAvatar value={avatarSvg} onChange={setAvatarSvg} name={name} />
+          <div>
+            <p className="mb-2 text-sm font-semibold">2. 拍照生成画像</p>
+            <SelfieAvatar value={avatarSvg} onChange={setAvatarSvg} name={name} required />
+          </div>
 
           <button
             type="button"
             onClick={create}
-            disabled={busy}
-            className="press flex w-full items-center justify-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-60"
+            disabled={busy || !profileReady}
+            className="press flex w-full items-center justify-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
           >
-            {busy ? "准备中…" : "开一局"}
+            {busy ? "准备中…" : profileReady ? "3. 开一局" : "完成画像后开局"}
             <ArrowRight className="size-5" />
           </button>
 
@@ -196,8 +205,8 @@ function Index() {
             <button
               type="button"
               onClick={join}
-              disabled={busy}
-              className="press rounded-md border-2 border-[var(--ink)] bg-accent px-4 font-display text-lg text-accent-foreground shadow-[4px_4px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-60"
+              disabled={busy || !profileReady}
+              className="press rounded-md border-2 border-[var(--ink)] bg-accent px-4 font-display text-lg text-accent-foreground shadow-[4px_4px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
             >
               加入
             </button>

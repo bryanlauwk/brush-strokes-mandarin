@@ -35,14 +35,7 @@ function cleanAvatarSvg(raw?: string | null) {
 }
 
 async function insertPlayer(supabaseAdmin: Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"], payload: PlayerInsert) {
-  const withAvatar = await supabaseAdmin.from("players").insert(payload).select("*").single();
-  if (!withAvatar.error || !("avatar_svg" in payload)) return withAvatar;
-
-  const message = `${withAvatar.error.code ?? ""} ${withAvatar.error.message ?? ""}`;
-  if (!message.includes("avatar_svg")) return withAvatar;
-
-  const { avatar_svg: _avatarSvg, ...withoutAvatar } = payload;
-  return supabaseAdmin.from("players").insert(withoutAvatar).select("*").single();
+  return supabaseAdmin.from("players").insert(payload).select("*").single();
 }
 
 export const createRoom = createServerFn({ method: "POST" })

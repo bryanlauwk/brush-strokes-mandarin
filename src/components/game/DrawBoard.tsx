@@ -216,11 +216,13 @@ export function DrawBoard({
             </span>
             <div className="min-w-0">
               <p className="font-display text-lg leading-none">大画纸</p>
-              <p className="text-xs text-muted-foreground">{canDraw ? `${activeLabel} · ${size}px` : "看大家怎么画"}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {canDraw ? `${activeLabel} · ${size}px` : (lockReason ?? "看大家怎么画")}
+              </p>
             </div>
-            {canDraw && (
-              <span className="ml-auto rounded-full border-2 border-[var(--ink)] bg-card px-3 py-1 text-xs font-semibold">
-                轮到你画
+            {modeLabel && (
+              <span className="ml-auto shrink-0 rounded-full border-2 border-[var(--ink)] bg-card px-3 py-1 text-xs font-semibold">
+                {modeLabel}
               </span>
             )}
           </div>
@@ -246,13 +248,19 @@ export function DrawBoard({
         </div>
       </div>
 
-      {canDraw && (
-        <div className="studio-panel flex shrink-0 flex-wrap items-center justify-center gap-3 p-2 sm:p-3">
+      <div
+        className={cn(
+          "studio-panel flex shrink-0 flex-wrap items-center justify-center gap-3 p-2 sm:p-3",
+          !canDraw && "pointer-events-none opacity-45 saturate-50",
+        )}
+        aria-disabled={!canDraw}
+      >
           <div className="grid grid-cols-6 gap-1">
             {PALETTE.map((c) => (
               <button
                 key={c}
                 type="button"
+                disabled={!canDraw}
                 aria-label={`颜色 ${c}`}
                 onClick={() => {
                   setColor(c);
@@ -272,6 +280,7 @@ export function DrawBoard({
               <button
                 key={s}
                 type="button"
+                disabled={!canDraw}
                 aria-label={`笔刷 ${s}`}
                 onClick={() => setSize(s)}
                 className={cn(
@@ -288,24 +297,31 @@ export function DrawBoard({
           </div>
 
           <div className="flex items-center gap-1 rounded-md border-2 border-border bg-card/70 p-1">
-            <ToolButton active={tool === "pen"} onClick={() => setTool("pen")} label="画笔">
+            <ToolButton disabled={!canDraw} active={tool === "pen"} onClick={() => setTool("pen")} label="画笔">
               <Pencil className="size-4" />
             </ToolButton>
-            <ToolButton active={tool === "eraser"} onClick={() => setTool("eraser")} label="擦掉">
+            <ToolButton disabled={!canDraw} active={tool === "eraser"} onClick={() => setTool("eraser")} label="擦掉">
               <Eraser className="size-4" />
             </ToolButton>
-            <ToolButton active={tool === "fill"} onClick={() => setTool("fill")} label="填色">
+            <ToolButton disabled={!canDraw} active={tool === "fill"} onClick={() => setTool("fill")} label="填色">
               <PaintBucket className="size-4" />
             </ToolButton>
-            <ToolButton onClick={() => onStroke({ id: crypto.randomUUID(), kind: "undo" })} label="退一步">
+            <ToolButton
+              disabled={!canDraw}
+              onClick={() => onStroke({ id: crypto.randomUUID(), kind: "undo" })}
+              label="退一步"
+            >
               <RotateCcw className="size-4" />
             </ToolButton>
-            <ToolButton onClick={() => onStroke({ id: crypto.randomUUID(), kind: "clear" })} label="清空画纸">
+            <ToolButton
+              disabled={!canDraw}
+              onClick={() => onStroke({ id: crypto.randomUUID(), kind: "clear" })}
+              label="清空画纸"
+            >
               <Trash2 className="size-4" />
             </ToolButton>
           </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -315,17 +331,20 @@ function ToolButton({
   onClick,
   active,
   label,
+  disabled,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   active?: boolean;
   label: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       title={label}
       aria-label={label}
+      disabled={disabled}
       onClick={onClick}
       className={cn(
         "press flex size-9 items-center justify-center rounded-md border-2 border-[var(--ink)] bg-card shadow-[2px_2px_0_0_var(--ink)] hover:bg-accent",

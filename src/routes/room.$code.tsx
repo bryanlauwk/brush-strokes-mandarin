@@ -9,7 +9,7 @@ import { PlayerAvatar } from "@/components/game/PlayerAvatar";
 import { Scoreboard } from "@/components/game/Scoreboard";
 import { SelfieAvatar } from "@/components/game/SelfieAvatar";
 import { useRoom } from "@/hooks/use-room";
-import { DIFFICULTIES, type Difficulty, type Stroke } from "@/lib/game-types";
+import { DIFFICULTIES, type Difficulty, type Player, type Stroke } from "@/lib/game-types";
 import { cn } from "@/lib/utils";
 import {
   chooseWord,
@@ -226,6 +226,8 @@ function RoomPage() {
   const turnsPerRound = Math.max(order.length || players.length, 1);
   const turnInRound = (room.turn_index % turnsPerRound) + 1;
   const urgent = inGame && room.status === "drawing" && secondsLeft <= 10;
+  const withLocalAvatar = (player: Player) =>
+    player.id === identity.playerId && !player.avatar_svg && avatarSvg ? { ...player, avatar_svg: avatarSvg } : player;
 
   const chat = (
     <ChatPanel
@@ -302,7 +304,7 @@ function RoomPage() {
 
       <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3 lg:grid-cols-[220px_minmax(0,1fr)_290px] lg:grid-rows-1">
         <div className="order-2 h-32 min-h-0 lg:order-1 lg:h-auto">
-          <Scoreboard players={players} drawerId={room.drawer_id} meId={identity.playerId} />
+          <Scoreboard players={players} drawerId={room.drawer_id} meId={identity.playerId} meAvatarSvg={avatarSvg} />
         </div>
 
         <div className="order-1 min-h-0 lg:order-2">
@@ -381,7 +383,7 @@ function RoomPage() {
                               className="animate-pop-in flex items-center justify-center gap-1"
                               style={{ animationDelay: `${i * 90}ms` }}
                             >
-                              <PlayerAvatar player={p} size="sm" />
+                              <PlayerAvatar player={withLocalAvatar(p)} size="sm" />
                               <span className="max-w-32 truncate" title={p.name}>{p.name}</span>
                               <span className="font-semibold text-[var(--success)]">+{p.round_score}</span>
                             </li>
@@ -405,7 +407,7 @@ function RoomPage() {
                               style={{ animationDelay: `${i * 120}ms` }}
                             >
                               <span>{["🥇", "🥈", "🥉"][i] ?? `${i + 1}.`}</span>
-                              <PlayerAvatar player={p} size="sm" />
+                              <PlayerAvatar player={withLocalAvatar(p)} size="sm" />
                               <span className="max-w-32 truncate" title={p.name}>{p.name}</span>
                               <span className="tabular-nums">· {p.score}</span>
                             </li>

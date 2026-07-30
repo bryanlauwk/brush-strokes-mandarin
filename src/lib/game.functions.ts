@@ -108,7 +108,6 @@ export const createRoom = createServerFn({ method: "POST" })
     const name = g.cleanName(data.name);
     const avatarSvg = cleanAvatarSvg(data.avatarSvg);
     const selectedTheme = normalizeRoomTheme(data.roomTheme);
-    if (!avatarSvg) throw new Error(avatarRequiredMessage);
 
     let code = g.makeCode();
     for (let i = 0; i < 6; i++) {
@@ -127,7 +126,7 @@ export const createRoom = createServerFn({ method: "POST" })
       avatar: Math.floor(Math.random() * 8),
       avatar_svg: avatarSvg,
     });
-    if (pErr || !player) throw new Error("加入失败");
+    if (pErr || !player) throw new Error(insertPlayerMessage(pErr));
 
     const token = g.makeToken();
     await supabaseAdmin.from("player_tokens").insert({ player_id: player.id, token });
@@ -154,7 +153,6 @@ export const joinRoom = createServerFn({ method: "POST" })
     let name = g.cleanName(data.name);
     if (players.some((p) => p.name === name)) name = `${name}2`.slice(0, 12);
     const avatarSvg = cleanAvatarSvg(data.avatarSvg);
-    if (!avatarSvg) throw new Error(avatarRequiredMessage);
 
     const { data: player, error } = await insertPlayer(supabaseAdmin, {
       room_id: room.id,
@@ -162,7 +160,7 @@ export const joinRoom = createServerFn({ method: "POST" })
       avatar: Math.floor(Math.random() * 8),
       avatar_svg: avatarSvg,
     });
-    if (error || !player) throw new Error("加入失败");
+    if (error || !player) throw new Error(insertPlayerMessage(error));
 
     const token = g.makeToken();
     await supabaseAdmin.from("player_tokens").insert({ player_id: player.id, token });

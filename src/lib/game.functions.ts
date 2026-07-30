@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { ROOM_THEMES, normalizeRoomTheme } from "@/lib/game-themes";
+import type { Stroke } from "@/lib/game-types";
 
 const identity = z.object({
   code: z.string().min(4).max(8),
@@ -414,7 +415,7 @@ export const getRoomSnapshot = createServerFn({ method: "POST" })
     return {
       room,
       players,
-      strokes: ((strokes ?? []) as { payload: Record<string, unknown> }[]).map((r) => r.payload),
+      strokes: ((strokes ?? []) as unknown as { payload: Stroke }[]).map((r) => r.payload),
       messages: messages ?? [],
     };
   });

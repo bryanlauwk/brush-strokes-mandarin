@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { ROOM_THEMES, normalizeRoomTheme } from "@/lib/game-themes";
 
 const identity = z.object({
   code: z.string().min(4).max(8),
@@ -8,10 +9,17 @@ const identity = z.object({
 });
 
 const difficulty = z.enum(["全部", "容易", "普通", "挑战", "高手", "简单", "中等", "困难"]);
-const profile = z.object({ name: z.string().max(30), avatarSvg: z.string().max(5000).nullable().optional() });
+const roomTheme = z.enum(ROOM_THEMES);
+const profile = z.object({
+  name: z.string().max(30),
+  avatarSvg: z.string().max(5000).nullable().optional(),
+  roomTheme: roomTheme.optional(),
+});
 const avatarRequiredMessage = "先拍照或上传照片，生成入场画像";
 
 type PlayerInsert = Record<string, unknown>;
+
+type SupabaseAdmin = Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"];
 
 function cleanAvatarSvg(raw?: string | null) {
   const svg = (raw ?? "").trim();
@@ -34,7 +42,28 @@ function cleanAvatarSvg(raw?: string | null) {
   return svg;
 }
 
-async function insertPlayer(supabaseAdmin: Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"], payload: PlayerInsert) {
+function isMissingColumn(error: { code?: string; message?: string } | null, column: string) {
+  const text = `${error?.code ?? ""} ${error?.message ?? ""}`.toLowerCase();
+  return text.includes(column.toLowerCase()) || text.includes("could not find") || text.includes("schema cache");
+}
+
+async function insertRoom(supabaseAdmin: SupabaseAdmin, payload: Record<string, unknown>) {
+  const withTheme = await supabaseAdmin.from("rooms").insert(payload).select("*").single();
+  if (!withTheme.error || !isMissingColumn(withTheme.error, "room_theme")) return withTheme;
+
+  const { room_theme: _roomTheme, ...fallbackPayload } = payload;
+  return supabaseAdmin.from("rooms").insert(fallbackPayload).select("*").single();
+}
+
+async function updateRoomSettings(supabaseAdmin: SupabaseAdmin, roomId: string, payload: Record<string, unknown>) {
+  const withTheme = await supabaseAdmin.from("rooms").update(payload).eq("id", roomId);
+  if (!withTheme.error || !isMissingColumn(withTheme.error, "room_theme")) return withTheme;
+
+  const { room_theme: _roomTheme, ...fallbackPayload } = payload;
+  return supabaseAdmin.from("rooms").update(fallbackPayload).eq("id", roomId);
+}
+
+async function insertPlayer(supabaseAdmin: SupabaseAdmin, payload: PlayerInsert) {
   return supabaseAdmin.from("players").insert(payload).select("*").single();
 }
 
@@ -45,6 +74,7 @@ export const createRoom = createServerFn({ method: "POST" })
     const g = await import("./game.server");
     const name = g.cleanName(data.name);
     const avatarSvg = cleanAvatarSvg(data.avatarSvg);
+    const selectedTheme = normalizeRoomTheme(data.roomTheme);
     if (!avatarSvg) throw new Error(avatarRequiredMessage);
 
     let code = g.makeCode();
@@ -54,11 +84,7 @@ export const createRoom = createServerFn({ method: "POST" })
       code = g.makeCode();
     }
 
-    const { data: room, error } = await supabaseAdmin
-      .from("rooms")
-      .insert({ code })
-      .select("*")
-      .single();
+    const { data: room, error } = await insertRoom(supabaseAdmin, { code, room_theme: selectedTheme });
     if (error || !room) throw new Error("开局失败");
 
     const { data: player, error: pErr } = await insertPlayer(supabaseAdmin, {
@@ -74,7 +100,7 @@ export const createRoom = createServerFn({ method: "POST" })
     await supabaseAdmin.from("player_tokens").insert({ player_id: player.id, token });
     await supabaseAdmin.from("rooms").update({ host_id: player.id }).eq("id", room.id);
     await supabaseAdmin.from("room_secrets").insert({ room_id: room.id });
-    await g.say(room.id, 0, "system", `${name} 开了一局`);
+    await g.say(room.id, 0, "system", `${name} 开了一局 · ${selectedTheme}`);
 
     return { code: room.code, playerId: player.id, token };
   });
@@ -147,6 +173,7 @@ export const updateSettings = createServerFn({ method: "POST" })
         totalRounds: z.number().int().min(1).max(10),
         drawSeconds: z.number().int().min(30).max(180),
         difficulty,
+        roomTheme: roomTheme.optional(),
       })
       .parse(d),
   )
@@ -157,14 +184,13 @@ export const updateSettings = createServerFn({ method: "POST" })
     if (room.host_id !== player.id) throw new Error("只有主持人可以改设置");
     if (room.status !== "waiting" && room.status !== "ended") throw new Error("这一局已经开始了");
 
-    await supabaseAdmin
-      .from("rooms")
-      .update({
-        total_rounds: data.totalRounds,
-        draw_seconds: data.drawSeconds,
-        difficulty: g.normalizeDifficulty(data.difficulty),
-      })
-      .eq("id", room.id);
+    const saved = await updateRoomSettings(supabaseAdmin, room.id, {
+      total_rounds: data.totalRounds,
+      draw_seconds: data.drawSeconds,
+      difficulty: g.normalizeDifficulty(data.difficulty),
+      room_theme: normalizeRoomTheme(data.roomTheme ?? room.room_theme),
+    });
+    if (saved.error) throw new Error("保存失败");
     return { ok: true };
   });
 

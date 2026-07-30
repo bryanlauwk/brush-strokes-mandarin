@@ -21,7 +21,7 @@ export function Scoreboard({
           <Trophy className="size-4 text-primary" />
         </span>
         <div className="min-w-0">
-          <p className="font-display text-lg leading-none">玩家排行</p>
+          <p className="font-display text-lg leading-none">分数榜</p>
           <p className="flex items-center gap-1 text-xs text-muted-foreground">
             <UsersRound className="size-3" /> {players.length} 人在线
           </p>
@@ -64,12 +64,12 @@ export function Scoreboard({
                   {p.id === meId && <span className="text-muted-foreground">（你）</span>}
                 </span>
                 <span className="flex shrink-0 items-center gap-1">
-                  {p.is_host && <Crown className="size-3.5 text-primary" aria-label="房主" />}
+                  {p.is_host && <Crown className="size-3.5 text-primary" aria-label="主持人" />}
                   {p.id === drawerId && (
-                    <Pencil className="size-3.5 origin-bottom animate-wiggle text-primary" aria-label="画者" />
+                    <Pencil className="size-3.5 origin-bottom animate-wiggle text-primary" aria-label="画的人" />
                   )}
                   {p.has_guessed && p.id !== drawerId && (
-                    <Check className="size-3.5 text-[var(--success)]" aria-label="已猜对" />
+                    <Check className="size-3.5 text-[var(--success)]" aria-label="已猜中" />
                   )}
                   <span className="tabular-nums text-sm font-semibold">{p.score}</span>
                 </span>

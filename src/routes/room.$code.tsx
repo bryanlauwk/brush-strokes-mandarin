@@ -394,18 +394,21 @@ function RoomPage() {
 
         <div className="order-1 min-h-0 lg:order-2">
           <DrawBoard
-            strokes={strokes}
+            strokes={isLobby ? scratch : strokes}
             live={live}
-            canDraw={iAmDrawer && room.status === "drawing"}
+            canDraw={isLobby || (iAmDrawer && room.status === "drawing")}
+            lockReason={lockReason}
+            modeLabel={isLobby ? "自由涂鸦" : iAmDrawer && room.status === "drawing" ? "轮到你画" : undefined}
             onStroke={handleStroke}
             onLive={broadcastLive}
             onLiveEnd={broadcastLiveEnd}
             overlay={
               <>
                 {room.status === "waiting" && (
-                  <Overlay>
+                  <Overlay transparent>
                     <WaitingCard
                       canStart={isHost && players.length >= 2}
+                      playerCount={players.length}
                       isHost={isHost}
                       code={upper}
                       totalRounds={room.total_rounds}

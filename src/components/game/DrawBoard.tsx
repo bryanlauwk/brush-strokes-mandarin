@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Eraser, PaintBucket, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { Brush, Eraser, PaintBucket, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { BRUSH_SIZES, PALETTE, type Stroke } from "@/lib/game-types";
 import type { LiveStroke } from "@/hooks/use-room";
 import { cn } from "@/lib/utils";
@@ -48,7 +48,7 @@ export function DrawBoard({ strokes, live, canDraw, onStroke, onLive, onLiveEnd,
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = "#fffdf7";
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
     const committed: Stroke[] = [];
@@ -59,7 +59,7 @@ export function DrawBoard({ strokes, live, canDraw, onStroke, onLive, onLiveEnd,
     }
     for (const s of committed) {
       if (s.kind === "fill") {
-        ctx.fillStyle = s.color ?? "#ffffff";
+        ctx.fillStyle = s.color ?? "#fffdf7";
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
       } else if (s.kind === "line") {
         drawLine(ctx, { color: s.color ?? "#000", size: s.size ?? 8, points: s.points ?? [] });
@@ -92,7 +92,7 @@ export function DrawBoard({ strokes, live, canDraw, onStroke, onLive, onLiveEnd,
     }
     drawingRef.current = {
       id: crypto.randomUUID(),
-      color: tool === "eraser" ? "#ffffff" : color,
+      color: tool === "eraser" ? "#fffdf7" : color,
       size: tool === "eraser" ? size * 2.2 : size,
       points: [point],
     };
@@ -126,29 +126,50 @@ export function DrawBoard({ strokes, live, canDraw, onStroke, onLive, onLiveEnd,
     forceRender((n) => n + 1);
   };
 
+  const activeLabel = tool === "pen" ? "画笔" : tool === "eraser" ? "橡皮" : "填充";
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="flex min-h-0 flex-1 items-center justify-center">
-        <div className="paper relative aspect-[4/3] max-h-full w-full max-w-full overflow-hidden rounded-lg border-2 border-[var(--ink)] shadow-[6px_6px_0_0_var(--ink)]">
-          <canvas
-            ref={canvasRef}
-            width={WIDTH}
-            height={HEIGHT}
-            onPointerDown={handleDown}
-            onPointerMove={handleMove}
-            onPointerUp={handleUp}
-            onPointerCancel={handleUp}
-            className={cn(
-              "absolute inset-0 block h-full w-full touch-none",
-              canDraw ? "cursor-crosshair" : "cursor-default",
+        <div className="studio-panel relative flex h-full max-h-full w-full flex-col overflow-hidden p-2 sm:p-3">
+          <div className="mb-2 flex shrink-0 items-center gap-2 px-1">
+            <span className="grid size-8 place-items-center rounded-md border-2 border-[var(--ink)] bg-secondary">
+              <Brush className="size-4 text-primary" />
+            </span>
+            <div className="min-w-0">
+              <p className="font-display text-lg leading-none">画布工作台</p>
+              <p className="text-xs text-muted-foreground">{canDraw ? `${activeLabel} · ${size}px` : "观看画者作画"}</p>
+            </div>
+            {canDraw && (
+              <span className="ml-auto rounded-full border-2 border-[var(--ink)] bg-card px-3 py-1 text-xs font-semibold">
+                轮到你
+              </span>
             )}
-          />
-          {overlay}
+          </div>
+
+          <div className="flex min-h-0 flex-1 items-center justify-center">
+            <div className="paper relative aspect-[4/3] max-h-full w-full max-w-full overflow-hidden rounded-md border-2 border-[var(--ink)] shadow-[4px_4px_0_0_var(--ink)]">
+              <canvas
+                ref={canvasRef}
+                width={WIDTH}
+                height={HEIGHT}
+                onPointerDown={handleDown}
+                onPointerMove={handleMove}
+                onPointerUp={handleUp}
+                onPointerCancel={handleUp}
+                className={cn(
+                  "absolute inset-0 block h-full w-full touch-none",
+                  canDraw ? "cursor-crosshair" : "cursor-default",
+                )}
+              />
+              {overlay}
+            </div>
+          </div>
         </div>
       </div>
 
       {canDraw && (
-        <div className="panel flex shrink-0 flex-wrap items-center justify-center gap-3 p-2 sm:p-3">
+        <div className="studio-panel flex shrink-0 flex-wrap items-center justify-center gap-3 p-2 sm:p-3">
           <div className="grid grid-cols-6 gap-1">
             {PALETTE.map((c) => (
               <button
@@ -161,14 +182,14 @@ export function DrawBoard({ strokes, live, canDraw, onStroke, onLive, onLiveEnd,
                 }}
                 style={{ backgroundColor: c }}
                 className={cn(
-                  "size-7 rounded-md border-2 border-[var(--ink)] transition-transform",
+                  "press size-7 rounded-md border-2 border-[var(--ink)] shadow-[1px_1px_0_0_var(--ink)]",
                   color === c && tool !== "eraser" ? "scale-110 ring-2 ring-primary" : "hover:scale-105",
                 )}
               />
             ))}
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 rounded-md border-2 border-border bg-card/70 p-1">
             {BRUSH_SIZES.map((s) => (
               <button
                 key={s}
@@ -176,7 +197,7 @@ export function DrawBoard({ strokes, live, canDraw, onStroke, onLive, onLiveEnd,
                 aria-label={`笔刷 ${s}`}
                 onClick={() => setSize(s)}
                 className={cn(
-                  "flex size-9 items-center justify-center rounded-md border-2 border-[var(--ink)] bg-card",
+                  "press flex size-9 items-center justify-center rounded-md border-2 border-[var(--ink)] bg-card shadow-[1px_1px_0_0_var(--ink)]",
                   size === s && "bg-accent",
                 )}
               >
@@ -188,7 +209,7 @@ export function DrawBoard({ strokes, live, canDraw, onStroke, onLive, onLiveEnd,
             ))}
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 rounded-md border-2 border-border bg-card/70 p-1">
             <ToolButton active={tool === "pen"} onClick={() => setTool("pen")} label="画笔">
               <Pencil className="size-4" />
             </ToolButton>
@@ -235,7 +256,7 @@ function ToolButton({
       aria-label={label}
       onClick={onClick}
       className={cn(
-        "press flex size-9 items-center justify-center rounded-md border-2 border-[var(--ink)] bg-card shadow-[2px_2px_0_0_var(--ink)] transition-colors hover:bg-accent",
+        "press flex size-9 items-center justify-center rounded-md border-2 border-[var(--ink)] bg-card shadow-[2px_2px_0_0_var(--ink)] hover:bg-accent",
         active && "bg-primary text-primary-foreground",
       )}
     >

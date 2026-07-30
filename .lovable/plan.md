@@ -1,40 +1,27 @@
-## 问题诊断
+## 诊断（已核实）
 
-首页目前有两组内容在讲同一件事：
+不是 OpenAI 出问题，是这个功能根本没打到任何模型。
 
-- 左栏 `highlights`：选角登场 / 主题开局 / 开画抢答
-- 右栏底部 `flow`：选角 / 开房 / 开画
+`src/lib/drawing-hint.functions.ts:42` 读 `process.env.OPENAI_API_KEY`，读不到就直接 `return unavailableHint(prompt)`——沙箱里确认 `OPENAI_API_KEY` 未配置，而 `LOVABLE_API_KEY` 是有的。所以每次都走「AI 图没生成」这条静默分支，前端 `DrawingHintPanel` 只看到 `source: "unavailable"`，无法区分「没配 key」「模型报错」「超时」。
 
-两者都是「三步曲」，措辞几乎重复，占了大量首屏空间，却没有推进用户动作。另外首屏还有两套 CTA：标题卡里的「创建房间／加入房间」按钮只是滚动定位到右栏表单，右栏本身又有真正的「创建房间」「加入」按钮——同一个动作出现两次，容易让人误以为点了没反应。
+## 修改计划
 
-## 重新规划
+### 1. 改用 Lovable AI 出图（不需要用户自备 key）
+- 把 `fetch("https://api.openai.com/v1/images/generations")` 换成 `https://ai.gateway.lovable.dev/v1/images/generations`，用 `LOVABLE_API_KEY`。
+- 模型选 `google/gemini-3.1-flash-image`（Nano Banana 2，出图快、质量够用，适合一局游戏里 18 秒内要拿到图），请求体用 Gemini 的 `messages` + `modalities` 形状，非流式（服务端一次性拿 `data[0].b64_json` 返回给前端）。
+- 保留现有的 18 秒超时与 `AbortController`。
 
-### 1. 去重，只保留一条流程叙事
-- 删除右栏底部的 `flow` 三宫格。
-- 左栏 `highlights` 改成真正的「三步曲」：1 填名选角 → 2 开房分享号码 → 3 开画抢答，带序号徽标（①②③）和连接线，视觉上成为一条流程，而不是三张并列卖点卡。
+### 2. 失败原因要能看见
+- `DrawingHint` 增加一个 `reason` 字段（`no-key` / `blocked` / `timeout` / `error`）。
+- 服务端在每个失败分支记录 `console.error`，方便用日志排查。
+- 前端把「AI 图没生成」换成对应的中文提示，例如「这题被模型挡下来了，换个说法再试」「网络慢了，点重试」。
 
-### 2. CTA 收敛为一套
-- 标题卡内的两个大按钮不再只做「滚动聚焦」：
-  - 桌面（右栏表单已经可见）：改为一句简短引导 + 单个次要链接「怎么玩」，主操作交给右栏面板。
-  - 移动端（表单在下方）：保留一个「开始玩」按钮做滚动定位。
-- 用 CSS 断点控制显示，避免出现两个看起来一样的主按钮。
-
-### 3. 右栏面板改为「一步一步」的表单节奏
-当前是：名字 → 主题 → 角色 → 创建按钮 → 分隔线 → 加入号码。创建和加入混在一列，视觉权重不清。改为顶部两个 tab：**「开新房」/「加入房」**。
-- 名字 + 角色是共用区，永远显示在 tab 上方。
-- 「开新房」tab：主题选择 + 创建按钮。
-- 「加入房」tab：号码输入 + 自动校验状态 + 加入按钮。
-- 现有的号码校验逻辑、状态文案、禁用规则全部保留，只是换了容器。
-
-### 4. 首屏密度与层级
-- 标题卡瘦身：标题 + 一行副标题 + 三步流程，去掉重复装饰。
-- 顶部两枚 label chip 合并成一枚（「马来西亚华语画猜」），减少噪音。
-- 保持浮世绘背景与米纸柔光层不变。
+### 3. 提示词微调
+现在的 prompt 明确禁止出现文字，这对 Gemini 图像模型同样适用，保留。只把开头一句改得更像图像指令（去掉 "Private reference image for..." 这种元描述），减少模型把它当成对话来回答的概率。
 
 ## 技术细节
 
-- 改动集中在 `src/routes/index.tsx`（结构 + tab 状态）与 `src/styles/home-ukiyo.css`（步骤条、tab 样式）。
-- 不动 `game.functions.ts`、`use-room.ts` 或任何后端逻辑；`createRoom` / `roomExists` 调用方式不变。
-- 保留现有无障碍处理：`aria-live` 状态播报、`aria-invalid`、focus-visible 轮廓；tab 用 `role="tablist"` + 键盘左右切换。
-- 保留 `prefers-reduced-motion` 分支与标题逐字入场动画。
-- head() metadata 不变。
+- 只改 `src/lib/drawing-hint.functions.ts` 与 `src/components/game/DrawingHintPanel.tsx`。
+- `process.env.LOVABLE_API_KEY` 在 `.handler()` 内读，不在模块顶层。
+- 现有的房主/回合校验（`authPlayer`、`drawer_id`、`turn_index`）与 `room_secrets` 读取逻辑完全不动。
+- 改完后在房间里实跑一次，确认返回 `source: "ai"` 且图能渲染，再看服务端日志确认没有 400。

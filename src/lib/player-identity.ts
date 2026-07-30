@@ -1,6 +1,7 @@
 export type Identity = { code: string; playerId: string; token: string };
 
 const NAME_KEY = "hy.nickname";
+const AVATAR_KEY = "hy.avatarSvg";
 
 function key(code: string) {
   return `hy.player.${code.toUpperCase()}`;
@@ -37,4 +38,15 @@ export function saveNickname(name: string) {
 export function loadNickname() {
   if (typeof window === "undefined") return "";
   return localStorage.getItem(NAME_KEY) ?? "";
+}
+
+export function saveAvatarSvg(svg: string | null) {
+  if (typeof window === "undefined") return;
+  if (svg) localStorage.setItem(AVATAR_KEY, svg);
+  else localStorage.removeItem(AVATAR_KEY);
+}
+
+export function loadAvatarSvg() {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(AVATAR_KEY);
 }

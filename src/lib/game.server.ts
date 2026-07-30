@@ -23,13 +23,19 @@ type WordEntry = {
   difficulty: "容易" | "普通" | "挑战" | "高手";
 };
 
+type WordTuple = [string, string, WordEntry["difficulty"]];
+
 type RoomSecretRow = {
   word?: string | null;
   choices?: unknown;
   used_words?: unknown;
 };
 
-const LOCAL_WORD_BANK: WordEntry[] = [
+function makeWordEntries(rows: WordTuple[]): WordEntry[] {
+  return rows.map(([word, category, difficulty]) => ({ word, category, difficulty }));
+}
+
+const LOCAL_WORD_BANK = makeWordEntries([
   ["椰浆饭", "本地吃喝", "容易"],
   ["拉茶", "本地吃喝", "容易"],
   ["咖椰", "本地吃喝", "容易"],
@@ -158,10 +164,10 @@ const LOCAL_WORD_BANK: WordEntry[] = [
   ["轻快铁月台", "本地生活", "高手"],
   ["雨后堵车", "本地生活", "挑战"],
   ["周末早茶", "本地生活", "挑战"],
-].map(([word, category, difficulty]) => ({ word, category, difficulty })) as WordEntry[];
+]);
 
 const THEME_WORD_BANKS: Record<Exclude<RoomTheme, "全部主题" | "马来西亚日常">, WordEntry[]> = {
-  我爱槟城: [
+  我爱槟城: makeWordEntries([
     ["乔治市", "我爱槟城", "普通"],
     ["姓周桥", "我爱槟城", "普通"],
     ["升旗山", "我爱槟城", "普通"],
@@ -194,8 +200,8 @@ const THEME_WORD_BANKS: Record<Exclude<RoomTheme, "全部主题" | "马来西亚
     ["古迹酒店", "我爱槟城", "挑战"],
     ["周末塞车", "我爱槟城", "挑战"],
     ["早市咖啡", "我爱槟城", "挑战"],
-  ],
-  我爱马六甲: [
+  ]),
+  我爱马六甲: makeWordEntries([
     ["红屋", "我爱马六甲", "容易"],
     ["鸡场街", "我爱马六甲", "普通"],
     ["马六甲河", "我爱马六甲", "挑战"],
@@ -226,8 +232,8 @@ const THEME_WORD_BANKS: Record<Exclude<RoomTheme, "全部主题" | "马来西亚
     ["游客合照", "我爱马六甲", "挑战"],
     ["古董店", "我爱马六甲", "普通"],
     ["娘惹珠鞋", "我爱马六甲", "挑战"],
-  ],
-  我爱TVB: [
+  ]),
+  我爱TVB: makeWordEntries([
     ["茶餐厅", "我爱TVB", "普通"],
     ["奶茶", "我爱TVB", "容易"],
     ["菠萝包", "我爱TVB", "普通"],
@@ -260,8 +266,8 @@ const THEME_WORD_BANKS: Record<Exclude<RoomTheme, "全部主题" | "马来西亚
     ["茶餐厅伙计", "我爱TVB", "高手"],
     ["港剧反派", "我爱TVB", "挑战"],
     ["大结局", "我爱TVB", "普通"],
-  ],
-} as const;
+  ]),
+};
 
 function themeWords() {
   return Object.values(THEME_WORD_BANKS).flat();

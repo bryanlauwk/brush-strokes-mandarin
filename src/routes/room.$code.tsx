@@ -193,16 +193,13 @@ function RoomPage() {
       toast.error("先输入你的名字");
       return;
     }
-    if (!avatarSvg) {
-      toast.error("先拍照或上传照片，生成入场画像");
-      return;
-    }
+    const svg = avatarSvg ?? createDefaultAvatar(trimmedName);
 
     setJoining(true);
     try {
-      const res = await joinFn({ data: { code: upper, name: trimmedName, avatarSvg } });
+      const res = await joinFn({ data: { code: upper, name: trimmedName, avatarSvg: svg } });
       saveNickname(trimmedName);
-      saveAvatarSvg(avatarSvg);
+      saveAvatarSvg(svg);
       saveIdentity(res);
       setIdentity({ playerId: res.playerId, token: res.token });
     } catch (e) {
@@ -252,8 +249,8 @@ function RoomPage() {
             className="mt-1 w-full rounded-md border-2 border-[var(--ink)] bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-primary"
           />
           <div className="mt-4">
-            <p className="mb-2 text-sm font-medium">2. 拍照生成画像</p>
-            <SelfieAvatar value={avatarSvg} onChange={setAvatarSvg} name={nickname} compact required />
+            <p className="mb-2 text-sm font-medium">2. 拍照生成画像（可选）</p>
+            <SelfieAvatar value={avatarSvg} onChange={setAvatarSvg} name={nickname} compact />
           </div>
           <button
             type="button"
@@ -261,7 +258,7 @@ function RoomPage() {
             disabled={joining || !roomJoinReady}
             className="mt-4 w-full rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-2 font-display text-lg text-primary-foreground shadow-[3px_3px_0_0_var(--ink)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {joining ? "加入中…" : roomJoinReady ? "加入这一局" : "完成画像后加入"}
+            {joining ? "加入中…" : roomJoinReady ? "加入这一局" : "先输入名字"}
           </button>
         </div>
       </Shell>

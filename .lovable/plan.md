@@ -1,52 +1,48 @@
-# 修复三个问题 + 界面升级
+# Plan: Homepage "画啦猜啦" headline fix & visual upgrade
 
-## 1. 为什么有人三轮只画了一轮（轮次不公平）
+## What we saw
 
-已确认原因在游戏引擎的轮换算法：当前"谁来画"和"第几回合"都是**实时**按房间里当前玩家列表算出来的——
-`回合 = floor(turn_index / 当前人数) + 1`，`画者 = 玩家列表[turn_index % 当前人数]`（列表按加入时间排序）。
+The desktop screenshot at 1280 px shows **"画啦猜啦" breaking into two lines** ("画啦猜" / "啦"). Root cause: the left column is forced by `xl:grid-cols-[minmax(0,1fr)_300px]` to be narrower than the 8xl title, so the last character wraps. The user wants the title **always one line**, and the homepage **more fun / less flat** (animation level 4/5).
 
-所以只要有人中途加入或离开，人数一变：
-- 回合数会突然跳变（人数变多 → 回合数倒退；人数变少 → 直接跨过若干回合甚至提前结束）
-- 取模索引整体错位，某些玩家被反复选中，另一些从没轮到
+## Proposed changes
 
-修复方式：开局时**冻结一份轮换顺序**（turn order 快照），整局按这份名单依次轮流：
-- 房间新增一列保存本局的画者顺序（玩家 id 数组）
-- 每回合按快照顺序走，走完一遍 = 一回合，重复 N 回合
-- 中途加入的玩家排到当前回合顺序末尾（下一回合起正常参与），保证每人每回合恰好画一次
-- 中途离开的玩家从顺序中跳过，不影响其他人索引
-- 房间里显示"本回合进度 3/6 人"，让轮次可见
+### 1. Headline: force single-line, size it per breakpoint
 
-## 2. 名字显示被遮蔽
+- Add `whitespace-nowrap` to the `<h1>`.
+- Scale down the font on the breakpoints that currently wrap: `text-5xl sm:text-6xl lg:text-7xl xl:text-8xl`.
+- Slightly widen the left column on XL so the title + preview card sit comfortably side-by-side without squeezing.
 
-- 计分板：名字与分数改为两列网格（名字列 `min-w-0`，分数/图标 `shrink-0`），中文名不再挤压
-- 长名字用两行截断而不是单行硬切；hover/长按显示完整名字
-- 结算与回合结束列表同样处理
-- 昵称输入保持 12 字上限，输入时显示字数
+### 2. Title block: add a readable "paper" backing
 
-## 3. 聊天把画面顶下去
+- Wrap the title + subtitle in a small semi-transparent card / gradient blob so the text no longer floats directly on the busy Ukiyo-e illustration.
+- Keep the brush style: preserve the existing `ink-title` text shadow.
 
-改为**固定视口布局**：页面整体 `h-screen overflow-hidden`，只有聊天消息区自己滚动。
+### 3. Lively animations (level 4 — fun but not overwhelming)
 
-- 主区域三栏（计分板 / 画布 / 聊天）各自独立滚动，页面永不整体变长
-- 每一栏补齐 `min-h-0`（这是当前消息越多越撑高的直接原因）
-- 画布区域固定按可用高度自适应，不被聊天影响
-- 手机端：聊天变成底部可折叠面板/抽屉，画布始终完整可见
-- 聊天新增"回到底部"按钮，向上翻看历史时不被自动滚动打断
+- **Staggered title entrance**: each character of "画啦猜啦" pops in with a slight delay, using the existing `pop-in` keyframe.
+- **Brush-stroke underline**: an animated stroke appears under the title on load (SVG or CSS pseudo-element).
+- **Floating decorations**: slow CSS-only floating ink dots / sakura petals around the hero section.
+- **Sparkle badge**: the top "马来西亚华语画猜" chip gets a gentle pulse.
+- **Button micro-interactions**: enhance the existing `press` utility with a small bounce and color shift on hover.
 
-## 4. 界面更有趣
+### 4. Hero layout balance
 
-保持现有"纸墨 + 朱红"的中文手绘风，加强表现力：
+- Adjust the XL grid ratio so the title column is not starved for space.
+- On tablet/mobile, keep the title + subtitle on top, then the preview card, then the form — the current mobile order is fine but spacing will be tightened.
 
-- 画布纸面加轻微纸纹与手绘边框、投影，像真的画纸
-- 猜对时：绿色高亮 + 分数气泡上浮动画 + 轻微彩纸/星点效果
-- 倒计时最后 10 秒变红并脉动；计分板名次变化带平滑位移动画
-- 玩家头像加彩色底圈，画者显示铅笔动效，猜对显示对勾徽章
-- 聊天气泡区分"系统 / 猜测 / 接近 / 猜对 / 揭晓答案"的不同视觉样式（揭晓答案做成印章感）
-- 回合结束与最终排名做成登台式动画卡片（🥇🥈🥉 依次弹出）
-- 工具栏按钮加按压手感与选中态；等待页加"邀请好友"复制卡片
+### 5. Form panel polish
 
-## 技术说明
+- Restyle the "准备开玩" header into a bolder stamp/badge look with the paper texture.
+- Add a small theme color/icon hint next to each theme option (or just the selected one) to make the theme selector feel less like a plain dropdown.
 
-- 需要一次数据库迁移：`rooms` 增加轮换顺序字段（以及记录本回合已画人数）
-- 引擎改动集中在 `src/lib/game.server.ts` 的 `startTurn` / `advance`
-- 布局与视觉改动在 `src/routes/room.$code.tsx`、`ChatPanel.tsx`、`Scoreboard.tsx`、`DrawBoard.tsx`、`src/styles.css`（动画与令牌统一写进设计系统，不硬编码颜色）
+## Files to edit
+
+- `src/routes/index.tsx` — headline sizing, title backing wrapper, animation classes, form header.
+- `src/styles/home-ukiyo.css` — floating ink/petal decorations, title-area veil, responsive adjustments.
+- `src/styles.css` — extend `ink-title` / `press` utilities and add any new keyframes needed.
+
+## Out of scope
+
+- No backend changes.
+- No game logic changes.
+- No new routes or dependencies.

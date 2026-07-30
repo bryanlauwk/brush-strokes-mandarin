@@ -11,8 +11,8 @@ type Auth = {
 };
 
 type DrawingHint = {
-  imageUrl: string;
-  source: "ai" | "fallback";
+  imageUrl: string | null;
+  source: "ai" | "unavailable";
   prompt: string;
 };
 
@@ -37,7 +37,7 @@ export function DrawingHintPanel({ auth, turnIndex, word, compact }: Props) {
       const next = await generateFn({ data: { ...auth, turnIndex } });
       if (requestId.current !== id) return;
       setHint(next);
-      setStatus("ready");
+      setStatus(next.source === "ai" && next.imageUrl ? "ready" : "error");
     } catch {
       if (requestId.current !== id) return;
       setHint(null);
@@ -51,7 +51,8 @@ export function DrawingHintPanel({ auth, turnIndex, word, compact }: Props) {
     void load();
   }, [load, word]);
 
-  const badge = hint?.source === "ai" ? "AI 生成" : hint?.source === "fallback" ? "本机示意" : "准备中";
+  const imageReady = hint?.source === "ai" && !!hint.imageUrl;
+  const badge = imageReady ? "AI 生成" : status === "loading" ? "准备中" : "AI 未出图";
 
   return (
     <section className={cn("studio-panel overflow-hidden", compact ? "p-2" : "p-3")}>
@@ -68,13 +69,16 @@ export function DrawingHintPanel({ auth, turnIndex, word, compact }: Props) {
         </span>
       </div>
 
-      <div className={cn("mt-3 overflow-hidden rounded-md border-2 border-[var(--ink)] bg-[#fffdf7]", compact ? "aspect-[5/3]" : "aspect-square")}>
-        {hint ? (
-          <img src={hint.imageUrl} alt="画家灵感图" className="h-full w-full object-cover" />
+      <div className={cn("mt-3 overflow-hidden rounded-md border-2 border-[var(--ink)] bg-[#fff7df]", compact ? "aspect-[5/3]" : "aspect-square")}>
+        {imageReady ? (
+          <img src={hint.imageUrl!} alt="AI 生成的画家灵感图" className="h-full w-full object-cover" />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+          <div className="flex h-full flex-col items-center justify-center gap-2 bg-[radial-gradient(circle_at_30%_20%,#ffe0a3_0_14%,transparent_15%),linear-gradient(135deg,#fff7df,#f8e6bf)] px-4 text-center text-muted-foreground">
             <ImageIcon className={cn("text-primary", compact ? "size-6" : "size-8")} />
-            <p className="text-xs">{status === "error" ? "暂时生不出来" : "正在生图…"}</p>
+            <p className="text-xs font-semibold text-foreground">
+              {status === "loading" ? "正在生图…" : "AI 图没生成"}
+            </p>
+            {status !== "loading" && <p className="text-[11px] leading-4">点一下重试。</p>}
           </div>
         )}
       </div>
@@ -89,7 +93,7 @@ export function DrawingHintPanel({ auth, turnIndex, word, compact }: Props) {
           disabled={status === "loading"}
           className="press flex shrink-0 items-center gap-1 rounded-md border-2 border-[var(--ink)] bg-card px-2 py-1 text-xs font-semibold shadow-[2px_2px_0_0_var(--ink)] disabled:opacity-60"
         >
-          <RefreshCcw className="size-3.5" /> 换一张
+          <RefreshCcw className="size-3.5" /> 重试
         </button>
       </div>
     </section>

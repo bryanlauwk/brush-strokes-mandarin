@@ -175,21 +175,16 @@ function Index() {
           </span>
         </div>
 
-        <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(0,300px)]">
-          <div className="title-backing relative block w-full min-w-0 rounded-2xl border-2 border-[var(--ink)]/15 bg-[var(--card)]/72 p-5 shadow-[4px_4px_0_0_var(--ink)] backdrop-blur-sm sm:p-6">
+        <div className="title-backing relative block w-full min-w-0 rounded-2xl border-2 border-[var(--ink)]/15 bg-[var(--card)]/72 p-5 shadow-[4px_4px_0_0_var(--ink)] backdrop-blur-sm sm:p-6">
             <div className="absolute -right-3 -top-3 hidden text-5xl opacity-30 sm:block">✦</div>
-            <h1 className="ink-title font-display text-5xl leading-none text-primary sm:text-6xl xl:text-7xl whitespace-nowrap">
+            <h1 className="ink-title title-anim font-display text-5xl leading-none text-primary sm:text-6xl xl:text-7xl 2xl:text-8xl whitespace-nowrap">
               {"画啦猜啦".split("").map((char, i) => (
-                <span
-                  key={i}
-                  className="inline-block animate-pop-in"
-                  style={{ animationDelay: `${i * 90}ms` }}
-                >
+                <span key={i} className="title-char">
                   {char}
                 </span>
               ))}
             </h1>
-            <div className="mt-2 h-2 max-w-[12rem] rounded-full bg-[var(--primary)]/80 animate-brush-underline" />
+            <div className="title-underline mt-2 h-2 max-w-[12rem] rounded-full bg-[var(--primary)]/80" />
             <p className="subtitle-paper mt-4 max-w-xl rounded-xl border-2 border-[var(--ink)]/20 bg-[var(--wash)]/92 px-4 py-3 text-lg leading-8 text-muted-foreground shadow-[3px_3px_0_0_color-mix(in_oklab,var(--ink)_35%,transparent)] backdrop-blur-sm">
               先输入名字，把自拍变成圆脸动漫入场画像，再选一个主题房开画。题目可能从姓周桥跳到鸡场街，也可能突然变成一场港剧名场面。
             </p>
@@ -213,30 +208,6 @@ function Index() {
               </button>
               <span className="text-sm text-muted-foreground">免注册，30 秒开局</span>
             </div>
-          </div>
-
-          <div className="studio-panel hidden min-h-72 p-4 2xl:block">
-            <div className="paper relative h-full overflow-hidden rounded-md border-2 border-[var(--ink)] p-4">
-              <div className="absolute right-4 top-4 z-10 rounded-full border-2 border-[var(--ink)] bg-accent px-3 py-1 text-xs font-semibold shadow-[2px_2px_0_0_var(--ink)]">
-                入场画像
-              </div>
-              <div className="absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgba(57,192,200,.28),rgba(255,255,255,0))]" />
-              <div className="relative mx-auto mt-7 grid size-44 place-items-center rounded-full border-[7px] border-[var(--ink)] bg-[var(--ink)] shadow-[6px_6px_0_0_var(--ink)]">
-                <img
-                  src={homeEntryPreviewImage}
-                  alt="入场画像示例"
-                  className="size-full rounded-full object-cover"
-                />
-              </div>
-              <div className="absolute bottom-4 left-4 right-4 grid grid-cols-3 gap-2 text-xs">
-                {["填名", "拍照", "进房"].map((item) => (
-                  <span key={item} className="rounded-md border-2 border-[var(--ink)] bg-card py-1 text-center font-display text-lg">
-                    {item}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">

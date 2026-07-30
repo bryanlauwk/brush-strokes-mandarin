@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -49,11 +49,43 @@ function Index() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [entryIntent, setEntryIntent] = useState<EntryIntent | null>(null);
+  const bgRef = useRef<HTMLDivElement | null>(null);
+  const nameRef = useRef<HTMLInputElement | null>(null);
+  const codeRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setName(loadNickname());
     setAvatarSvg(loadAvatarSvg());
   }, []);
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (window.matchMedia("(hover: none)").matches) return;
+    let raf = 0;
+    const onMove = (event: PointerEvent) => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(() => {
+        raf = 0;
+        const el = bgRef.current;
+        if (!el) return;
+        const x = event.clientX / window.innerWidth - 0.5;
+        const y = event.clientY / window.innerHeight - 0.5;
+        el.style.setProperty("--px", `${(x * 18).toFixed(2)}px`);
+        el.style.setProperty("--py", `${(y * 12).toFixed(2)}px`);
+      });
+    };
+    window.addEventListener("pointermove", onMove);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  const focusEntry = (intent: EntryIntent) => {
+    const target = intent === "create" ? nameRef.current : codeRef.current;
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => target?.focus(), 320);
+  };
 
   const trimmedName = name.trim();
   const activeTheme = ROOM_THEME_OPTIONS.find((theme) => theme.value === roomTheme) ?? ROOM_THEME_OPTIONS[0];
@@ -127,8 +159,9 @@ function Index() {
 
   return (
     <main className="home-shell mx-auto grid min-h-screen w-full max-w-6xl items-center gap-5 px-5 py-6 sm:px-8 lg:grid-cols-[minmax(0,1fr)_440px]">
-      <div aria-hidden="true" className="home-ukiyo-bg">
+      <div aria-hidden="true" className="home-ukiyo-bg" ref={bgRef}>
         <span className="ukiyo-art" style={{ backgroundImage: `url(${homeUkiyoBg.url})` }} />
+        <span className="ukiyo-wave" style={{ backgroundImage: `url(${homeUkiyoBg.url})` }} />
         <span className="ukiyo-veil" />
       </div>
 
@@ -142,10 +175,10 @@ function Index() {
           </span>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,320px)]">
-          <div className="title-backing relative inline-block min-w-0 rounded-2xl border-2 border-[var(--ink)]/15 bg-[var(--card)]/72 p-5 shadow-[4px_4px_0_0_var(--ink)] backdrop-blur-sm sm:p-6">
+        <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(0,300px)]">
+          <div className="title-backing relative block w-full min-w-0 rounded-2xl border-2 border-[var(--ink)]/15 bg-[var(--card)]/72 p-5 shadow-[4px_4px_0_0_var(--ink)] backdrop-blur-sm sm:p-6">
             <div className="absolute -right-3 -top-3 hidden text-5xl opacity-30 sm:block">✦</div>
-            <h1 className="ink-title font-display text-5xl leading-none text-primary sm:text-6xl lg:text-7xl xl:text-8xl whitespace-nowrap">
+            <h1 className="ink-title font-display text-5xl leading-none text-primary sm:text-6xl xl:text-7xl whitespace-nowrap">
               {"画啦猜啦".split("").map((char, i) => (
                 <span
                   key={i}
@@ -157,12 +190,32 @@ function Index() {
               ))}
             </h1>
             <div className="mt-2 h-2 max-w-[12rem] rounded-full bg-[var(--primary)]/80 animate-brush-underline" />
-            <p className="mt-4 max-w-xl text-lg leading-8 text-muted-foreground">
+            <p className="subtitle-paper mt-4 max-w-xl rounded-xl border-2 border-[var(--ink)]/20 bg-[var(--wash)]/92 px-4 py-3 text-lg leading-8 text-muted-foreground shadow-[3px_3px_0_0_color-mix(in_oklab,var(--ink)_35%,transparent)] backdrop-blur-sm">
               先输入名字，把自拍变成圆脸动漫入场画像，再选一个主题房开画。题目可能从姓周桥跳到鸡场街，也可能突然变成一场港剧名场面。
             </p>
+
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => focusEntry("create")}
+                className="press cta-pulse inline-flex items-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-5 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)]"
+              >
+                <DoorOpen className="size-5" />
+                创建房间
+              </button>
+              <button
+                type="button"
+                onClick={() => focusEntry("join")}
+                className="press inline-flex items-center gap-2 rounded-md border-2 border-[var(--ink)] bg-accent px-5 py-3 font-display text-xl text-accent-foreground shadow-[5px_5px_0_0_var(--ink)]"
+              >
+                <Link2 className="size-5" />
+                加入房间
+              </button>
+              <span className="text-sm text-muted-foreground">免注册，30 秒开局</span>
+            </div>
           </div>
 
-          <div className="studio-panel hidden min-h-72 p-4 xl:block">
+          <div className="studio-panel hidden min-h-72 p-4 2xl:block">
             <div className="paper relative h-full overflow-hidden rounded-md border-2 border-[var(--ink)] p-4">
               <div className="absolute right-4 top-4 z-10 rounded-full border-2 border-[var(--ink)] bg-accent px-3 py-1 text-xs font-semibold shadow-[2px_2px_0_0_var(--ink)]">
                 入场画像
@@ -211,6 +264,7 @@ function Index() {
             </label>
             <input
               id="name"
+              ref={nameRef}
               value={name}
               maxLength={12}
               onChange={(e) => setName(e.target.value)}
@@ -273,6 +327,7 @@ function Index() {
 
           <div className="grid grid-cols-[minmax(0,1fr)_96px] gap-2">
             <input
+              ref={codeRef}
               value={code}
               maxLength={8}
               onChange={(e) => setCode(e.target.value.toUpperCase())}

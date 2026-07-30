@@ -154,10 +154,20 @@ export const startGame = createServerFn({ method: "POST" })
     await supabaseAdmin.from("guesses").delete().eq("room_id", room.id);
     await supabaseAdmin
       .from("rooms")
-      .update({ turn_index: 0, current_round: 0, status: "waiting" })
+      .update({
+        turn_index: 0,
+        current_round: 0,
+        status: "waiting",
+        turn_order: players.map((p) => p.id),
+      })
       .eq("id", room.id);
 
-    await g.startTurn({ ...room, turn_index: 0, current_round: 0 });
+    await g.startTurn({
+      ...room,
+      turn_index: 0,
+      current_round: 0,
+      turn_order: players.map((p) => p.id),
+    });
     return { ok: true };
   });
 

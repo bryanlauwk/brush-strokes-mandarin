@@ -174,6 +174,7 @@ export type Database = {
           status: string
           total_rounds: number
           turn_index: number
+          turn_order: Json
           word_length: number | null
         }
         Insert: {
@@ -192,6 +193,7 @@ export type Database = {
           status?: string
           total_rounds?: number
           turn_index?: number
+          turn_order?: Json
           word_length?: number | null
         }
         Update: {
@@ -210,6 +212,7 @@ export type Database = {
           status?: string
           total_rounds?: number
           turn_index?: number
+          turn_order?: Json
           word_length?: number | null
         }
         Relationships: []

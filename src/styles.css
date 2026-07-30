@@ -162,3 +162,92 @@
   border-radius: var(--radius-lg);
   box-shadow: 4px 4px 0 0 var(--ink);
 }
+
+/* Sketchbook paper surface for the canvas */
+@utility paper {
+  background-color: #fff;
+  background-image:
+    linear-gradient(oklch(0.9 0.02 80 / 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.9 0.02 80 / 0.35) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+@utility press {
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+  &:active {
+    transform: translate(2px, 2px);
+    box-shadow: 0 0 0 0 var(--ink);
+  }
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.92) rotate(-2deg);
+  }
+  70% {
+    transform: translateY(-2px) scale(1.03) rotate(1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+@keyframes float-up {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-26px);
+  }
+}
+
+@keyframes urgent {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(8deg);
+  }
+}
+
+@utility animate-pop-in {
+  animation: pop-in 320ms cubic-bezier(0.22, 1.3, 0.5, 1) both;
+}
+
+@utility animate-float-up {
+  animation: float-up 1.4s ease-out both;
+}
+
+@utility animate-urgent {
+  animation: urgent 1s ease-in-out infinite;
+}
+
+@utility animate-wiggle {
+  animation: wiggle 1.2s ease-in-out infinite;
+}
+
+@utility stamp {
+  border: 2px dashed var(--primary);
+  color: var(--primary);
+  transform: rotate(-1.5deg);
+}

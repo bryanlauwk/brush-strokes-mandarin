@@ -1,0 +1,1 @@
+ALTER TABLE public.rooms ADD COLUMN IF NOT EXISTS turn_order jsonb NOT NULL DEFAULT '[]'::jsonb;

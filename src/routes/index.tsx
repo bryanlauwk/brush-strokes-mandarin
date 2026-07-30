@@ -301,7 +301,43 @@ function Index() {
             />
           </div>
 
-          <div>
+          <CharacterPicker value={avatarSvg} onChange={setAvatarSvg} name={trimmedName || "画画人"} compact />
+
+          <div role="tablist" aria-label="开房或加入" className="home-tabs grid grid-cols-2 gap-2 rounded-md border-2 border-[var(--ink)] bg-card/70 p-1">
+            {(["create", "join"] as const).map((key) => (
+              <button
+                key={key}
+                role="tab"
+                type="button"
+                id={`tab-${key}`}
+                aria-selected={tab === key}
+                aria-controls={`panel-${key}`}
+                tabIndex={tab === key ? 0 : -1}
+                onClick={() => setTab(key)}
+                onKeyDown={(e) => {
+                  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+                  e.preventDefault();
+                  setTab(key === "create" ? "join" : "create");
+                }}
+                className={`press rounded-sm px-3 py-2 font-display text-lg transition-colors ${
+                  tab === key
+                    ? "border-2 border-[var(--ink)] bg-primary text-primary-foreground"
+                    : "border-2 border-transparent text-muted-foreground"
+                }`}
+              >
+                {key === "create" ? "开新房" : "加入房"}
+              </button>
+            ))}
+          </div>
+
+          <div
+            role="tabpanel"
+            id="panel-create"
+            aria-labelledby="tab-create"
+            hidden={tab !== "create"}
+            className="space-y-4"
+          >
+            <div>
             <label className="mb-2 block text-sm font-semibold" htmlFor="room-theme">
               主题房
             </label>
@@ -329,9 +365,7 @@ function Index() {
             <p className="mt-2 rounded-md border-2 border-border bg-card/70 px-3 py-2 text-sm leading-6 text-muted-foreground">
               {activeTheme.description}
             </p>
-          </div>
-
-          <CharacterPicker value={avatarSvg} onChange={setAvatarSvg} name={trimmedName || "画画人"} compact />
+            </div>
 
           <button
             ref={createButtonRef}
@@ -343,14 +377,9 @@ function Index() {
             {busy ? "准备中…" : "创建房间"}
             <ArrowRight className="size-5" />
           </button>
-
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="h-px flex-1 bg-border" />
-            加入朋友局
-            <span className="h-px flex-1 bg-border" />
           </div>
 
-          <div>
+          <div role="tabpanel" id="panel-join" aria-labelledby="tab-join" hidden={tab !== "join"}>
             <div className="grid grid-cols-[minmax(0,1fr)_96px] gap-2">
               <input
                 ref={codeRef}
@@ -408,18 +437,6 @@ function Index() {
               {codeMessage?.text ?? `跟朋友要 ${CODE_LENGTH} 位号码，例如 K7M3D。`}
             </p>
           </div>
-        </div>
-
-        <div className="mt-5 grid grid-cols-3 gap-2 rounded-md border-2 border-border bg-card/60 p-3">
-          {flow.map(({ icon: Icon, title, text }) => (
-            <div key={title} className="min-w-0 text-center">
-              <span className="mx-auto grid size-9 place-items-center rounded-md border-2 border-[var(--ink)] bg-secondary">
-                <Icon className="size-4" />
-              </span>
-              <span className="mt-2 block font-display text-lg leading-none text-primary">{title}</span>
-              <span className="mt-1 block text-xs leading-5 text-muted-foreground">{text}</span>
-            </div>
-          ))}
         </div>
 
         <Link to="/how-to-play" className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-primary underline underline-offset-4">

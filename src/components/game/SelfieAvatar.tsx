@@ -227,10 +227,13 @@ function getSourceSize(source: CanvasImageSource, fallback: number) {
   if (source instanceof SVGImageElement) {
     return { width: source.width.baseVal.value || fallback, height: source.height.baseVal.value || fallback };
   }
-  if (source instanceof HTMLCanvasElement || source instanceof OffscreenCanvas) {
+  if (source instanceof HTMLCanvasElement) {
     return { width: source.width || fallback, height: source.height || fallback };
   }
-  if (source instanceof ImageBitmap) {
+  if (typeof OffscreenCanvas !== "undefined" && source instanceof OffscreenCanvas) {
+    return { width: source.width || fallback, height: source.height || fallback };
+  }
+  if (typeof ImageBitmap !== "undefined" && source instanceof ImageBitmap) {
     return { width: source.width || fallback, height: source.height || fallback };
   }
   return { width: fallback, height: fallback };

@@ -4,20 +4,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/*
- * Design system definition.
- *
- * The @theme inline block maps CSS custom properties to Tailwind utility
- * classes (e.g. --color-primary -> bg-primary, text-primary).
- *
- * The :root and .dark blocks define the actual color values using oklch.
- * All colors MUST use oklch format.
- *
- * To add a new semantic color:
- * 1. Add the variable to :root (light value) and .dark (dark value)
- * 2. Register it in @theme inline as --color-<name>: var(--<name>)
- */
-
 @theme inline {
   --font-sans: "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
   --font-display: "ZCOOL KuaiLe", "Noto Sans SC", sans-serif;
@@ -64,28 +50,33 @@
 }
 
 :root {
-  --radius: 1rem;
-  --background: oklch(0.958 0.018 88);
-  --foreground: oklch(0.24 0.02 60);
-  --card: oklch(0.992 0.008 92);
-  --card-foreground: oklch(0.24 0.02 60);
-  --popover: oklch(0.992 0.008 92);
-  --popover-foreground: oklch(0.24 0.02 60);
-  --primary: oklch(0.575 0.196 31);
-  --primary-foreground: oklch(0.985 0.01 90);
-  --secondary: oklch(0.915 0.026 86);
-  --secondary-foreground: oklch(0.28 0.02 60);
-  --muted: oklch(0.925 0.02 86);
-  --muted-foreground: oklch(0.5 0.024 66);
-  --accent: oklch(0.87 0.075 82);
-  --accent-foreground: oklch(0.26 0.03 60);
+  --radius: 0.5rem;
+  --background: oklch(0.965 0.014 86);
+  --foreground: oklch(0.205 0.023 54);
+  --card: oklch(0.992 0.006 92);
+  --card-foreground: oklch(0.205 0.023 54);
+  --popover: oklch(0.992 0.006 92);
+  --popover-foreground: oklch(0.205 0.023 54);
+  --primary: oklch(0.57 0.205 31);
+  --primary-foreground: oklch(0.988 0.01 92);
+  --secondary: oklch(0.89 0.045 190);
+  --secondary-foreground: oklch(0.19 0.03 205);
+  --muted: oklch(0.925 0.018 86);
+  --muted-foreground: oklch(0.46 0.028 62);
+  --accent: oklch(0.86 0.1 83);
+  --accent-foreground: oklch(0.22 0.034 67);
   --destructive: oklch(0.55 0.21 25);
   --destructive-foreground: oklch(0.985 0.01 90);
-  --border: oklch(0.845 0.026 80);
-  --input: oklch(0.87 0.022 82);
-  --ring: oklch(0.575 0.196 31);
-  --ink: oklch(0.24 0.02 60);
-  --success: oklch(0.6 0.15 152);
+  --border: oklch(0.78 0.035 76);
+  --input: oklch(0.91 0.018 82);
+  --ring: oklch(0.57 0.205 31);
+  --ink: oklch(0.19 0.024 52);
+  --success: oklch(0.58 0.15 154);
+  --teal: oklch(0.65 0.13 190);
+  --blue: oklch(0.55 0.13 255);
+  --gold: oklch(0.82 0.145 82);
+  --plum: oklch(0.49 0.12 312);
+  --wash: oklch(0.93 0.035 78);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -108,19 +99,26 @@
   --card-foreground: oklch(0.984 0.003 247.858);
   --popover: oklch(0.208 0.042 265.755);
   --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
+  --primary: oklch(0.76 0.16 32);
+  --primary-foreground: oklch(0.16 0.035 260);
+  --secondary: oklch(0.31 0.055 205);
   --secondary-foreground: oklch(0.984 0.003 247.858);
   --muted: oklch(0.279 0.041 260.031);
   --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
+  --accent: oklch(0.72 0.12 82);
+  --accent-foreground: oklch(0.16 0.035 260);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(1 0 0 / 10%);
+  --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
+  --ring: oklch(0.76 0.16 32);
+  --ink: oklch(0.96 0.01 90);
+  --success: oklch(0.74 0.14 154);
+  --teal: oklch(0.72 0.12 190);
+  --blue: oklch(0.72 0.12 255);
+  --gold: oklch(0.86 0.12 82);
+  --plum: oklch(0.72 0.11 312);
+  --wash: oklch(0.24 0.035 260);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -142,12 +140,19 @@
   }
 
   body {
+    min-height: 100vh;
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     background-image:
-      radial-gradient(oklch(0.86 0.03 78 / 0.55) 1px, transparent 1px);
-    background-size: 22px 22px;
+      linear-gradient(120deg, oklch(0.89 0.075 190 / 0.45) 0 14%, transparent 14% 100%),
+      linear-gradient(300deg, oklch(0.9 0.08 82 / 0.55) 0 17%, transparent 17% 100%),
+      radial-gradient(oklch(0.78 0.04 72 / 0.35) 1px, transparent 1px);
+    background-size: auto, auto, 22px 22px;
+  }
+
+  ::selection {
+    background: oklch(0.86 0.1 83 / 0.65);
   }
 }
 
@@ -157,15 +162,43 @@
 }
 
 @utility panel {
+  position: relative;
   background-color: var(--color-card);
   border: 2px solid var(--ink);
   border-radius: var(--radius-lg);
-  box-shadow: 4px 4px 0 0 var(--ink);
+  box-shadow: 5px 5px 0 0 var(--ink);
 }
 
-/* Sketchbook paper surface for the canvas */
+@utility studio-panel {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, oklch(1 0 0 / 0.82), oklch(0.96 0.025 90 / 0.86)),
+    var(--color-card);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-lg);
+  box-shadow: 6px 6px 0 0 var(--ink);
+}
+
+@utility ink-title {
+  text-shadow:
+    2px 2px 0 oklch(0.19 0.024 52 / 0.16),
+    0 8px 18px oklch(0.57 0.205 31 / 0.18);
+}
+
+@utility label-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--color-card);
+  padding: 0.35rem 0.7rem;
+  box-shadow: 2px 2px 0 0 var(--ink);
+}
+
 @utility paper {
-  background-color: #fff;
+  background-color: #fffdf7;
   background-image:
     linear-gradient(oklch(0.9 0.02 80 / 0.35) 1px, transparent 1px),
     linear-gradient(90deg, oklch(0.9 0.02 80 / 0.35) 1px, transparent 1px);
@@ -175,7 +208,12 @@
 @utility press {
   transition:
     transform 120ms ease,
-    box-shadow 120ms ease;
+    box-shadow 120ms ease,
+    background-color 140ms ease,
+    color 140ms ease;
+  &:hover {
+    transform: translate(-1px, -1px);
+  }
   &:active {
     transform: translate(2px, 2px);
     box-shadow: 0 0 0 0 var(--ink);
@@ -193,6 +231,12 @@
   100% {
     opacity: 1;
     transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+@keyframes draw-dash {
+  to {
+    stroke-dashoffset: 0;
   }
 }
 
@@ -244,6 +288,12 @@
 
 @utility animate-wiggle {
   animation: wiggle 1.2s ease-in-out infinite;
+}
+
+@utility animate-draw-dash {
+  stroke-dasharray: 360;
+  stroke-dashoffset: 360;
+  animation: draw-dash 1.2s ease-out both;
 }
 
 @utility stamp {

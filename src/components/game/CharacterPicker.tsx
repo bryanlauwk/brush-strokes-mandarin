@@ -47,8 +47,8 @@ export function CharacterPicker({ value, onChange, name = "画画人", compact }
           </span>
         </span>
         <div className="min-w-0 self-center">
-          <span className="block truncate font-display text-xl text-foreground">{active?.name ?? "默认角色"}</span>
-          <span className="mt-1 inline-flex items-center gap-1 rounded-full border-2 border-[var(--ink)] bg-accent px-2 py-0.5 text-[11px] font-semibold">
+          <span className="block font-display text-xl leading-none text-foreground">已选角色</span>
+          <span className="mt-2 inline-flex items-center gap-1 rounded-full border-2 border-[var(--ink)] bg-accent px-2 py-0.5 text-[11px] font-semibold">
             <Sparkles className="size-3" /> {active?.group ?? "漫画风"}
           </span>
         </div>
@@ -59,7 +59,7 @@ export function CharacterPicker({ value, onChange, name = "画画人", compact }
           <section key={group}>
             <p className="mb-2 text-xs font-semibold text-muted-foreground">{group}</p>
             <div className={cn("grid gap-2", compact ? "grid-cols-3" : "grid-cols-3 sm:grid-cols-5")}>
-              {avatars.map((avatar) => {
+              {avatars.map((avatar, index) => {
                 const selected = avatar.svg === value;
                 return (
                   <button
@@ -67,18 +67,17 @@ export function CharacterPicker({ value, onChange, name = "画画人", compact }
                     type="button"
                     role="radio"
                     aria-checked={selected}
-                    title={`${avatar.name} · ${avatar.caption}`}
+                    aria-label={`${group}角色 ${index + 1}`}
+                    title={`${group}角色 ${index + 1}`}
                     onClick={() => onChange(avatar.svg)}
                     className={cn(
                       "press relative min-w-0 rounded-md border-2 border-[var(--ink)] bg-secondary p-1.5 shadow-[2px_2px_0_0_var(--ink)] transition-transform hover:-translate-y-0.5 focus-visible:z-10",
                       selected && "ring-4 ring-primary ring-offset-2 ring-offset-card",
                     )}
                   >
-                    <span className="mx-auto block size-16 overflow-hidden rounded-full border-2 border-[var(--ink)] bg-card">
-                      <InlineSvgAvatar svg={avatar.svg} label={avatar.name} />
+                    <span className="mx-auto block aspect-square w-full max-w-[76px] overflow-hidden rounded-full border-2 border-[var(--ink)] bg-card">
+                      <InlineSvgAvatar svg={avatar.svg} label={`${group}角色 ${index + 1}`} />
                     </span>
-                    <span className="mt-1 block truncate text-[11px] font-semibold leading-4">{avatar.name}</span>
-                    <span className="block truncate text-[10px] leading-3 text-muted-foreground">{avatar.caption}</span>
                     {selected && (
                       <span className="absolute right-1 top-1 grid size-5 place-items-center rounded-full border-2 border-[var(--ink)] bg-[var(--success)] text-white">
                         <CheckCircle2 className="size-3" />

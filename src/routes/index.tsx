@@ -406,13 +406,14 @@ function Index() {
                   requestEntry("join");
                 }}
                 placeholder="输入号码"
-                className={`${field} tracking-[0.28em] ${
+                style={
                   codeMessage?.tone === "error"
-                    ? "border-destructive focus:ring-destructive"
+                    ? { borderColor: "var(--destructive)" }
                     : codeMessage?.tone === "ok"
-                      ? "border-[var(--teal)] focus:ring-[var(--teal)]"
-                      : ""
-                }`}
+                      ? { borderColor: "var(--teal)" }
+                      : undefined
+                }
+                className={`${field} tracking-[0.28em]`}
               />
               <button
                 type="button"

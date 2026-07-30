@@ -4,11 +4,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { getRoomSnapshot, roomExists } from "@/lib/game.functions";
 import type { ChatMessage, Player, Room, Stroke } from "@/lib/game-types";
 
-export type LiveStroke = { id: string; color: string; size: number; points: [number, number][] };
+export type LiveStroke = { id: string; color: string; size: number; points: [number, number][]; turnIndex?: number };
 
 export type RoomIdentity = { playerId: string; token: string } | null;
 
 const POLL_MS = 1000;
+const LIVE_END_GRACE_MS = 1800;
+
+type StrokeBroadcast = { stroke: Stroke; turnIndex: number };
+
+function mergeStrokes(snapshot: Stroke[], optimistic: Stroke[]) {
+  const seen = new Set(snapshot.map((stroke) => stroke.id));
+  const localOnly = optimistic.filter((stroke) => !seen.has(stroke.id));
+  return localOnly.length ? [...snapshot, ...localOnly] : snapshot;
+}
 
 export function useRoom(code: string, identity: RoomIdentity) {
   const [room, setRoom] = useState<Room | null>(null);
@@ -20,9 +29,17 @@ export function useRoom(code: string, identity: RoomIdentity) {
   const [missing, setMissing] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const turnRef = useRef<number>(-1);
+  const liveEndTimersRef = useRef<Record<string, number>>({});
 
   const playerId = identity?.playerId ?? null;
   const token = identity?.token ?? null;
+
+  const clearLiveEndTimer = useCallback((id: string) => {
+    const timer = liveEndTimersRef.current[id];
+    if (!timer) return;
+    window.clearTimeout(timer);
+    delete liveEndTimersRef.current[id];
+  }, []);
 
   // Without an identity we can only check that the room code exists.
   useEffect(() => {
@@ -62,16 +79,17 @@ export function useRoom(code: string, identity: RoomIdentity) {
       if (snap.room.turn_index !== turnRef.current) {
         turnRef.current = snap.room.turn_index;
         setLive({});
+        Object.values(liveEndTimersRef.current).forEach((timer) => window.clearTimeout(timer));
+        liveEndTimersRef.current = {};
       }
-      setStrokes((prev) => {
-        const seen = new Set(snap.strokes.map((s) => s.id));
-        const localOnly = prev.filter((s) => !seen.has(s.id));
-        return snap.strokes.length || !localOnly.length ? snap.strokes : prev;
-      });
+      setStrokes((prev) => mergeStrokes(snap.strokes, prev));
       setLive((prev) => {
         if (!snap.strokes.length) return prev;
         const next = { ...prev };
-        for (const s of snap.strokes) delete next[s.id];
+        for (const s of snap.strokes) {
+          delete next[s.id];
+          clearLiveEndTimer(s.id);
+        }
         return next;
       });
     };
@@ -100,16 +118,34 @@ export function useRoom(code: string, identity: RoomIdentity) {
       .channel(`room-${upper}`, { config: { broadcast: { self: false } } })
       .on("broadcast", { event: "live" }, ({ payload }) => {
         const s = payload as LiveStroke;
+        if (typeof s.turnIndex === "number" && s.turnIndex !== turnRef.current) return;
+        clearLiveEndTimer(s.id);
         setLive((prev) => ({ ...prev, [s.id]: s }));
       })
-      .on("broadcast", { event: "live-end" }, ({ payload }) => {
-        const { id } = payload as { id: string };
+      .on("broadcast", { event: "stroke" }, ({ payload }) => {
+        const { stroke, turnIndex } = payload as StrokeBroadcast;
+        if (turnIndex !== turnRef.current) return;
+        clearLiveEndTimer(stroke.id);
+        setStrokes((prev) => (prev.some((s) => s.id === stroke.id) ? prev : [...prev, stroke]));
         setLive((prev) => {
           const next = { ...prev };
-          delete next[id];
+          delete next[stroke.id];
           return next;
         });
-        void refresh();
+      })
+      .on("broadcast", { event: "live-end" }, ({ payload }) => {
+        const { id, turnIndex } = payload as { id: string; turnIndex?: number };
+        if (typeof turnIndex === "number" && turnIndex !== turnRef.current) return;
+        clearLiveEndTimer(id);
+        liveEndTimersRef.current[id] = window.setTimeout(() => {
+          setLive((prev) => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+          });
+          delete liveEndTimersRef.current[id];
+          void refresh();
+        }, LIVE_END_GRACE_MS);
       })
       .on("broadcast", { event: "sync" }, () => {
         void refresh();
@@ -118,6 +154,11 @@ export function useRoom(code: string, identity: RoomIdentity) {
     channel.on("broadcast", { event: "scratch" }, ({ payload }) => {
       const s = payload as Stroke;
       setScratch((prev) => (prev.some((x) => x.id === s.id) ? prev : [...prev, s]));
+      setLive((prev) => {
+        const next = { ...prev };
+        delete next[s.id];
+        return next;
+      });
     });
 
     channel.subscribe();
@@ -126,24 +167,38 @@ export function useRoom(code: string, identity: RoomIdentity) {
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      Object.values(liveEndTimersRef.current).forEach((pendingTimer) => window.clearTimeout(pendingTimer));
+      liveEndTimersRef.current = {};
       if (channelRef.current) {
         void supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
     };
-  }, [code, playerId, token]);
+  }, [code, playerId, token, clearLiveEndTimer]);
 
   const broadcastLive = useCallback((stroke: LiveStroke) => {
-    void channelRef.current?.send({ type: "broadcast", event: "live", payload: stroke });
+    void channelRef.current?.send({
+      type: "broadcast",
+      event: "live",
+      payload: { ...stroke, turnIndex: turnRef.current },
+    });
   }, []);
 
   const broadcastLiveEnd = useCallback((id: string) => {
-    void channelRef.current?.send({ type: "broadcast", event: "live-end", payload: { id } });
+    void channelRef.current?.send({
+      type: "broadcast",
+      event: "live-end",
+      payload: { id, turnIndex: turnRef.current },
+    });
   }, []);
 
   const appendLocalStroke = useCallback((stroke: Stroke) => {
     setStrokes((prev) => (prev.some((s) => s.id === stroke.id) ? prev : [...prev, stroke]));
-    void channelRef.current?.send({ type: "broadcast", event: "sync", payload: {} });
+    void channelRef.current?.send({
+      type: "broadcast",
+      event: "stroke",
+      payload: { stroke, turnIndex: turnRef.current },
+    });
   }, []);
 
   // Free doodling in the lobby: never persisted, only shared over the channel.

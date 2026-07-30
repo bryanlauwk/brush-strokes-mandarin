@@ -127,12 +127,8 @@ function Index() {
   return (
     <main className="home-shell mx-auto grid min-h-screen w-full max-w-6xl items-center gap-5 px-5 py-6 sm:px-8 lg:grid-cols-[minmax(0,1fr)_440px]">
       <div aria-hidden="true" className="home-ukiyo-bg">
-        <span className="ukiyo-ink-swipe" />
-        <span className="ukiyo-shophouses" />
-        <span className="ukiyo-clouds" />
-        <span className="ukiyo-cards" />
-        <span className="ukiyo-lantern" />
-        <span className="ukiyo-dots" />
+        <span className="ukiyo-art" style={{ backgroundImage: `url(${homeUkiyoBg.url})` }} />
+        <span className="ukiyo-veil" />
       </div>
 
       <section className="space-y-5">

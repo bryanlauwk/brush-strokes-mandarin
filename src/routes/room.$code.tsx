@@ -6,6 +6,7 @@ import { Copy, LogOut, MessageCircle, X } from "lucide-react";
 import { DrawBoard } from "@/components/game/DrawBoard";
 import { ChatPanel } from "@/components/game/ChatPanel";
 import { DrawingHintPanel } from "@/components/game/DrawingHintPanel";
+import { GameFeedback, type GameFeedbackEvent, type GameFeedbackKind } from "@/components/game/GameFeedback";
 import { PlayerAvatar } from "@/components/game/PlayerAvatar";
 import { Scoreboard } from "@/components/game/Scoreboard";
 import { SelfieAvatar } from "@/components/game/SelfieAvatar";
@@ -74,6 +75,10 @@ function RoomPage() {
   });
   const [now, setNow] = useState(() => Date.now());
   const [chatOpen, setChatOpen] = useState(false);
+  const [feedback, setFeedback] = useState<GameFeedbackEvent | null>(null);
+  const feedbackIdRef = useRef(0);
+  const roomFeedbackKeyRef = useRef<string | null>(null);
+  const correctMessageIdRef = useRef(0);
 
   const joinFn = useServerFn(joinRoom);
   const privFn = useServerFn(getPrivateState);
@@ -84,6 +89,11 @@ function RoomPage() {
   const strokeFn = useServerFn(pushStroke);
   const settingsFn = useServerFn(updateSettings);
   const leaveFn = useServerFn(leaveRoom);
+
+  const triggerFeedback = useCallback((kind: GameFeedbackKind, title: string, subtitle?: string) => {
+    feedbackIdRef.current += 1;
+    setFeedback({ id: feedbackIdRef.current, kind, title, subtitle });
+  }, []);
 
   useEffect(() => {
     const stored = loadIdentity(upper);
@@ -134,6 +144,39 @@ function RoomPage() {
     }, 1500);
     return () => clearInterval(t);
   }, [auth?.playerId, isHost, room?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!room || !identity) return;
+    const key = `${room.status}:${room.turn_index}:${room.current_round}`;
+    if (roomFeedbackKeyRef.current === null) {
+      roomFeedbackKeyRef.current = key;
+      return;
+    }
+    if (roomFeedbackKeyRef.current === key) return;
+    roomFeedbackKeyRef.current = key;
+
+    const drawerName = players.find((p) => p.id === room.drawer_id)?.name ?? "画画人";
+    if (room.status === "drawing") {
+      triggerFeedback(
+        "round-start",
+        room.drawer_id === identity.playerId ? "轮到你画！" : "开画啦！",
+        room.drawer_id === identity.playerId ? "朋友们等着猜，放胆画。" : `${drawerName} 开始画了，快看线索。`,
+      );
+    }
+    if (room.status === "turn_end") {
+      triggerFeedback("round-end", "答案揭晓", room.revealed_word ? `答案是「${room.revealed_word}」` : "这一回合结束");
+    }
+    if (room.status === "ended") {
+      triggerFeedback("round-end", "最后排名", "这一局结束，来看谁最会猜。");
+    }
+  }, [identity, players, room, triggerFeedback]);
+
+  useEffect(() => {
+    const latestCorrect = [...messages].reverse().find((message) => message.kind === "correct");
+    if (!latestCorrect || latestCorrect.id === correctMessageIdRef.current) return;
+    correctMessageIdRef.current = latestCorrect.id;
+    triggerFeedback("correct", "猜中了！", latestCorrect.text ?? "有人答对了");
+  }, [messages, triggerFeedback]);
 
   const handleStroke = useCallback(
     (stroke: Stroke) => {
@@ -496,6 +539,7 @@ function RoomPage() {
           </div>
         </div>
       )}
+      <GameFeedback event={feedback} />
     </main>
   );
 }

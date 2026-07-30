@@ -16,28 +16,59 @@ type Props = {
 
 const WIDTH = 1200;
 const HEIGHT = 900;
+const LIVE_SEND_MS = 45;
+const MIN_POINT_DISTANCE = 0.0022;
 
 function drawLine(ctx: CanvasRenderingContext2D, s: { color: string; size: number; points: [number, number][] }) {
   const pts = s.points;
   if (!pts?.length) return;
+
   ctx.strokeStyle = s.color;
   ctx.lineWidth = s.size;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.beginPath();
   ctx.moveTo(pts[0][0] * WIDTH, pts[0][1] * HEIGHT);
+
   if (pts.length === 1) {
     ctx.lineTo(pts[0][0] * WIDTH + 0.01, pts[0][1] * HEIGHT);
+  } else if (pts.length === 2) {
+    ctx.lineTo(pts[1][0] * WIDTH, pts[1][1] * HEIGHT);
   } else {
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0] * WIDTH, pts[i][1] * HEIGHT);
+    for (let i = 1; i < pts.length - 1; i++) {
+      const control = pts[i];
+      const next = pts[i + 1];
+      const midX = ((control[0] + next[0]) / 2) * WIDTH;
+      const midY = ((control[1] + next[1]) / 2) * HEIGHT;
+      ctx.quadraticCurveTo(control[0] * WIDTH, control[1] * HEIGHT, midX, midY);
+    }
+    const last = pts[pts.length - 1];
+    ctx.lineTo(last[0] * WIDTH, last[1] * HEIGHT);
   }
+
   ctx.stroke();
+}
+
+function posFromClient(canvas: HTMLCanvasElement, clientX: number, clientY: number): [number, number] {
+  const rect = canvas.getBoundingClientRect();
+  return [
+    Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)),
+    Math.min(1, Math.max(0, (clientY - rect.top) / rect.height)),
+  ];
+}
+
+function shouldAddPoint(points: [number, number][], point: [number, number]) {
+  const last = points[points.length - 1];
+  if (!last) return true;
+  return Math.hypot(point[0] - last[0], point[1] - last[1]) >= MIN_POINT_DISTANCE;
 }
 
 export function DrawBoard({ strokes, live, canDraw, onStroke, onLive, onLiveEnd, overlay }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef<LiveStroke | null>(null);
   const lastSentRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+  const paintRef = useRef<() => void>(() => undefined);
   const [color, setColor] = useState(PALETTE[0]);
   const [size, setSize] = useState(BRUSH_SIZES[1]);
   const [tool, setTool] = useState<"pen" | "eraser" | "fill">("pen");
@@ -69,25 +100,55 @@ export function DrawBoard({ strokes, live, canDraw, onStroke, onLive, onLiveEnd,
     if (drawingRef.current) drawLine(ctx, drawingRef.current);
   }, [strokes, live]);
 
-  useEffect(() => {
-    paint();
-  }, [paint]);
+  paintRef.current = paint;
 
-  const posFrom = (e: React.PointerEvent<HTMLCanvasElement>): [number, number] => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    return [
-      Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)),
-      Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height)),
-    ];
-  };
+  const schedulePaint = useCallback(() => {
+    if (rafRef.current) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      paintRef.current();
+    });
+  }, []);
+
+  useEffect(() => {
+    schedulePaint();
+  }, [schedulePaint, strokes, live]);
+
+  useEffect(
+    () => () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    },
+    [],
+  );
+
+  const addPoint = useCallback((point: [number, number]) => {
+    const current = drawingRef.current;
+    if (!current || !shouldAddPoint(current.points, point)) return false;
+    current.points.push(point);
+    return true;
+  }, []);
+
+  const addPointerPoints = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      const native = e.nativeEvent as PointerEvent & { getCoalescedEvents?: () => PointerEvent[] };
+      const events = native.getCoalescedEvents?.() ?? [native];
+      let changed = false;
+      for (const event of events) {
+        changed = addPoint(posFromClient(e.currentTarget, event.clientX, event.clientY)) || changed;
+      }
+      return changed;
+    },
+    [addPoint],
+  );
 
   const handleDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!canDraw) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    const point = posFrom(e);
+    const point = posFromClient(e.currentTarget, e.clientX, e.clientY);
 
     if (tool === "fill") {
       onStroke({ id: crypto.randomUUID(), kind: "fill", color });
+      schedulePaint();
       return;
     }
     drawingRef.current = {
@@ -96,22 +157,26 @@ export function DrawBoard({ strokes, live, canDraw, onStroke, onLive, onLiveEnd,
       size: tool === "eraser" ? size * 2.2 : size,
       points: [point],
     };
-    paint();
+    lastSentRef.current = performance.now();
+    onLive({ ...drawingRef.current, points: [...drawingRef.current.points] });
+    schedulePaint();
   };
 
   const handleMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const current = drawingRef.current;
     if (!canDraw || !current) return;
-    current.points.push(posFrom(e));
-    paint();
-    const now = Date.now();
-    if (now - lastSentRef.current > 60) {
+    if (!addPointerPoints(e)) return;
+    schedulePaint();
+
+    const now = performance.now();
+    if (now - lastSentRef.current > LIVE_SEND_MS) {
       lastSentRef.current = now;
       onLive({ ...current, points: [...current.points] });
     }
   };
 
-  const handleUp = () => {
+  const handleUp = (e?: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e && drawingRef.current) addPointerPoints(e);
     const current = drawingRef.current;
     drawingRef.current = null;
     if (!current) return;
@@ -123,10 +188,11 @@ export function DrawBoard({ strokes, live, canDraw, onStroke, onLive, onLiveEnd,
       size: current.size,
       points: current.points.slice(0, 4000),
     });
+    schedulePaint();
     forceRender((n) => n + 1);
   };
 
-  const activeLabel = tool === "pen" ? "画笔" : tool === "eraser" ? "橡皮" : "填充";
+  const activeLabel = tool === "pen" ? "笔" : tool === "eraser" ? "擦" : "填色";
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -137,12 +203,12 @@ export function DrawBoard({ strokes, live, canDraw, onStroke, onLive, onLiveEnd,
               <Brush className="size-4 text-primary" />
             </span>
             <div className="min-w-0">
-              <p className="font-display text-lg leading-none">画布工作台</p>
-              <p className="text-xs text-muted-foreground">{canDraw ? `${activeLabel} · ${size}px` : "观看画者作画"}</p>
+              <p className="font-display text-lg leading-none">大画纸</p>
+              <p className="text-xs text-muted-foreground">{canDraw ? `${activeLabel} · ${size}px` : "看大家怎么画"}</p>
             </div>
             {canDraw && (
               <span className="ml-auto rounded-full border-2 border-[var(--ink)] bg-card px-3 py-1 text-xs font-semibold">
-                轮到你
+                轮到你画
               </span>
             )}
           </div>
@@ -213,22 +279,16 @@ export function DrawBoard({ strokes, live, canDraw, onStroke, onLive, onLiveEnd,
             <ToolButton active={tool === "pen"} onClick={() => setTool("pen")} label="画笔">
               <Pencil className="size-4" />
             </ToolButton>
-            <ToolButton active={tool === "eraser"} onClick={() => setTool("eraser")} label="橡皮">
+            <ToolButton active={tool === "eraser"} onClick={() => setTool("eraser")} label="擦掉">
               <Eraser className="size-4" />
             </ToolButton>
-            <ToolButton active={tool === "fill"} onClick={() => setTool("fill")} label="填充">
+            <ToolButton active={tool === "fill"} onClick={() => setTool("fill")} label="填色">
               <PaintBucket className="size-4" />
             </ToolButton>
-            <ToolButton
-              onClick={() => onStroke({ id: crypto.randomUUID(), kind: "undo" })}
-              label="撤销"
-            >
+            <ToolButton onClick={() => onStroke({ id: crypto.randomUUID(), kind: "undo" })} label="退一步">
               <RotateCcw className="size-4" />
             </ToolButton>
-            <ToolButton
-              onClick={() => onStroke({ id: crypto.randomUUID(), kind: "clear" })}
-              label="清空"
-            >
+            <ToolButton onClick={() => onStroke({ id: crypto.randomUUID(), kind: "clear" })} label="清空画纸">
               <Trash2 className="size-4" />
             </ToolButton>
           </div>

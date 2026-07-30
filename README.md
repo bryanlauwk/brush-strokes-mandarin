@@ -1,10 +1,10 @@
-# Skribbl Chinese Edition
+# 画啦猜啦
 
-recreate/clone skribbl game (https://skribbl.io/) for chinese wording/library
+马来西亚华语画猜派对：开一局、分享号码、轮流画画，用华语猜答案。题目包含本地吃喝、地方、节庆、校园、交通和日常生活，也会随机出现挑战题。
 
 This project was built with [Lovable](https://lovable.dev).
 
-**Live app**: https://brush-strokes-mandarin.lovable.app
+**Live app**: https://chineseskribbl.lovable.app
 
 ## Build with Lovable
 

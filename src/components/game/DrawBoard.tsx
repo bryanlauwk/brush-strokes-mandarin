@@ -18,7 +18,7 @@ type Props = {
 
 const WIDTH = 1200;
 const HEIGHT = 900;
-const LIVE_SEND_MS = 45;
+const LIVE_SEND_MS = 30;
 const MIN_POINT_DISTANCE = 0.0022;
 
 function drawLine(ctx: CanvasRenderingContext2D, s: { color: string; size: number; points: [number, number][] }) {
@@ -192,14 +192,15 @@ export function DrawBoard({
     const current = drawingRef.current;
     drawingRef.current = null;
     if (!current) return;
-    onLiveEnd(current.id);
-    onStroke({
+    const finalStroke: Stroke = {
       id: current.id,
       kind: "line",
       color: current.color,
       size: current.size,
       points: current.points.slice(0, 4000),
-    });
+    };
+    onStroke(finalStroke);
+    onLiveEnd(current.id);
     schedulePaint();
     forceRender((n) => n + 1);
   };

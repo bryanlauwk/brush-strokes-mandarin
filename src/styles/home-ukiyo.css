@@ -30,12 +30,25 @@
   background-size: auto, auto, auto, auto, auto, 24px 24px, auto;
 }
 
-.home-ukiyo-bg::before,
-.home-ukiyo-bg::after,
 .home-ukiyo-bg span {
   content: "";
   position: absolute;
   display: block;
+}
+
+.ukiyo-art {
+  inset: 0;
+  background-position: center bottom;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: 0.95;
+}
+
+.ukiyo-veil {
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 60% 42%, oklch(0.99 0.02 88 / 0.82) 0 32%, oklch(0.98 0.03 84 / 0.4) 55%, transparent 78%),
+    linear-gradient(180deg, oklch(0.99 0.02 88 / 0.25), transparent 40%);
 }
 
 .home-ukiyo-bg::before {

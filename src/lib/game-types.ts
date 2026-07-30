@@ -1,3 +1,6 @@
+export { DEFAULT_ROOM_THEME, ROOM_THEME_OPTIONS, ROOM_THEMES, normalizeRoomTheme } from "./game-themes";
+export type { RoomTheme } from "./game-themes";
+
 export const DIFFICULTIES = ["全部", "容易", "普通", "挑战", "高手"] as const;
 export type Difficulty = (typeof DIFFICULTIES)[number];
 
@@ -9,6 +12,7 @@ export type Room = {
   total_rounds: number;
   draw_seconds: number;
   difficulty: string;
+  room_theme?: string | null;
   current_round: number;
   turn_index: number;
   drawer_id: string | null;

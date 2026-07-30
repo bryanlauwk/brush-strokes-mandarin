@@ -53,18 +53,18 @@ export function DrawingHintPanel({ auth, turnIndex, word, compact }: Props) {
   }, [load, word]);
 
   const imageReady = hint?.source === "ai" && !!hint.imageUrl;
-  const badge = imageReady ? "AI" : status === "loading" ? "准备中" : "未出图";
+  const badge = imageReady ? "已准备" : status === "loading" ? "准备中" : "未出图";
   const failText = (() => {
     if (status === "loading") return null;
     switch (hint?.reason) {
       case "no-key":
-        return { title: "AI 还没接上", hint: "稍后再试一次。" };
+        return { title: "提示还没接上", hint: "稍后再试一次。" };
       case "blocked":
-        return { title: "这题被模型挡下来了", hint: "点重试，换个画法。" };
+        return { title: "这题暂时出不了图", hint: "点重试，换个画法。" };
       case "timeout":
-        return { title: "生图太慢了", hint: "点一下重试。" };
+        return { title: "出图太慢了", hint: "点一下重试。" };
       default:
-        return { title: "AI 图没生成", hint: "点一下重试。" };
+        return { title: "提示图没生成", hint: "点一下重试。" };
     }
   })();
 
@@ -90,7 +90,7 @@ export function DrawingHintPanel({ auth, turnIndex, word, compact }: Props) {
         )}
       >
         {imageReady ? (
-          <img src={hint.imageUrl!} alt="AI 生成的画图提示" className="h-full w-full bg-[#fffdf7] object-contain p-2" />
+          <img src={hint.imageUrl!} alt="画图提示" className="h-full w-full bg-[#fffdf7] object-contain p-2" />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 bg-[linear-gradient(#00000008_1px,transparent_1px),linear-gradient(90deg,#00000008_1px,transparent_1px)] bg-[size:22px_22px] px-4 text-center text-muted-foreground">
             <ImageIcon className={cn("text-primary", compact ? "size-6" : "size-8")} />

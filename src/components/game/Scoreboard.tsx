@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { Check, Crown, Pencil, Trophy, UsersRound } from "lucide-react";
 import { PlayerAvatar } from "@/components/game/PlayerAvatar";
 import type { Player } from "@/lib/game-types";
+import { loadAvatarSvg } from "@/lib/player-identity";
 import { cn } from "@/lib/utils";
 
 export function Scoreboard({
@@ -14,8 +16,13 @@ export function Scoreboard({
   meId: string | null;
   meAvatarSvg?: string | null;
 }) {
+  const [localAvatarSvg, setLocalAvatarSvg] = useState<string | null>(null);
   const ranked = [...players].sort((a, b) => b.score - a.score);
   const topScore = ranked[0]?.score ?? 0;
+
+  useEffect(() => {
+    setLocalAvatarSvg(loadAvatarSvg());
+  }, [meId]);
 
   return (
     <div className="studio-panel flex h-full min-h-0 flex-col overflow-hidden">
@@ -34,7 +41,8 @@ export function Scoreboard({
       <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
         {ranked.map((p, i) => {
           const scoreWidth = topScore > 0 ? Math.max(12, Math.round((p.score / topScore) * 100)) : 0;
-          const displayPlayer = p.id === meId && !p.avatar_svg && meAvatarSvg ? { ...p, avatar_svg: meAvatarSvg } : p;
+          const fallbackSvg = meAvatarSvg ?? localAvatarSvg;
+          const displayPlayer = p.id === meId && !p.avatar_svg && fallbackSvg ? { ...p, avatar_svg: fallbackSvg } : p;
           return (
             <li
               key={p.id}

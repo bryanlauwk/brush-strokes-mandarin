@@ -13,26 +13,70 @@ type Props = {
 export function ChatPanel({ messages, disabled, placeholder, onSend }: Props) {
   const [value, setValue] = useState("");
   const [atBottom, setAtBottom] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const atBottomRef = useRef(true);
   const composingRef = useRef(false);
+  const hydratedRef = useRef(false);
+  const lastMessageIdRef = useRef<number | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+
+  const isNearBottom = useCallback((el: HTMLDivElement) => {
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  }, []);
+
+  const setBottomState = useCallback((next: boolean) => {
+    atBottomRef.current = next;
+    setAtBottom(next);
+    if (next) setUnreadCount(0);
+  }, []);
 
   const scrollToBottom = useCallback((smooth = false) => {
     const el = listRef.current;
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
-  }, []);
+    setBottomState(true);
+  }, [setBottomState]);
 
   useEffect(() => {
-    if (atBottom) scrollToBottom();
-  }, [messages.length, atBottom, scrollToBottom]);
+    if (messages.length === 0) {
+      hydratedRef.current = false;
+      lastMessageIdRef.current = null;
+      setUnreadCount(0);
+      return;
+    }
+
+    const latestId = messages[messages.length - 1]?.id ?? null;
+    const previousId = lastMessageIdRef.current;
+    lastMessageIdRef.current = latestId;
+
+    if (!hydratedRef.current) {
+      hydratedRef.current = true;
+      requestAnimationFrame(() => scrollToBottom());
+      return;
+    }
+
+    if (latestId === null || latestId === previousId) return;
+
+    if (atBottomRef.current) {
+      requestAnimationFrame(() => scrollToBottom());
+      return;
+    }
+
+    const newMessages = previousId === null
+      ? messages.length
+      : messages.filter((message) => message.id > previousId).length;
+    setUnreadCount((count) => count + Math.max(newMessages, 1));
+  }, [messages, scrollToBottom]);
 
   const submit = () => {
     const text = value.trim();
     if (!text || disabled) return;
     onSend(text);
     setValue("");
-    setAtBottom(true);
+    scrollToBottom(true);
   };
+
+  const showJumpButton = !atBottom || unreadCount > 0;
 
   return (
     <div className="studio-panel flex h-full min-h-0 flex-col overflow-hidden">
@@ -50,8 +94,7 @@ export function ChatPanel({ messages, disabled, placeholder, onSend }: Props) {
         <div
           ref={listRef}
           onScroll={(e) => {
-            const el = e.currentTarget;
-            setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 40);
+            setBottomState(isNearBottom(e.currentTarget));
           }}
           className="h-full space-y-2 overflow-y-auto overscroll-contain p-3 text-sm"
         >
@@ -65,16 +108,17 @@ export function ChatPanel({ messages, disabled, placeholder, onSend }: Props) {
             messages.map((m) => <MessageRow key={m.id} message={m} />)
           )}
         </div>
-        {!atBottom && (
+        {showJumpButton && (
           <button
             type="button"
-            onClick={() => {
-              setAtBottom(true);
-              scrollToBottom(true);
-            }}
-            className="press absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border-2 border-[var(--ink)] bg-card px-3 py-1 text-xs shadow-[2px_2px_0_0_var(--ink)]"
+            onClick={() => scrollToBottom(true)}
+            className={cn(
+              "press absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border-2 border-[var(--ink)] px-3 py-1 text-xs shadow-[2px_2px_0_0_var(--ink)]",
+              unreadCount > 0 ? "bg-primary text-primary-foreground" : "bg-card",
+            )}
           >
-            <ArrowDown className="size-3" /> 回到最新
+            <ArrowDown className="size-3" />
+            {unreadCount > 0 ? `${unreadCount} 条新消息` : "回到最新"}
           </button>
         )}
       </div>

@@ -22,6 +22,12 @@ type WordEntry = {
   difficulty: "容易" | "普通" | "挑战" | "高手";
 };
 
+type RoomSecretRow = {
+  word?: string | null;
+  choices?: unknown;
+  used_words?: unknown;
+};
+
 const LOCAL_WORD_BANK: WordEntry[] = [
   ["椰浆饭", "本地吃喝", "容易"],
   ["拉茶", "本地吃喝", "容易"],
@@ -326,7 +332,61 @@ function dedupeWords(words: WordEntry[]) {
   });
 }
 
-async function pickChoices(difficulty: string) {
+function normalizeWordArray(raw: unknown) {
+  return Array.isArray(raw)
+    ? raw.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean)
+    : [];
+}
+
+function isMissingColumn(error: { code?: string; message?: string } | null, column: string) {
+  const text = `${error?.code ?? ""} ${error?.message ?? ""}`.toLowerCase();
+  return text.includes(column.toLowerCase()) || text.includes("could not find") || text.includes("schema cache");
+}
+
+async function getRoomSecret(roomId: string, includeUsedWords: boolean) {
+  const columns = includeUsedWords ? "word, choices, used_words" : "word, choices";
+  const result = await supabaseAdmin.from("room_secrets").select(columns).eq("room_id", roomId).maybeSingle();
+  if (result.error && includeUsedWords && isMissingColumn(result.error, "used_words")) {
+    return getRoomSecret(roomId, false);
+  }
+  return {
+    secret: (result.data as RoomSecretRow | null) ?? null,
+    supportsUsedWords: includeUsedWords && !result.error,
+  };
+}
+
+async function getUsedWords(roomId: string, resetHistory: boolean) {
+  const { secret, supportsUsedWords } = await getRoomSecret(roomId, true);
+  const usedWords = new Set<string>();
+
+  if (!resetHistory) {
+    for (const word of normalizeWordArray(secret?.used_words)) usedWords.add(word);
+    for (const word of normalizeWordArray(secret?.choices)) usedWords.add(word);
+    if (secret?.word?.trim()) usedWords.add(secret.word.trim());
+
+    const { data } = await supabaseAdmin
+      .from("guesses")
+      .select("text")
+      .eq("room_id", roomId)
+      .eq("kind", "reveal");
+    for (const row of (data ?? []) as { text?: string | null }[]) {
+      const word = (row.text ?? "").trim();
+      if (word && word !== "（无）") usedWords.add(word);
+    }
+  }
+
+  return { usedWords, supportsUsedWords };
+}
+
+async function saveTurnChoices(roomId: string, payload: Record<string, unknown>, supportsUsedWords: boolean) {
+  const saved = await supabaseAdmin.from("room_secrets").upsert(payload);
+  if (!saved.error || !supportsUsedWords || !isMissingColumn(saved.error, "used_words")) return saved;
+
+  const { used_words: _usedWords, ...fallbackPayload } = payload;
+  return supabaseAdmin.from("room_secrets").upsert(fallbackPayload);
+}
+
+async function pickChoices(difficulty: string, excludedWords: Set<string>) {
   const selectedDifficulty = normalizeDifficulty(difficulty);
   const { data } = await supabaseAdmin.from("words").select("word, category, difficulty");
   const dbWords = ((data ?? []) as { word?: string | null; category?: string | null; difficulty?: string | null }[])
@@ -334,7 +394,7 @@ async function pickChoices(difficulty: string) {
     .filter((entry): entry is WordEntry => Boolean(entry));
 
   const pool = dedupeWords([...LOCAL_WORD_BANK, ...dbWords]).filter(
-    (entry) => selectedDifficulty === "全部" || entry.difficulty === selectedDifficulty,
+    (entry) => (selectedDifficulty === "全部" || entry.difficulty === selectedDifficulty) && !excludedWords.has(entry.word),
   );
   const picked: WordEntry[] = [];
 
@@ -420,20 +480,33 @@ export async function startTurn(room: RoomRow) {
     room = { ...room, turn_index: index };
   }
   const drawer = alive.get(order[index % order.length])!;
-  const choices = await pickChoices(room.difficulty);
+  const resetHistory = room.current_round === 0 && index === 0;
+  const { usedWords, supportsUsedWords } = await getUsedWords(room.id, resetHistory);
+  const choices = await pickChoices(room.difficulty, usedWords);
+  if (choices.length === 0) {
+    await endGame({ ...room, current_round: round });
+    await say(room.id, round, "system", "题库这一局已经出完了，没有重复题，先看排名。");
+    return;
+  }
 
   await supabaseAdmin
     .from("players")
     .update({ has_guessed: false, round_score: 0 })
     .eq("room_id", room.id);
 
-  await supabaseAdmin.from("room_secrets").upsert({
-    room_id: room.id,
-    word: null,
-    choices,
-    drawer_id: drawer.id,
-    updated_at: new Date().toISOString(),
-  });
+  const nextUsedWords = Array.from(new Set([...usedWords, ...choices]));
+  await saveTurnChoices(
+    room.id,
+    {
+      room_id: room.id,
+      word: null,
+      choices,
+      drawer_id: drawer.id,
+      updated_at: new Date().toISOString(),
+      ...(supportsUsedWords ? { used_words: nextUsedWords } : {}),
+    },
+    supportsUsedWords,
+  );
 
   await supabaseAdmin
     .from("rooms")

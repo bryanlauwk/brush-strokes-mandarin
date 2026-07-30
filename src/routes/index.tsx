@@ -49,7 +49,6 @@ function Index() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [entryIntent, setEntryIntent] = useState<EntryIntent | null>(null);
-  const bgRef = useRef<HTMLDivElement | null>(null);
   const nameRef = useRef<HTMLInputElement | null>(null);
   const codeRef = useRef<HTMLInputElement | null>(null);
 
@@ -58,28 +57,6 @@ function Index() {
     setAvatarSvg(loadAvatarSvg());
   }, []);
 
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    if (window.matchMedia("(hover: none)").matches) return;
-    let raf = 0;
-    const onMove = (event: PointerEvent) => {
-      if (raf) return;
-      raf = window.requestAnimationFrame(() => {
-        raf = 0;
-        const el = bgRef.current;
-        if (!el) return;
-        const x = event.clientX / window.innerWidth - 0.5;
-        const y = event.clientY / window.innerHeight - 0.5;
-        el.style.setProperty("--px", `${(x * 18).toFixed(2)}px`);
-        el.style.setProperty("--py", `${(y * 12).toFixed(2)}px`);
-      });
-    };
-    window.addEventListener("pointermove", onMove);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      if (raf) window.cancelAnimationFrame(raf);
-    };
-  }, []);
 
   const focusEntry = (intent: EntryIntent) => {
     const target = intent === "create" ? nameRef.current : codeRef.current;
@@ -159,9 +136,8 @@ function Index() {
 
   return (
     <main className="home-shell mx-auto grid min-h-screen w-full max-w-6xl items-center gap-5 px-5 py-6 sm:px-8 lg:grid-cols-[minmax(0,1fr)_440px]">
-      <div aria-hidden="true" className="home-ukiyo-bg" ref={bgRef}>
+      <div aria-hidden="true" className="home-ukiyo-bg">
         <span className="ukiyo-art" style={{ backgroundImage: `url(${homeUkiyoBg.url})` }} />
-        <span className="ukiyo-wave" style={{ backgroundImage: `url(${homeUkiyoBg.url})` }} />
         <span className="ukiyo-veil" />
       </div>
 

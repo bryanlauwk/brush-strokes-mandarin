@@ -106,8 +106,21 @@ function RoomPage() {
     setReady(true);
   }, [upper]);
 
-  const { room, players, messages, strokes, live, missing, me, broadcastLive, broadcastLiveEnd, appendLocalStroke } =
-    useRoom(upper, identity);
+  const {
+    room,
+    players,
+    messages,
+    strokes,
+    scratch,
+    live,
+    missing,
+    me,
+    broadcastLive,
+    broadcastLiveEnd,
+    appendLocalStroke,
+    appendScratchStroke,
+    clearScratch,
+  } = useRoom(upper, identity);
 
   const auth = identity ? { code: upper, playerId: identity.playerId, token: identity.token } : null;
   const roomJoinReady = nickname.trim().length > 0;
@@ -184,10 +197,14 @@ function RoomPage() {
   const handleStroke = useCallback(
     (stroke: Stroke) => {
       if (!auth) return;
+      if (room?.status === "waiting") {
+        appendScratchStroke(stroke);
+        return;
+      }
       appendLocalStroke(stroke);
       void strokeFn({ data: { ...auth, stroke } }).catch(() => undefined);
     },
-    [auth, appendLocalStroke, strokeFn],
+    [auth, room?.status, appendScratchStroke, appendLocalStroke, strokeFn],
   );
 
   const doJoin = async () => {

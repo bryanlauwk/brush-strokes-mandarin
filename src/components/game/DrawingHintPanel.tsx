@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ImageIcon, RefreshCcw, Sparkles } from "lucide-react";
+import { ImageIcon, Pencil, RefreshCcw } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { generateDrawingHint } from "@/lib/drawing-hint.functions";
 import { cn } from "@/lib/utils";
@@ -53,16 +53,16 @@ export function DrawingHintPanel({ auth, turnIndex, word, compact }: Props) {
   }, [load, word]);
 
   const imageReady = hint?.source === "ai" && !!hint.imageUrl;
-  const badge = imageReady ? "AI 生成" : status === "loading" ? "准备中" : "AI 未出图";
+  const badge = imageReady ? "简笔图" : status === "loading" ? "准备中" : "未出图";
   const failText = (() => {
     if (status === "loading") return null;
     switch (hint?.reason) {
       case "no-key":
         return { title: "AI 还没接上", hint: "稍后再试一次。" };
       case "blocked":
-        return { title: "这题被模型挡下来了", hint: "点重试，换个画面再生成。" };
+        return { title: "这题被模型挡下来了", hint: "点重试，换个画法。" };
       case "timeout":
-        return { title: "生图太慢了", hint: "网络慢了，点一下重试。" };
+        return { title: "生图太慢了", hint: "点一下重试。" };
       default:
         return { title: "AI 图没生成", hint: "点一下重试。" };
     }
@@ -71,26 +71,31 @@ export function DrawingHintPanel({ auth, turnIndex, word, compact }: Props) {
   return (
     <section className={cn("studio-panel overflow-hidden", compact ? "p-2" : "p-3")}>
       <div className="flex items-center gap-2">
-        <span className="grid size-8 shrink-0 place-items-center rounded-md border-2 border-[var(--ink)] bg-accent">
-          <Sparkles className="size-4 text-primary" />
+        <span className="grid size-8 shrink-0 place-items-center rounded-md border-2 border-[var(--ink)] bg-card">
+          <Pencil className="size-4 text-primary" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-display text-lg leading-none">画家灵感图</p>
-          <p className="mt-1 text-xs text-muted-foreground">只给你看</p>
+          <p className="font-display text-lg leading-none">简笔提示</p>
+          <p className="mt-1 text-xs text-muted-foreground">只给画家看</p>
         </div>
         <span className="rounded-full border-2 border-[var(--ink)] bg-card px-2 py-0.5 text-[10px] font-semibold">
           {badge}
         </span>
       </div>
 
-      <div className={cn("mt-3 overflow-hidden rounded-md border-2 border-[var(--ink)] bg-[#fff7df]", compact ? "aspect-[5/3]" : "aspect-square")}>
+      <div
+        className={cn(
+          "mt-3 overflow-hidden rounded-md border-2 border-[var(--ink)] bg-[#fffdf7]",
+          compact ? "aspect-[5/3]" : "aspect-square",
+        )}
+      >
         {imageReady ? (
-          <img src={hint.imageUrl!} alt="AI 生成的画家灵感图" className="h-full w-full object-cover" />
+          <img src={hint.imageUrl!} alt="AI 生成的简笔提示" className="h-full w-full bg-[#fffdf7] object-contain p-2" />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 bg-[radial-gradient(circle_at_30%_20%,#ffe0a3_0_14%,transparent_15%),linear-gradient(135deg,#fff7df,#f8e6bf)] px-4 text-center text-muted-foreground">
+          <div className="flex h-full flex-col items-center justify-center gap-2 bg-[linear-gradient(#00000008_1px,transparent_1px),linear-gradient(90deg,#00000008_1px,transparent_1px)] bg-[size:22px_22px] px-4 text-center text-muted-foreground">
             <ImageIcon className={cn("text-primary", compact ? "size-6" : "size-8")} />
             <p className="text-xs font-semibold text-foreground">
-              {status === "loading" ? "正在生图…" : failText?.title}
+              {status === "loading" ? "正在画提示…" : failText?.title}
             </p>
             {failText && <p className="text-[11px] leading-4">{failText.hint}</p>}
           </div>

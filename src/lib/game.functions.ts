@@ -414,7 +414,7 @@ export const getRoomSnapshot = createServerFn({ method: "POST" })
     return {
       room,
       players,
-      strokes: ((strokes ?? []) as { payload: unknown }[]).map((r) => r.payload),
+      strokes: ((strokes ?? []) as { payload: Record<string, unknown> }[]).map((r) => r.payload),
       messages: messages ?? [],
     };
   });

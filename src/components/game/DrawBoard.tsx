@@ -127,26 +127,28 @@ export function DrawBoard({ strokes, live, canDraw, onStroke, onLive, onLiveEnd,
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="relative overflow-hidden rounded-lg border-2 border-[var(--ink)] shadow-[4px_4px_0_0_var(--ink)]">
-        <canvas
-          ref={canvasRef}
-          width={WIDTH}
-          height={HEIGHT}
-          onPointerDown={handleDown}
-          onPointerMove={handleMove}
-          onPointerUp={handleUp}
-          onPointerCancel={handleUp}
-          className={cn(
-            "block aspect-[4/3] w-full touch-none bg-white",
-            canDraw ? "cursor-crosshair" : "cursor-default",
-          )}
-        />
-        {overlay}
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="flex min-h-0 flex-1 items-center justify-center">
+        <div className="paper relative aspect-[4/3] max-h-full w-full max-w-full overflow-hidden rounded-lg border-2 border-[var(--ink)] shadow-[6px_6px_0_0_var(--ink)]">
+          <canvas
+            ref={canvasRef}
+            width={WIDTH}
+            height={HEIGHT}
+            onPointerDown={handleDown}
+            onPointerMove={handleMove}
+            onPointerUp={handleUp}
+            onPointerCancel={handleUp}
+            className={cn(
+              "absolute inset-0 block h-full w-full touch-none",
+              canDraw ? "cursor-crosshair" : "cursor-default",
+            )}
+          />
+          {overlay}
+        </div>
       </div>
 
       {canDraw && (
-        <div className="panel flex flex-wrap items-center gap-3 p-3">
+        <div className="panel flex shrink-0 flex-wrap items-center justify-center gap-3 p-2 sm:p-3">
           <div className="grid grid-cols-6 gap-1">
             {PALETTE.map((c) => (
               <button
@@ -233,7 +235,7 @@ function ToolButton({
       aria-label={label}
       onClick={onClick}
       className={cn(
-        "flex size-9 items-center justify-center rounded-md border-2 border-[var(--ink)] bg-card transition-colors hover:bg-accent",
+        "press flex size-9 items-center justify-center rounded-md border-2 border-[var(--ink)] bg-card shadow-[2px_2px_0_0_var(--ink)] transition-colors hover:bg-accent",
         active && "bg-primary text-primary-foreground",
       )}
     >

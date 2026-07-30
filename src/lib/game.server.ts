@@ -66,6 +66,7 @@ export type RoomRow = {
   revealed_word: string | null;
   round_started_at: string | null;
   round_ends_at: string | null;
+  turn_order?: string[] | null;
 };
 
 export type PlayerRow = {
@@ -166,6 +167,22 @@ export async function endGame(room: RoomRow) {
   await say(room.id, room.current_round, "system", "游戏结束，来看看最终排名！");
 }
 
+/**
+ * Resolve the frozen drawing order for this game.
+ * Players that joined mid-game are appended to the end of the order so that
+ * everybody still draws exactly once per round; players that left are kept in
+ * the array (so nobody else's slot shifts) but are skipped when their turn comes.
+ */
+async function resolveOrder(room: RoomRow, players: PlayerRow[]) {
+  const stored = Array.isArray(room.turn_order) ? (room.turn_order as string[]) : [];
+  const order = [...stored];
+  for (const p of players) if (!order.includes(p.id)) order.push(p.id);
+  if (order.length !== stored.length) {
+    await supabaseAdmin.from("rooms").update({ turn_order: order }).eq("id", room.id);
+  }
+  return order;
+}
+
 /** Begin the turn at room.turn_index (drawer picks a word). */
 export async function startTurn(room: RoomRow) {
   const players = await listPlayers(room.id);
@@ -173,12 +190,25 @@ export async function startTurn(room: RoomRow) {
     await supabaseAdmin.from("rooms").update({ status: "waiting" }).eq("id", room.id);
     return;
   }
-  const round = Math.floor(room.turn_index / players.length) + 1;
+  const order = await resolveOrder(room, players);
+  const alive = new Map(players.map((p) => [p.id, p]));
+
+  // Skip slots whose player has left, without shifting anybody else's turn.
+  let index = Math.max(0, room.turn_index);
+  let round = Math.floor(index / order.length) + 1;
+  while (round <= room.total_rounds && !alive.has(order[index % order.length])) {
+    index += 1;
+    round = Math.floor(index / order.length) + 1;
+  }
   if (round > room.total_rounds) {
     await endGame(room);
     return;
   }
-  const drawer = players[room.turn_index % players.length];
+  if (index !== room.turn_index) {
+    await supabaseAdmin.from("rooms").update({ turn_index: index }).eq("id", room.id);
+    room = { ...room, turn_index: index };
+  }
+  const drawer = alive.get(order[index % order.length])!;
   const choices = await pickChoices(room.difficulty);
 
   await supabaseAdmin

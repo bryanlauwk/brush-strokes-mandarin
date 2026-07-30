@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Copy, LogOut } from "lucide-react";
+import { Copy, LogOut, MessageCircle, X } from "lucide-react";
 import { DrawBoard } from "@/components/game/DrawBoard";
 import { ChatPanel } from "@/components/game/ChatPanel";
 import { Scoreboard } from "@/components/game/Scoreboard";
 import { useRoom } from "@/hooks/use-room";
 import { AVATARS, type Stroke } from "@/lib/game-types";
+import { cn } from "@/lib/utils";
 import {
   chooseWord,
   getPrivateState,
@@ -56,6 +57,7 @@ function RoomPage() {
     choices: [],
   });
   const [now, setNow] = useState(() => Date.now());
+  const [chatOpen, setChatOpen] = useState(false);
 
   const joinFn = useServerFn(joinRoom);
   const privFn = useServerFn(getPrivateState);
@@ -200,10 +202,33 @@ function RoomPage() {
   const guessed = !!me?.has_guessed;
 
   const wordDisplay = iAmDrawer && priv.word ? [...priv.word].join(" ") : (room.masked_word ?? "");
+  const order = (room.turn_order ?? []).filter((id) => players.some((p) => p.id === id));
+  const turnsPerRound = Math.max(order.length || players.length, 1);
+  const turnInRound = (room.turn_index % turnsPerRound) + 1;
+  const urgent = inGame && room.status === "drawing" && secondsLeft <= 10;
+
+  const chat = (
+    <ChatPanel
+      messages={messages}
+      disabled={iAmDrawer && room.status === "drawing"}
+      placeholder={
+        iAmDrawer && room.status === "drawing"
+          ? "你是画者，安静作画吧"
+          : guessed
+            ? "你已猜对，聊聊天吧"
+            : "输入中文答案…"
+      }
+      onSend={(text) =>
+        void guessFn({ data: { ...auth!, text } }).catch((e) =>
+          toast.error(e instanceof Error ? e.message : "发送失败"),
+        )
+      }
+    />
+  );
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-3 p-3 sm:p-5">
-      <header className="panel flex flex-wrap items-center gap-3 px-4 py-3">
+    <main className="mx-auto flex h-[100dvh] max-w-6xl flex-col gap-3 overflow-hidden p-3 sm:p-5">
+      <header className="panel flex shrink-0 flex-wrap items-center gap-3 px-4 py-2 sm:py-3">
         <Link to="/" className="font-display text-xl text-primary">
           你画我猜
         </Link>
@@ -215,17 +240,22 @@ function RoomPage() {
             void navigator.clipboard?.writeText(upper);
             toast.success(`房号 ${upper} 已复制`);
           }}
-          className="flex items-center gap-1 rounded-md border-2 border-[var(--ink)] bg-secondary px-3 py-1 text-sm tracking-[0.2em] transition-transform hover:-translate-y-0.5"
+          className="press flex items-center gap-1 rounded-md border-2 border-[var(--ink)] bg-secondary px-3 py-1 text-sm tracking-[0.2em] shadow-[2px_2px_0_0_var(--ink)]"
         >
           {upper}
           <Copy className="size-3.5" />
         </button>
         {inGame && (
           <>
-            <span className="text-sm text-muted-foreground">
-              第 {room.current_round}/{room.total_rounds} 回合
+            <span className="rounded-full border-2 border-[var(--ink)] bg-card px-3 py-1 text-xs sm:text-sm">
+              第 {room.current_round}/{room.total_rounds} 回合 · 本回合 {turnInRound}/{turnsPerRound} 人
             </span>
-            <span className="ml-auto flex size-11 items-center justify-center rounded-full border-2 border-[var(--ink)] bg-accent font-display text-lg tabular-nums">
+            <span
+              className={cn(
+                "ml-auto flex size-11 items-center justify-center rounded-full border-2 border-[var(--ink)] font-display text-lg tabular-nums",
+                urgent ? "animate-urgent bg-primary text-primary-foreground" : "bg-accent",
+              )}
+            >
               {secondsLeft}
             </span>
           </>
@@ -234,7 +264,7 @@ function RoomPage() {
           <button
             type="button"
             onClick={doLeave}
-            className="flex items-center gap-1 rounded-md border-2 border-[var(--ink)] bg-card px-3 py-1 text-sm hover:bg-accent"
+            className="press flex items-center gap-1 rounded-md border-2 border-[var(--ink)] bg-card px-3 py-1 text-sm shadow-[2px_2px_0_0_var(--ink)] hover:bg-accent"
           >
             <LogOut className="size-3.5" /> 离开
           </button>
@@ -242,20 +272,20 @@ function RoomPage() {
       </header>
 
       {inGame && (
-        <div className="panel px-4 py-3 text-center">
+        <div className="panel shrink-0 px-4 py-2 text-center">
           <p className="text-xs text-muted-foreground">
             {iAmDrawer ? "你正在画：" : `${drawer?.name ?? "?"} 正在画 · ${room.word_length ?? "?"} 个字`}
           </p>
-          <p className="font-display text-2xl tracking-[0.3em]">{wordDisplay || "…"}</p>
+          <p className="font-display text-2xl tracking-[0.3em] break-all">{wordDisplay || "…"}</p>
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[220px_1fr_290px]">
-        <div className="order-2 h-56 lg:order-1 lg:h-auto">
+      <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3 lg:grid-cols-[220px_minmax(0,1fr)_290px] lg:grid-rows-1">
+        <div className="order-2 h-32 min-h-0 lg:order-1 lg:h-auto">
           <Scoreboard players={players} drawerId={room.drawer_id} meId={identity.playerId} />
         </div>
 
-        <div className="order-1 lg:order-2">
+        <div className="order-1 min-h-0 lg:order-2">
           <DrawBoard
             strokes={strokes}
             live={live}
@@ -301,7 +331,7 @@ function RoomPage() {
                               onClick={() =>
                                 void chooseFn({ data: { ...auth!, word: w } }).catch(() => undefined)
                               }
-                              className="rounded-md border-2 border-[var(--ink)] bg-card px-4 py-2 font-display text-lg shadow-[3px_3px_0_0_var(--ink)] hover:bg-accent"
+                              className="press animate-pop-in rounded-md border-2 border-[var(--ink)] bg-card px-4 py-2 font-display text-lg shadow-[3px_3px_0_0_var(--ink)] hover:bg-accent"
                             >
                               {w}
                             </button>
@@ -316,16 +346,24 @@ function RoomPage() {
 
                 {room.status === "turn_end" && (
                   <Overlay>
-                    <div className="text-center">
+                    <div className="panel animate-pop-in max-w-xs px-6 py-4 text-center">
                       <p className="text-sm text-muted-foreground">答案是</p>
-                      <p className="font-display text-3xl text-primary">{room.revealed_word ?? "—"}</p>
+                      <p className="stamp mx-auto mt-1 inline-block rounded-md px-3 py-1 font-display text-3xl">
+                        {room.revealed_word ?? "—"}
+                      </p>
                       <ul className="mt-3 space-y-1 text-sm">
                         {players
                           .filter((p) => p.round_score > 0)
                           .sort((a, b) => b.round_score - a.round_score)
-                          .map((p) => (
-                            <li key={p.id}>
-                              {AVATARS[p.avatar % AVATARS.length]} {p.name} +{p.round_score}
+                          .map((p, i) => (
+                            <li
+                              key={p.id}
+                              className="animate-pop-in flex items-center justify-center gap-1"
+                              style={{ animationDelay: `${i * 90}ms` }}
+                            >
+                              <span>{AVATARS[p.avatar % AVATARS.length]}</span>
+                              <span className="max-w-32 truncate" title={p.name}>{p.name}</span>
+                              <span className="font-semibold text-[var(--success)]">+{p.round_score}</span>
                             </li>
                           ))}
                       </ul>
@@ -335,14 +373,20 @@ function RoomPage() {
 
                 {room.status === "ended" && (
                   <Overlay>
-                    <div className="text-center">
-                      <p className="font-display text-2xl">最终排名</p>
+                    <div className="panel animate-pop-in max-w-xs px-6 py-4 text-center">
+                      <p className="font-display text-2xl">🏆 最终排名</p>
                       <ol className="mt-3 space-y-1 text-base">
                         {[...players]
                           .sort((a, b) => b.score - a.score)
                           .map((p, i) => (
-                            <li key={p.id}>
-                              {["🥇", "🥈", "🥉"][i] ?? `${i + 1}.`} {p.name} · {p.score}
+                            <li
+                              key={p.id}
+                              className="animate-pop-in flex items-center justify-center gap-1"
+                              style={{ animationDelay: `${i * 120}ms` }}
+                            >
+                              <span>{["🥇", "🥈", "🥉"][i] ?? `${i + 1}.`}</span>
+                              <span className="max-w-32 truncate" title={p.name}>{p.name}</span>
+                              <span className="tabular-nums">· {p.score}</span>
                             </li>
                           ))}
                       </ol>
@@ -354,7 +398,7 @@ function RoomPage() {
                               toast.error(e instanceof Error ? e.message : "无法开始"),
                             )
                           }
-                          className="mt-4 rounded-md border-2 border-[var(--ink)] bg-primary px-5 py-2 font-display text-lg text-primary-foreground shadow-[3px_3px_0_0_var(--ink)]"
+                          className="press mt-4 rounded-md border-2 border-[var(--ink)] bg-primary px-5 py-2 font-display text-lg text-primary-foreground shadow-[3px_3px_0_0_var(--ink)]"
                         >
                           再来一局
                         </button>
@@ -367,25 +411,38 @@ function RoomPage() {
           />
         </div>
 
-        <div className="order-3 h-72 lg:h-auto">
-          <ChatPanel
-            messages={messages}
-            disabled={iAmDrawer && room.status === "drawing"}
-            placeholder={
-              iAmDrawer && room.status === "drawing"
-                ? "你是画者，安静作画吧"
-                : guessed
-                  ? "你已猜对，聊聊天吧"
-                  : "输入中文答案…"
-            }
-            onSend={(text) =>
-              void guessFn({ data: { ...auth!, text } }).catch((e) =>
-                toast.error(e instanceof Error ? e.message : "发送失败"),
-              )
-            }
-          />
-        </div>
+        <div className="order-3 hidden min-h-0 lg:block">{chat}</div>
       </div>
+
+      {/* Mobile: chat lives in a bottom sheet so it never pushes the canvas away */}
+      <button
+        type="button"
+        onClick={() => setChatOpen(true)}
+        className="press fixed right-4 bottom-4 z-40 flex items-center gap-1 rounded-full border-2 border-[var(--ink)] bg-primary px-4 py-2 text-sm text-primary-foreground shadow-[3px_3px_0_0_var(--ink)] lg:hidden"
+      >
+        <MessageCircle className="size-4" /> 聊天
+      </button>
+      {chatOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-background/60 backdrop-blur-[2px] lg:hidden">
+          <button
+            type="button"
+            aria-label="关闭聊天"
+            onClick={() => setChatOpen(false)}
+            className="flex-1"
+          />
+          <div className="relative h-[60vh] p-2">
+            <button
+              type="button"
+              aria-label="关闭聊天"
+              onClick={() => setChatOpen(false)}
+              className="absolute -top-2 right-4 z-10 grid size-9 place-items-center rounded-full border-2 border-[var(--ink)] bg-card shadow-[2px_2px_0_0_var(--ink)]"
+            >
+              <X className="size-4" />
+            </button>
+            {chat}
+          </div>
+        </div>
+      )}
     </main>
   );
 }

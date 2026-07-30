@@ -1,68 +1,52 @@
-# 你画我猜 — 多人在线画图猜词游戏
+# 修复三个问题 + 界面升级
 
-A skribbl-style realtime drawing-and-guessing game with a Simplified Chinese interface and a ~300-word Chinese library. Original UI and artwork (game format only — no copied assets or branding).
+## 1. 为什么有人三轮只画了一轮（轮次不公平）
 
-## Game flow
+已确认原因在游戏引擎的轮换算法：当前"谁来画"和"第几回合"都是**实时**按房间里当前玩家列表算出来的——
+`回合 = floor(turn_index / 当前人数) + 1`，`画者 = 玩家列表[turn_index % 当前人数]`（列表按加入时间排序）。
 
-```text
-首页 /            -> 输入昵称、创建房间 或 输入房号加入
-房间 /room/$code  -> 等待区 (玩家列表, 房主设置回合数/时长) 
-                  -> 每回合: 画者从 3 个词中选 1 -> 80 秒作画
-                     其他人在聊天框输入汉字猜词 (完全匹配)
-                  -> 回合结束: 公布答案 + 得分动画
-                  -> 所有回合结束: 最终排行榜 -> 再来一局
-```
+所以只要有人中途加入或离开，人数一变：
+- 回合数会突然跳变（人数变多 → 回合数倒退；人数变少 → 直接跨过若干回合甚至提前结束）
+- 取模索引整体错位，某些玩家被反复选中，另一些从没轮到
 
-## Backend (Lovable Cloud)
+修复方式：开局时**冻结一份轮换顺序**（turn order 快照），整局按这份名单依次轮流：
+- 房间新增一列保存本局的画者顺序（玩家 id 数组）
+- 每回合按快照顺序走，走完一遍 = 一回合，重复 N 回合
+- 中途加入的玩家排到当前回合顺序末尾（下一回合起正常参与），保证每人每回合恰好画一次
+- 中途离开的玩家从顺序中跳过，不影响其他人索引
+- 房间里显示"本回合进度 3/6 人"，让轮次可见
 
-Enable Cloud, then one migration creating:
-- `rooms` — code (6位), host_player_id, status (waiting/playing/ended), settings (rounds, draw_seconds), current_round, current_drawer, current_word, word_started_at
-- `players` — room_id, name, score, is_host, joined_at, last_seen
-- `guesses` — room_id, round, player_id, text, is_correct (correct guesses store a masked "猜对了！" flag so the word never leaks)
-- `words` — ~300 rows seeded as literal INSERTs: word (汉字), category (动物/食物/物品/动作/地点/自然), difficulty (简单/中等/困难)
-- `strokes` — room_id, round, ordered stroke payloads, so late joiners see the drawing so far
+## 2. 名字显示被遮蔽
 
-Anonymous play: no login. Each browser gets a persisted player id; rooms are public-by-code with narrow `TO anon` policies plus GRANTs, and all mutations that could cheat (choosing words, scoring guesses, revealing the word) run through server functions rather than direct table writes.
+- 计分板：名字与分数改为两列网格（名字列 `min-w-0`，分数/图标 `shrink-0`），中文名不再挤压
+- 长名字用两行截断而不是单行硬切；hover/长按显示完整名字
+- 结算与回合结束列表同样处理
+- 昵称输入保持 12 字上限，输入时显示字数
 
-Realtime: Supabase Realtime channel per room for strokes, chat, presence, and round state, with DB rows as the source of truth for scores and reconnection.
+## 3. 聊天把画面顶下去
 
-## Server functions
+改为**固定视口布局**：页面整体 `h-screen overflow-hidden`，只有聊天消息区自己滚动。
 
-- `createRoom` / `joinRoom` — generate code, insert player
-- `startGame`, `startRound` — pick drawer in rotation, draw 3 random candidate words, only the drawer receives them
-- `chooseWord` — locks the word and the round clock
-- `submitGuess` — compares against the exact hanzi word server-side; awards points by speed (faster = more), gives the drawer points per correct guesser; never returns the word to guessers
-- `endRound` / `endGame` — reveal word, tally, advance or finish
+- 主区域三栏（计分板 / 画布 / 聊天）各自独立滚动，页面永不整体变长
+- 每一栏补齐 `min-h-0`（这是当前消息越多越撑高的直接原因）
+- 画布区域固定按可用高度自适应，不被聊天影响
+- 手机端：聊天变成底部可折叠面板/抽屉，画布始终完整可见
+- 聊天新增"回到底部"按钮，向上翻看历史时不被自动滚动打断
 
-## Client
+## 4. 界面更有趣
 
-- **Canvas**: pointer-based drawing, brush sizes, color palette, eraser, fill, undo, clear; strokes broadcast in batches; read-only for guessers
-- **Word hint bar**: `_ _ _` per character, timed hints reveal a character or two
-- **Chat**: Chinese input friendly (composition-event safe), correct guesses hidden from others, "接近了！" hint when a guess shares characters with the answer
-- **Scoreboard** with live ranks, drawer badge, timer ring
-- **房间设置**: 回合数, 每回合秒数, 词语难度
+保持现有"纸墨 + 朱红"的中文手绘风，加强表现力：
 
-## Design
+- 画布纸面加轻微纸纹与手绘边框、投影，像真的画纸
+- 猜对时：绿色高亮 + 分数气泡上浮动画 + 轻微彩纸/星点效果
+- 倒计时最后 10 秒变红并脉动；计分板名次变化带平滑位移动画
+- 玩家头像加彩色底圈，画者显示铅笔动效，猜对显示对勾徽章
+- 聊天气泡区分"系统 / 猜测 / 接近 / 猜对 / 揭晓答案"的不同视觉样式（揭晓答案做成印章感）
+- 回合结束与最终排名做成登台式动画卡片（🥇🥈🥉 依次弹出）
+- 工具栏按钮加按压手感与选中态；等待页加"邀请好友"复制卡片
 
-Playful but not generic: warm paper-cream board, thick ink-black strokes, a single vermilion accent, rounded chunky panels, Noto Sans SC typography. All colors as semantic tokens in `src/styles.css`.
+## 技术说明
 
-## Routes & SEO
-
-- `src/routes/index.tsx` — lobby/home (replaces placeholder), own `head()` metadata in Chinese
-- `src/routes/room.$code.tsx` — game room, own `head()`
-- `src/routes/how-to-play.tsx` — 玩法说明
-
-## Technical notes
-
-- Turn timing is validated server-side from `word_started_at`, so a client clock can't be gamed.
-- Stroke data is throttled and chunked to keep realtime payloads small; a compacted snapshot is stored per round for late joiners.
-- Guess matching is exact hanzi match after trimming whitespace and normalizing full/half-width punctuation.
-
-## Build order
-
-1. Enable Cloud + migration with word seed data
-2. Home/lobby + create/join rooms + player presence
-3. Canvas + realtime stroke sync
-4. Round loop, word selection, timer, hints
-5. Guessing, scoring, round/game results
-6. Polish: sounds toggle, mobile layout, reconnect handling, SEO metadata
+- 需要一次数据库迁移：`rooms` 增加轮换顺序字段（以及记录本回合已画人数）
+- 引擎改动集中在 `src/lib/game.server.ts` 的 `startTurn` / `advance`
+- 布局与视觉改动在 `src/routes/room.$code.tsx`、`ChatPanel.tsx`、`Scoreboard.tsx`、`DrawBoard.tsx`、`src/styles.css`（动画与令牌统一写进设计系统，不硬编码颜色）

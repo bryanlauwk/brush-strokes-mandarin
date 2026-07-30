@@ -14,6 +14,7 @@ export type Room = {
   revealed_word: string | null;
   round_started_at: string | null;
   round_ends_at: string | null;
+  turn_order?: string[] | null;
 };
 
 export type Player = {

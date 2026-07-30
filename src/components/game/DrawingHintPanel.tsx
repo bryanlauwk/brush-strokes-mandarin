@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImageIcon, RefreshCcw, Sparkles } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { generateDrawingHint } from "@/lib/game.functions";
+import { generateDrawingHint } from "@/lib/drawing-hint.functions";
 import { cn } from "@/lib/utils";
 
 type Auth = {

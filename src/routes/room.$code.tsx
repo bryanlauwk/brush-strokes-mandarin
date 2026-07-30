@@ -5,9 +5,11 @@ import { toast } from "sonner";
 import { Copy, LogOut, MessageCircle, X } from "lucide-react";
 import { DrawBoard } from "@/components/game/DrawBoard";
 import { ChatPanel } from "@/components/game/ChatPanel";
+import { PlayerAvatar } from "@/components/game/PlayerAvatar";
 import { Scoreboard } from "@/components/game/Scoreboard";
+import { SelfieAvatar } from "@/components/game/SelfieAvatar";
 import { useRoom } from "@/hooks/use-room";
-import { AVATARS, DIFFICULTIES, type Difficulty, type Stroke } from "@/lib/game-types";
+import { DIFFICULTIES, type Difficulty, type Stroke } from "@/lib/game-types";
 import { cn } from "@/lib/utils";
 import {
   chooseWord,
@@ -20,7 +22,15 @@ import {
   tick,
   updateSettings,
 } from "@/lib/game.functions";
-import { clearIdentity, loadIdentity, loadNickname, saveIdentity, saveNickname } from "@/lib/player-identity";
+import {
+  clearIdentity,
+  loadAvatarSvg,
+  loadIdentity,
+  loadNickname,
+  saveAvatarSvg,
+  saveIdentity,
+  saveNickname,
+} from "@/lib/player-identity";
 
 export const Route = createFileRoute("/room/$code")({
   head: () => ({
@@ -54,6 +64,7 @@ function RoomPage() {
   const [identity, setIdentity] = useState<{ playerId: string; token: string } | null>(null);
   const [ready, setReady] = useState(false);
   const [nickname, setNickname] = useState("");
+  const [avatarSvg, setAvatarSvg] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [priv, setPriv] = useState<{ isDrawer: boolean; word: string | null; choices: string[] }>({
     isDrawer: false,
@@ -77,6 +88,7 @@ function RoomPage() {
     const stored = loadIdentity(upper);
     if (stored) setIdentity({ playerId: stored.playerId, token: stored.token });
     setNickname(loadNickname());
+    setAvatarSvg(loadAvatarSvg());
     setReady(true);
   }, [upper]);
 
@@ -133,8 +145,9 @@ function RoomPage() {
   const doJoin = async () => {
     setJoining(true);
     try {
-      const res = await joinFn({ data: { code: upper, name: nickname } });
+      const res = await joinFn({ data: { code: upper, name: nickname, avatarSvg } });
       saveNickname(nickname.trim());
+      saveAvatarSvg(avatarSvg);
       saveIdentity(res);
       setIdentity({ playerId: res.playerId, token: res.token });
     } catch (e) {
@@ -182,6 +195,9 @@ function RoomPage() {
             placeholder="画画人"
             className="mt-1 w-full rounded-md border-2 border-[var(--ink)] bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-primary"
           />
+          <div className="mt-4">
+            <SelfieAvatar value={avatarSvg} onChange={setAvatarSvg} name={nickname} compact />
+          </div>
           <button
             type="button"
             onClick={doJoin}
@@ -365,7 +381,7 @@ function RoomPage() {
                               className="animate-pop-in flex items-center justify-center gap-1"
                               style={{ animationDelay: `${i * 90}ms` }}
                             >
-                              <span>{AVATARS[p.avatar % AVATARS.length]}</span>
+                              <PlayerAvatar player={p} size="sm" />
                               <span className="max-w-32 truncate" title={p.name}>{p.name}</span>
                               <span className="font-semibold text-[var(--success)]">+{p.round_score}</span>
                             </li>
@@ -389,6 +405,7 @@ function RoomPage() {
                               style={{ animationDelay: `${i * 120}ms` }}
                             >
                               <span>{["🥇", "🥈", "🥉"][i] ?? `${i + 1}.`}</span>
+                              <PlayerAvatar player={p} size="sm" />
                               <span className="max-w-32 truncate" title={p.name}>{p.name}</span>
                               <span className="tabular-nums">· {p.score}</span>
                             </li>

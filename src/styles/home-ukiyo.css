@@ -13,6 +13,24 @@
     0 10px 24px oklch(0.98 0.03 84 / 0.45);
 }
 
+.home-shell :where(button, input, select):focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 4px;
+  box-shadow:
+    0 0 0 7px oklch(0.82 0.145 82 / 0.36),
+    5px 5px 0 0 var(--ink);
+}
+
+.home-shell a:focus-visible {
+  border-radius: 0.35rem;
+  outline: 3px solid var(--primary);
+  outline-offset: 4px;
+}
+
+.home-field:focus-visible {
+  background: oklch(0.99 0.014 90);
+}
+
 .home-ukiyo-bg {
   position: fixed;
   inset: 0;

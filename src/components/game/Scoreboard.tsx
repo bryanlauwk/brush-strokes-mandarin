@@ -7,10 +7,12 @@ export function Scoreboard({
   players,
   drawerId,
   meId,
+  meAvatarSvg,
 }: {
   players: Player[];
   drawerId: string | null;
   meId: string | null;
+  meAvatarSvg?: string | null;
 }) {
   const ranked = [...players].sort((a, b) => b.score - a.score);
   const topScore = ranked[0]?.score ?? 0;
@@ -32,6 +34,7 @@ export function Scoreboard({
       <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
         {ranked.map((p, i) => {
           const scoreWidth = topScore > 0 ? Math.max(12, Math.round((p.score / topScore) * 100)) : 0;
+          const displayPlayer = p.id === meId && !p.avatar_svg && meAvatarSvg ? { ...p, avatar_svg: meAvatarSvg } : p;
           return (
             <li
               key={p.id}
@@ -52,7 +55,7 @@ export function Scoreboard({
               <div className="relative grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2">
                 <span className="w-5 shrink-0 text-center font-display text-sm text-primary">{i + 1}</span>
                 <PlayerAvatar
-                  player={p}
+                  player={displayPlayer}
                   className={cn(i === 0 && "bg-[var(--gold)]/60", p.id === drawerId && "bg-primary/15")}
                 />
                 <span className="min-w-0 text-sm leading-tight break-words [overflow-wrap:anywhere] line-clamp-2">

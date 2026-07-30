@@ -15,6 +15,7 @@ export function useRoom(code: string, identity: RoomIdentity) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
+  const [scratch, setScratch] = useState<Stroke[]>([]);
   const [live, setLive] = useState<Record<string, LiveStroke>>({});
   const [missing, setMissing] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -114,6 +115,11 @@ export function useRoom(code: string, identity: RoomIdentity) {
         void refresh();
       });
 
+    channel.on("broadcast", { event: "scratch" }, ({ payload }) => {
+      const s = payload as Stroke;
+      setScratch((prev) => (prev.some((x) => x.id === s.id) ? prev : [...prev, s]));
+    });
+
     channel.subscribe();
     channelRef.current = channel;
 
@@ -140,6 +146,14 @@ export function useRoom(code: string, identity: RoomIdentity) {
     void channelRef.current?.send({ type: "broadcast", event: "sync", payload: {} });
   }, []);
 
+  // Free doodling in the lobby: never persisted, only shared over the channel.
+  const appendScratchStroke = useCallback((stroke: Stroke) => {
+    setScratch((prev) => (prev.some((s) => s.id === stroke.id) ? prev : [...prev, stroke]));
+    void channelRef.current?.send({ type: "broadcast", event: "scratch", payload: stroke });
+  }, []);
+
+  const clearScratch = useCallback(() => setScratch([]), []);
+
   const me = players.find((p) => p.id === playerId) ?? null;
 
   return {
@@ -147,11 +161,14 @@ export function useRoom(code: string, identity: RoomIdentity) {
     players,
     messages,
     strokes,
+    scratch,
     live,
     missing,
     me,
     broadcastLive,
     broadcastLiveEnd,
     appendLocalStroke,
+    appendScratchStroke,
+    clearScratch,
   };
 }

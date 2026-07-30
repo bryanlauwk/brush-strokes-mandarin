@@ -223,9 +223,6 @@ function Index() {
           <span className="label-chip text-xs font-semibold text-primary animate-pop-in">
             <Sparkles className="size-3.5 animate-sparkle" /> 马来西亚华语画猜
           </span>
-          <span className="label-chip text-xs font-semibold animate-pop-in" style={{ animationDelay: "120ms" }}>
-            <Link2 className="size-3.5 text-[var(--teal)]" /> 主题房，马上玩
-          </span>
         </div>
 
         <div className="title-backing relative block w-full min-w-0 rounded-2xl border-2 border-[var(--ink)]/15 bg-[var(--card)]/72 p-5 shadow-[4px_4px_0_0_var(--ink)] backdrop-blur-sm sm:p-6">
@@ -246,34 +243,30 @@ function Index() {
             <button
               type="button"
               onClick={() => focusEntry("create")}
-              aria-label="聚焦到创建房间表单"
-              className="press cta-pulse inline-flex items-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-5 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)]"
+              aria-label="前往开房表单"
+              className="press cta-pulse inline-flex items-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-5 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)] lg:hidden"
             >
               <DoorOpen className="size-5" />
-              创建房间
+              开始玩
             </button>
-            <button
-              type="button"
-              onClick={() => focusEntry("join")}
-              aria-label="聚焦到加入房间号码输入框"
-              className="press inline-flex items-center gap-2 rounded-md border-2 border-[var(--ink)] bg-accent px-5 py-3 font-display text-xl text-accent-foreground shadow-[5px_5px_0_0_var(--ink)]"
-            >
-              <Link2 className="size-5" />
-              加入房间
-            </button>
-            <span className="text-sm text-muted-foreground">免注册，选角即玩</span>
+            <span className="text-sm text-muted-foreground">免注册，选角即玩 · 右边填好就能开局</span>
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          {highlights.map(({ icon: Icon, label, text }) => (
-            <article key={label} className="studio-panel p-4">
-              <Icon className="size-5 text-primary" />
-              <h2 className="mt-3 font-display text-xl text-foreground">{label}</h2>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">{text}</p>
-            </article>
+        <ol className="home-steps grid gap-3 sm:grid-cols-3">
+          {steps.map(({ icon: Icon, label, text }, i) => (
+            <li key={label} className="home-step studio-panel relative p-4">
+              <div className="flex items-center gap-2">
+                <span className="home-step-num grid size-8 shrink-0 place-items-center rounded-full border-2 border-[var(--ink)] bg-primary font-display text-lg text-primary-foreground">
+                  {i + 1}
+                </span>
+                <Icon className="size-5 shrink-0 text-primary" />
+                <h2 className="min-w-0 truncate font-display text-xl text-foreground">{label}</h2>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p>
+            </li>
           ))}
-        </div>
+        </ol>
       </section>
 
       <aside className="studio-panel p-4 sm:p-5">

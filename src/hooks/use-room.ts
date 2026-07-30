@@ -4,19 +4,37 @@ import { supabase } from "@/integrations/supabase/client";
 import { getRoomSnapshot, roomExists } from "@/lib/game.functions";
 import type { ChatMessage, Player, Room, Stroke } from "@/lib/game-types";
 
-export type LiveStroke = { id: string; color: string; size: number; points: [number, number][]; turnIndex?: number };
+export type LiveStroke = {
+  id: string;
+  color: string;
+  size: number;
+  points: [number, number][];
+  turnIndex?: number;
+  round?: number;
+};
 
 export type RoomIdentity = { playerId: string; token: string } | null;
 
 const POLL_MS = 1000;
 const LIVE_END_GRACE_MS = 1800;
 
-type StrokeBroadcast = { stroke: Stroke; turnIndex: number };
+type TurnMarker = { turnIndex?: number; round?: number };
+type StrokeBroadcast = { stroke: Stroke; turnIndex: number; round: number };
 
 function mergeStrokes(snapshot: Stroke[], optimistic: Stroke[]) {
   const seen = new Set(snapshot.map((stroke) => stroke.id));
   const localOnly = optimistic.filter((stroke) => !seen.has(stroke.id));
   return localOnly.length ? [...snapshot, ...localOnly] : snapshot;
+}
+
+function sameKnownTurn(marker: TurnMarker, currentTurn: number, currentRound: number) {
+  if (typeof marker.turnIndex === "number" && marker.turnIndex >= 0 && currentTurn >= 0 && marker.turnIndex !== currentTurn) {
+    return false;
+  }
+  if (typeof marker.round === "number" && marker.round >= 0 && currentRound >= 0 && marker.round !== currentRound) {
+    return false;
+  }
+  return true;
 }
 
 export function useRoom(code: string, identity: RoomIdentity) {
@@ -29,6 +47,7 @@ export function useRoom(code: string, identity: RoomIdentity) {
   const [missing, setMissing] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const turnRef = useRef<number>(-1);
+  const roundRef = useRef<number>(-1);
   const liveEndTimersRef = useRef<Record<string, number>>({});
 
   const playerId = identity?.playerId ?? null;
@@ -65,6 +84,9 @@ export function useRoom(code: string, identity: RoomIdentity) {
 
     setMissing(false);
     turnRef.current = -1;
+    roundRef.current = -1;
+
+    const matchesCurrentTurn = (marker: TurnMarker) => sameKnownTurn(marker, turnRef.current, roundRef.current);
 
     const applySnapshot = (snap: {
       room: Room;
@@ -76,11 +98,23 @@ export function useRoom(code: string, identity: RoomIdentity) {
       setRoom(snap.room);
       setPlayers(snap.players);
       setMessages(snap.messages);
-      if (snap.room.turn_index !== turnRef.current) {
-        turnRef.current = snap.room.turn_index;
+      const hadTurn = turnRef.current >= 0 && roundRef.current >= 0;
+      const turnChanged = snap.room.turn_index !== turnRef.current || snap.room.current_round !== roundRef.current;
+      turnRef.current = snap.room.turn_index;
+      roundRef.current = snap.room.current_round;
+      if (hadTurn && turnChanged) {
         setLive({});
         Object.values(liveEndTimersRef.current).forEach((timer) => window.clearTimeout(timer));
         liveEndTimersRef.current = {};
+      } else {
+        setLive((prev) => {
+          const next: Record<string, LiveStroke> = {};
+          for (const [id, s] of Object.entries(prev)) {
+            if (sameKnownTurn(s, turnRef.current, roundRef.current)) next[id] = s;
+            else clearLiveEndTimer(id);
+          }
+          return next;
+        });
       }
       setStrokes((prev) => mergeStrokes(snap.strokes, prev));
       setLive((prev) => {
@@ -118,13 +152,13 @@ export function useRoom(code: string, identity: RoomIdentity) {
       .channel(`room-${upper}`, { config: { broadcast: { self: false } } })
       .on("broadcast", { event: "live" }, ({ payload }) => {
         const s = payload as LiveStroke;
-        if (typeof s.turnIndex === "number" && s.turnIndex !== turnRef.current) return;
+        if (!matchesCurrentTurn(s)) return;
         clearLiveEndTimer(s.id);
         setLive((prev) => ({ ...prev, [s.id]: s }));
       })
       .on("broadcast", { event: "stroke" }, ({ payload }) => {
-        const { stroke, turnIndex } = payload as StrokeBroadcast;
-        if (turnIndex !== turnRef.current) return;
+        const { stroke, turnIndex, round } = payload as StrokeBroadcast;
+        if (!matchesCurrentTurn({ turnIndex, round })) return;
         clearLiveEndTimer(stroke.id);
         setStrokes((prev) => (prev.some((s) => s.id === stroke.id) ? prev : [...prev, stroke]));
         setLive((prev) => {
@@ -134,8 +168,8 @@ export function useRoom(code: string, identity: RoomIdentity) {
         });
       })
       .on("broadcast", { event: "live-end" }, ({ payload }) => {
-        const { id, turnIndex } = payload as { id: string; turnIndex?: number };
-        if (typeof turnIndex === "number" && turnIndex !== turnRef.current) return;
+        const { id, turnIndex, round } = payload as { id: string; turnIndex?: number; round?: number };
+        if (!matchesCurrentTurn({ turnIndex, round })) return;
         clearLiveEndTimer(id);
         liveEndTimersRef.current[id] = window.setTimeout(() => {
           setLive((prev) => {
@@ -180,7 +214,7 @@ export function useRoom(code: string, identity: RoomIdentity) {
     void channelRef.current?.send({
       type: "broadcast",
       event: "live",
-      payload: { ...stroke, turnIndex: turnRef.current },
+      payload: { ...stroke, turnIndex: turnRef.current, round: roundRef.current },
     });
   }, []);
 
@@ -188,7 +222,7 @@ export function useRoom(code: string, identity: RoomIdentity) {
     void channelRef.current?.send({
       type: "broadcast",
       event: "live-end",
-      payload: { id, turnIndex: turnRef.current },
+      payload: { id, turnIndex: turnRef.current, round: roundRef.current },
     });
   }, []);
 
@@ -197,13 +231,13 @@ export function useRoom(code: string, identity: RoomIdentity) {
     void channelRef.current?.send({
       type: "broadcast",
       event: "stroke",
-      payload: { stroke, turnIndex: turnRef.current },
+      payload: { stroke, turnIndex: turnRef.current, round: roundRef.current },
     });
   }, []);
 
   // Free doodling in the lobby: never persisted, only shared over the channel.
   const appendScratchStroke = useCallback((stroke: Stroke) => {
-    setScratch((prev) => (prev.some((s) => s.id === stroke.id) ? prev : [...prev, stroke]));
+    setScratch((prev) => (prev.some((x) => x.id === s.id) ? prev : [...prev, s]));
     void channelRef.current?.send({ type: "broadcast", event: "scratch", payload: stroke });
   }, []);
 

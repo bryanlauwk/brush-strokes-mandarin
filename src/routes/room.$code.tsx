@@ -478,6 +478,11 @@ function RoomPage() {
                       drawSeconds={room.draw_seconds}
                       difficulty={room.difficulty}
                       roomTheme={currentRoomTheme}
+                      devTools={
+                        import.meta.env.DEV
+                          ? { botCount: bots.length, busy: botBusy, onAdd: addTestPlayer, onClear: removeTestPlayers }
+                          : null
+                      }
                       onSettings={(s) =>
                         void settingsFn({ data: { ...auth!, ...s } }).catch((e) =>
                           toast.error(e instanceof Error ? e.message : "保存失败"),

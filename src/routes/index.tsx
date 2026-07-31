@@ -221,7 +221,7 @@ function Index() {
     "home-field w-full rounded-md border-2 border-[var(--ink)] bg-card px-3 py-3 outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-primary";
 
   return (
-    <main className="home-shell mx-auto grid min-h-screen w-full max-w-6xl items-center gap-5 px-5 py-6 sm:px-8 lg:grid-cols-[minmax(0,1fr)_440px]">
+    <main className="home-shell mx-auto grid min-h-screen w-full max-w-6xl items-start content-center gap-5 px-5 py-6 sm:px-8 lg:grid-cols-[minmax(0,1fr)_440px]">
       <div aria-hidden="true" className="home-ukiyo-bg">
         <span className="ukiyo-art" style={{ backgroundImage: `url(${homeUkiyoBg.url})` }} />
         <span className="ukiyo-veil" />

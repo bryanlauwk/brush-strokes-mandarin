@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { ArrowRight, Brush, ChevronDown, DoorOpen, Sparkles, UserRound } from "lucide-react";
 import { CharacterPicker } from "@/components/game/CharacterPicker";
-import { createRoom, roomExists } from "@/lib/game.functions";
+import { createRoom, joinRoom, roomExists } from "@/lib/game.functions";
 import { ROOM_THEME_OPTIONS, type RoomTheme } from "@/lib/game-themes";
 import { createDefaultAvatar, isPresetCharacterAvatar } from "@/lib/character-avatars";
 import homeUkiyoBg from "@/assets/home-ukiyo-bg.png.asset.json";
@@ -58,6 +58,7 @@ const steps = [
 function Index() {
   const navigate = useNavigate();
   const createFn = useServerFn(createRoom);
+  const joinFn = useServerFn(joinRoom);
   const roomExistsFn = useServerFn(roomExists);
   const [name, setName] = useState("");
   const [avatarSvg, setAvatarSvg] = useState<string | null>(null);
@@ -181,7 +182,7 @@ function Index() {
     if (!validateName()) return;
     if (intent === "join" && !validateJoinCode()) return;
     if (intent === "create") void createWithProfile();
-    else joinWithProfile();
+    else void joinWithProfile();
   };
 
   const createWithProfile = async () => {
@@ -200,12 +201,20 @@ function Index() {
     }
   };
 
-  const joinWithProfile = () => {
+  const joinWithProfile = async () => {
     if (!validateName() || !validateJoinCode()) return;
     const svg = avatarSvg ?? createDefaultAvatar(trimmedName);
-    saveNickname(trimmedName);
-    saveAvatarSvg(svg);
-    void navigate({ to: "/room/$code", params: { code } });
+    setBusy(true);
+    try {
+      const res = await joinFn({ data: { code, name: trimmedName, avatarSvg: svg } });
+      saveNickname(trimmedName);
+      saveAvatarSvg(svg);
+      saveIdentity(res);
+      void navigate({ to: "/room/$code", params: { code: res.code } });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "加入失败");
+      setBusy(false);
+    }
   };
 
   const field =
@@ -419,7 +428,7 @@ function Index() {
                 disabled={busy || !trimmedName || !codeComplete || codeStatus === "missing"}
                 className="press rounded-md border-2 border-[var(--ink)] bg-accent px-4 font-display text-lg text-accent-foreground shadow-[4px_4px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
               >
-                加入
+                {busy && tab === "join" ? "加入中…" : "加入"}
               </button>
             </div>
             <p

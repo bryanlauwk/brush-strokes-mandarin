@@ -103,10 +103,12 @@ export function useRoom(code: string, identity: RoomIdentity) {
       turnRef.current = snap.room.turn_index;
       roundRef.current = snap.room.current_round;
       if (hadTurn && turnChanged) {
+        setStrokes(snap.strokes);
         setLive({});
         Object.values(liveEndTimersRef.current).forEach((timer) => window.clearTimeout(timer));
         liveEndTimersRef.current = {};
       } else {
+        setStrokes((prev) => mergeStrokes(snap.strokes, prev));
         setLive((prev) => {
           const next: Record<string, LiveStroke> = {};
           for (const [id, s] of Object.entries(prev)) {
@@ -116,7 +118,6 @@ export function useRoom(code: string, identity: RoomIdentity) {
           return next;
         });
       }
-      setStrokes((prev) => mergeStrokes(snap.strokes, prev));
       setLive((prev) => {
         if (!snap.strokes.length) return prev;
         const next = { ...prev };

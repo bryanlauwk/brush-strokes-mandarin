@@ -80,6 +80,9 @@ function RoomPage() {
   const feedbackIdRef = useRef(0);
   const roomFeedbackKeyRef = useRef<string | null>(null);
   const correctMessageIdRef = useRef(0);
+  const [bots, setBots] = useState<{ playerId: string; token: string }[]>([]);
+  const [botBusy, setBotBusy] = useState(false);
+  const botChoosingRef = useRef<string | null>(null);
 
   const joinFn = useServerFn(joinRoom);
   const privFn = useServerFn(getPrivateState);
@@ -238,6 +241,33 @@ function RoomPage() {
     if (auth) await leaveFn({ data: auth }).catch(() => undefined);
     clearIdentity(upper);
     void navigate({ to: "/" });
+  };
+
+  // Local test mode: spin up a throwaway second player so a round can start.
+  const addTestPlayer = async () => {
+    setBotBusy(true);
+    try {
+      const name = `测试玩家${bots.length + 1}`;
+      const res = await joinFn({ data: { code: upper, name, avatarSvg: createDefaultAvatar(name) } });
+      setBots((prev) => [...prev, { playerId: res.playerId, token: res.token }]);
+      toast.success(`${name} 已加入（仅本地测试）`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "加入测试玩家失败");
+    } finally {
+      setBotBusy(false);
+    }
+  };
+
+  const removeTestPlayers = async () => {
+    setBotBusy(true);
+    try {
+      await Promise.all(
+        bots.map((b) => leaveFn({ data: { code: upper, playerId: b.playerId, token: b.token } }).catch(() => undefined)),
+      );
+      setBots([]);
+    } finally {
+      setBotBusy(false);
+    }
   };
 
   if (!ready) return <Shell><p className="text-muted-foreground">载入中…</p></Shell>;

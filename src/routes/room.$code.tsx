@@ -202,6 +202,26 @@ function RoomPage() {
     if (room && room.status !== "waiting") clearScratch();
   }, [room?.status, clearScratch]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Test mode: if a test player is the drawer, auto-pick a word so the turn keeps moving.
+  useEffect(() => {
+    if (!room || room.status !== "choosing" || !bots.length) return;
+    const bot = bots.find((b) => b.playerId === room.drawer_id);
+    if (!bot) return;
+    const key = `${room.current_round}-${room.turn_index}-${bot.playerId}`;
+    if (botChoosingRef.current === key) return;
+    botChoosingRef.current = key;
+    void (async () => {
+      try {
+        const botAuth = { code: upper, playerId: bot.playerId, token: bot.token };
+        const state = await privFn({ data: botAuth });
+        const word = state.choices?.[0];
+        if (word) await chooseFn({ data: { ...botAuth, word } });
+      } catch {
+        botChoosingRef.current = null;
+      }
+    })();
+  }, [room?.status, room?.drawer_id, room?.current_round, room?.turn_index, bots, upper, privFn, chooseFn]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleStroke = useCallback(
     (stroke: Stroke) => {
       if (!auth) return;

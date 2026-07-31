@@ -791,6 +791,32 @@ function WaitingCard({
       ) : (
         <p className="mt-4 text-sm text-muted-foreground">等主持人开始…</p>
       )}
+      {devTools && (
+        <div className="mt-4 rounded-md border-2 border-dashed border-[var(--ink)]/40 p-3 text-left">
+          <p className="text-xs font-semibold">本地测试模式</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            一键补一名测试玩家凑够人数；轮到它画时会自动选题，方便你验证落笔与回合流程。
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={devTools.onAdd}
+              disabled={devTools.busy}
+              className="flex-1 rounded-md border-2 border-[var(--ink)] bg-card px-3 py-1.5 text-xs font-medium shadow-[2px_2px_0_0_var(--ink)] disabled:opacity-50"
+            >
+              {devTools.busy ? "处理中…" : "加一名测试玩家"}
+            </button>
+            <button
+              type="button"
+              onClick={devTools.onClear}
+              disabled={devTools.busy || devTools.botCount === 0}
+              className="rounded-md border-2 border-[var(--ink)] bg-background px-3 py-1.5 text-xs font-medium disabled:opacity-40"
+            >
+              清掉（{devTools.botCount}）
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

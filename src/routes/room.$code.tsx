@@ -80,6 +80,9 @@ function RoomPage() {
   const feedbackIdRef = useRef(0);
   const roomFeedbackKeyRef = useRef<string | null>(null);
   const correctMessageIdRef = useRef(0);
+  const [bots, setBots] = useState<{ playerId: string; token: string }[]>([]);
+  const [botBusy, setBotBusy] = useState(false);
+  const botChoosingRef = useRef<string | null>(null);
 
   const joinFn = useServerFn(joinRoom);
   const privFn = useServerFn(getPrivateState);
@@ -199,6 +202,26 @@ function RoomPage() {
     if (room && room.status !== "waiting") clearScratch();
   }, [room?.status, clearScratch]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Test mode: if a test player is the drawer, auto-pick a word so the turn keeps moving.
+  useEffect(() => {
+    if (!room || room.status !== "choosing" || !bots.length) return;
+    const bot = bots.find((b) => b.playerId === room.drawer_id);
+    if (!bot) return;
+    const key = `${room.current_round}-${room.turn_index}-${bot.playerId}`;
+    if (botChoosingRef.current === key) return;
+    botChoosingRef.current = key;
+    void (async () => {
+      try {
+        const botAuth = { code: upper, playerId: bot.playerId, token: bot.token };
+        const state = await privFn({ data: botAuth });
+        const word = state.choices?.[0];
+        if (word) await chooseFn({ data: { ...botAuth, word } });
+      } catch {
+        botChoosingRef.current = null;
+      }
+    })();
+  }, [room?.status, room?.drawer_id, room?.current_round, room?.turn_index, bots, upper, privFn, chooseFn]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleStroke = useCallback(
     (stroke: Stroke) => {
       if (!auth) return;
@@ -238,6 +261,33 @@ function RoomPage() {
     if (auth) await leaveFn({ data: auth }).catch(() => undefined);
     clearIdentity(upper);
     void navigate({ to: "/" });
+  };
+
+  // Local test mode: spin up a throwaway second player so a round can start.
+  const addTestPlayer = async () => {
+    setBotBusy(true);
+    try {
+      const name = `测试玩家${bots.length + 1}`;
+      const res = await joinFn({ data: { code: upper, name, avatarSvg: createDefaultAvatar(name) } });
+      setBots((prev) => [...prev, { playerId: res.playerId, token: res.token }]);
+      toast.success(`${name} 已加入（仅本地测试）`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "加入测试玩家失败");
+    } finally {
+      setBotBusy(false);
+    }
+  };
+
+  const removeTestPlayers = async () => {
+    setBotBusy(true);
+    try {
+      await Promise.all(
+        bots.map((b) => leaveFn({ data: { code: upper, playerId: b.playerId, token: b.token } }).catch(() => undefined)),
+      );
+      setBots([]);
+    } finally {
+      setBotBusy(false);
+    }
   };
 
   if (!ready) return <Shell><p className="text-muted-foreground">载入中…</p></Shell>;
@@ -428,6 +478,11 @@ function RoomPage() {
                       drawSeconds={room.draw_seconds}
                       difficulty={room.difficulty}
                       roomTheme={currentRoomTheme}
+                      devTools={
+                        import.meta.env.DEV
+                          ? { botCount: bots.length, busy: botBusy, onAdd: addTestPlayer, onClear: removeTestPlayers }
+                          : null
+                      }
                       onSettings={(s) =>
                         void settingsFn({ data: { ...auth!, ...s } }).catch((e) =>
                           toast.error(e instanceof Error ? e.message : "保存失败"),
@@ -608,6 +663,7 @@ function WaitingCard({
   drawSeconds,
   difficulty,
   roomTheme,
+  devTools,
   onSettings,
   onStart,
 }: {
@@ -619,6 +675,7 @@ function WaitingCard({
   drawSeconds: number;
   difficulty: string;
   roomTheme: RoomTheme;
+  devTools?: { botCount: number; busy: boolean; onAdd: () => void; onClear: () => void } | null;
   onSettings: (s: { totalRounds: number; drawSeconds: number; difficulty: Difficulty; roomTheme: RoomTheme }) => void;
   onStart: () => void;
 }) {
@@ -733,6 +790,32 @@ function WaitingCard({
         </button>
       ) : (
         <p className="mt-4 text-sm text-muted-foreground">等主持人开始…</p>
+      )}
+      {devTools && (
+        <div className="mt-4 rounded-md border-2 border-dashed border-[var(--ink)]/40 p-3 text-left">
+          <p className="text-xs font-semibold">本地测试模式</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            一键补一名测试玩家凑够人数；轮到它画时会自动选题，方便你验证落笔与回合流程。
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={devTools.onAdd}
+              disabled={devTools.busy}
+              className="flex-1 rounded-md border-2 border-[var(--ink)] bg-card px-3 py-1.5 text-xs font-medium shadow-[2px_2px_0_0_var(--ink)] disabled:opacity-50"
+            >
+              {devTools.busy ? "处理中…" : "加一名测试玩家"}
+            </button>
+            <button
+              type="button"
+              onClick={devTools.onClear}
+              disabled={devTools.busy || devTools.botCount === 0}
+              className="rounded-md border-2 border-[var(--ink)] bg-background px-3 py-1.5 text-xs font-medium disabled:opacity-40"
+            >
+              清掉（{devTools.botCount}）
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

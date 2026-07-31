@@ -663,6 +663,7 @@ function WaitingCard({
   drawSeconds,
   difficulty,
   roomTheme,
+  devTools,
   onSettings,
   onStart,
 }: {
@@ -674,6 +675,7 @@ function WaitingCard({
   drawSeconds: number;
   difficulty: string;
   roomTheme: RoomTheme;
+  devTools?: { botCount: number; busy: boolean; onAdd: () => void; onClear: () => void } | null;
   onSettings: (s: { totalRounds: number; drawSeconds: number; difficulty: Difficulty; roomTheme: RoomTheme }) => void;
   onStart: () => void;
 }) {

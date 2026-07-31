@@ -408,6 +408,7 @@ export const getRoomSnapshot = createServerFn({ method: "POST" })
         .from("strokes")
         .select("payload")
         .eq("room_id", room.id)
+        .eq("round", room.current_round)
         .eq("turn_index", room.turn_index)
         .order("id", { ascending: true }),
       supabaseAdmin

@@ -380,14 +380,18 @@ function RoomPage() {
 
     setJoining(true);
     try {
-      const res = await joinFn({
-        data: {
-          code: upper,
-          name: trimmedName,
-          avatarSvg: svg,
-          clientId: getOrCreateClientId(),
-        },
-      });
+      // Weak networks drop the join request outright; retry a few times with
+      // backoff so a single lost packet does not leave the player outside.
+      const res = await retryTransient(() =>
+        joinFn({
+          data: {
+            code: upper,
+            name: trimmedName,
+            avatarSvg: svg,
+            clientId: getOrCreateClientId(),
+          },
+        }),
+      );
       saveNickname(trimmedName);
       saveAvatarSvg(svg);
       saveIdentity(res);

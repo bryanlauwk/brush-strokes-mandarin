@@ -166,6 +166,7 @@ function RoomPage() {
     appendLocalStroke,
     appendScratchStroke,
     clearScratch,
+    broadcastSync,
   } = useRoom(upper, identity);
 
   const auth = useMemo(
@@ -200,7 +201,11 @@ function RoomPage() {
       }
     };
     void pull();
-    const t = setInterval(pull, 4000);
+    // While the drawer is waiting for the three options (the room flips to
+    // "choosing" a moment before the options land) poll fast so the picker does
+    // not appear seconds late.
+    const waitingForChoices = room.status === "choosing" && room.drawer_id === auth.playerId;
+    const t = setInterval(pull, waitingForChoices ? 700 : 4000);
     return () => {
       alive = false;
       clearInterval(t);
@@ -335,6 +340,9 @@ function RoomPage() {
           word: result.word,
           choices: [],
         }));
+        // Push the locked word to everybody immediately instead of waiting for
+        // the next poll, so all players enter the drawing round together.
+        broadcastSync();
         if (result.word !== word) {
           toast.info(`倒计时已先锁定「${result.word}」`);
         }
@@ -346,7 +354,7 @@ function RoomPage() {
         setChoosingWord(false);
       }
     },
-    [auth, room, chooseFn],
+    [auth, room, chooseFn, broadcastSync],
   );
 
   const handleStroke = useCallback(
@@ -694,6 +702,7 @@ function RoomPage() {
                             <button
                               key={w}
                               type="button"
+                              data-testid="word-choice"
                               onClick={() => void handleChooseWord(w)}
                               disabled={choosingWord}
                               aria-pressed={selectedWord === w}

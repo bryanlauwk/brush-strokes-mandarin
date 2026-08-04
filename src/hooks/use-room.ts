@@ -166,6 +166,10 @@ export function useRoom(code: string, identity: RoomIdentity) {
             }),
           { attempts: 3, baseDelayMs: 250 },
         );
+        if ((snap as { authError?: boolean }).authError) {
+          setIdentityInvalid(true);
+          return;
+        }
         setIdentityInvalid(false);
         applySnapshot(
           snap as unknown as {

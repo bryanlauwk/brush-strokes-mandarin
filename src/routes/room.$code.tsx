@@ -196,7 +196,8 @@ function RoomPage() {
     const pull = async () => {
       try {
         const res = await privFn({ data: auth });
-        if (alive) setPriv(res);
+        // Stale identity is handled by the rejoin flow; ignore the payload.
+        if (alive && !res.authError) setPriv(res);
       } catch {
         /* transient */
       }

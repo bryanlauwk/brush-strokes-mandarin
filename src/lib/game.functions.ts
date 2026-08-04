@@ -289,12 +289,10 @@ export const getPrivateState = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
-    const { room, player } = await g.authPlayer(
-      data.code,
-      data.playerId,
-      data.token,
-      data.clientId,
-    );
+    const authed = await g.tryAuthPlayer(data.code, data.playerId, data.token, data.clientId);
+    // A stale identity is an expected client state (rejoin flow), not a crash.
+    if (!authed) return { isDrawer: false, word: null, choices: [] as string[], authError: true };
+    const { room, player } = authed;
 
     await supabaseAdmin
       .from("players")
@@ -302,7 +300,8 @@ export const getPrivateState = createServerFn({ method: "POST" })
       .eq("id", player.id);
 
     const isDrawer = room.drawer_id === player.id;
-    if (!isDrawer) return { isDrawer: false, word: null, choices: [] as string[] };
+    if (!isDrawer)
+      return { isDrawer: false, word: null, choices: [] as string[], authError: false };
 
     const { data: secret } = await supabaseAdmin
       .from("room_secrets")
@@ -314,6 +313,7 @@ export const getPrivateState = createServerFn({ method: "POST" })
       isDrawer: true,
       word: (secret?.word as string | null) ?? null,
       choices: room.status === "choosing" ? ((secret?.choices as string[] | null) ?? []) : [],
+      authError: false,
     };
   });
 
@@ -571,7 +571,10 @@ export const getRoomSnapshot = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
-    const { room } = await g.authPlayer(data.code, data.playerId, data.token, data.clientId);
+    const authed = await g.tryAuthPlayer(data.code, data.playerId, data.token, data.clientId);
+    // Stale identity: tell the client to rejoin instead of throwing a runtime error.
+    if (!authed) return { authError: true as const };
+    const { room } = authed;
 
     const players = await g.listPlayers(room.id);
     const [{ data: strokes }, { data: messages }] = await Promise.all([
@@ -591,6 +594,7 @@ export const getRoomSnapshot = createServerFn({ method: "POST" })
     ]);
 
     return {
+      authError: false as const,
       room,
       players,
       strokes: ((strokes ?? []) as unknown as { payload: Stroke }[]).map((r) => r.payload),

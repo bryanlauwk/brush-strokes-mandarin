@@ -289,12 +289,10 @@ export const getPrivateState = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
-    const { room, player } = await g.authPlayer(
-      data.code,
-      data.playerId,
-      data.token,
-      data.clientId,
-    );
+    const authed = await g.tryAuthPlayer(data.code, data.playerId, data.token, data.clientId);
+    // A stale identity is an expected client state (rejoin flow), not a crash.
+    if (!authed) return { isDrawer: false, word: null, choices: [] as string[], authError: true };
+    const { room, player } = authed;
 
     await supabaseAdmin
       .from("players")
@@ -302,7 +300,8 @@ export const getPrivateState = createServerFn({ method: "POST" })
       .eq("id", player.id);
 
     const isDrawer = room.drawer_id === player.id;
-    if (!isDrawer) return { isDrawer: false, word: null, choices: [] as string[] };
+    if (!isDrawer)
+      return { isDrawer: false, word: null, choices: [] as string[], authError: false };
 
     const { data: secret } = await supabaseAdmin
       .from("room_secrets")
@@ -314,6 +313,7 @@ export const getPrivateState = createServerFn({ method: "POST" })
       isDrawer: true,
       word: (secret?.word as string | null) ?? null,
       choices: room.status === "choosing" ? ((secret?.choices as string[] | null) ?? []) : [],
+      authError: false,
     };
   });
 

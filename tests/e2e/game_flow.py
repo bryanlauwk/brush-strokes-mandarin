@@ -61,13 +61,19 @@ async def main():
         await a.screenshot(path=str(SHOTS / "2_choosing_a.png"))
         await b.screenshot(path=str(SHOTS / "2_choosing_b.png"))
 
-        # 用例 3: 画家选题锁定
-        for page in (a, b):
-            choice = page.locator("[data-testid='word-choice']").first
-            if await choice.count():
-                await choice.click()
+        # 用例 3: 画家选题锁定（等选项出现，最多 12 秒）
+        drawer = None
+        for _ in range(24):
+            for page in (a, b):
+                if await page.locator("[data-testid='word-choice']").count():
+                    drawer = page
+                    break
+            if drawer:
                 break
-        await a.wait_for_timeout(2500)
+            await a.wait_for_timeout(500)
+        assert drawer is not None, "选题按钮没有出现"
+        await drawer.locator("[data-testid='word-choice']").first.click()
+        await a.wait_for_timeout(3000)
         print("A:", (await room_state(a))[:200])
         print("B:", (await room_state(b))[:200])
         await a.screenshot(path=str(SHOTS / "3_drawing_a.png"))

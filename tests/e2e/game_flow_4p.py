@@ -73,13 +73,27 @@ async def set_name(page, name, timeout_ms=45000):
     raise AssertionError(f"找不到名字输入框 ({name}) 页面文本: {body!r}")
 
 
-async def join_room(page, code, name):
+async def join_room(page, code, name, attempts=4):
+    """弱网下 join 请求可能整包丢失，真实玩家会再点一次；这里模拟同样的行为。"""
     await page.goto(f"{BASE}/room/{code}", wait_until="domcontentloaded")
     await page.wait_for_timeout(1500)
-    await set_name(page, name)
-    btn = page.get_by_role("button", name="加入这一局")
-    await btn.wait_for(state="visible", timeout=30000)
-    await btn.click()
+    for attempt in range(attempts):
+        await set_name(page, name)
+        btn = page.get_by_role("button", name="加入这一局")
+        try:
+            await btn.wait_for(state="visible", timeout=30000)
+        except Exception:
+            return  # 已经进房了
+        await btn.click()
+        # 等进房成功（加入表单消失）
+        waited = 0
+        while waited < 12000:
+            if not await btn.count():
+                return
+            await page.wait_for_timeout(500)
+            waited += 500
+        print(f"  [{name}] 第 {attempt + 1} 次加入被丢包，重试")
+    raise AssertionError(f"{name} 多次重试后仍无法加入")
 
 
 async def word_view(page):

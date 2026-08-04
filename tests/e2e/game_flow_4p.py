@@ -39,7 +39,13 @@ async def impair(context, latency_ms, loss):
 
     async def handler(route):
         url = route.request.url
-        dynamic = "/_serverFn/" in url or "/api/" in url or "supabase" in url
+        # 只损伤真正的数据请求；dev server 的源码模块（含 supabase 客户端文件）必须放行，
+        # 否则页面根本 hydrate 不起来，测的就不是网络抖动了。
+        dynamic = (
+            "/_serverFn/" in url
+            or "supabase.co/" in url
+            or ("/api/" in url and "localhost" not in url.split("/api/")[0].split("//")[-1].split("/")[0][:0] or "/api/" in url)
+        ) and not url.endswith((".ts", ".tsx", ".js", ".jsx", ".css"))
         if not dynamic:
             await route.continue_()
             return

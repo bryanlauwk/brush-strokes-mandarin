@@ -64,7 +64,9 @@ async def set_name(page, name, timeout_ms=45000):
                 return
         await page.wait_for_timeout(500)
         waited += 500
-    raise AssertionError("找不到名字输入框")
+    await page.screenshot(path=str(SHOTS / f"fail_{name}.png"))
+    body = await page.evaluate("() => document.body.innerText.slice(0, 600)")
+    raise AssertionError(f"找不到名字输入框 ({name}) 页面文本: {body!r}")
 
 
 async def join_room(page, code, name):

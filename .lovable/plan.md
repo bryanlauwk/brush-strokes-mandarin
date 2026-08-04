@@ -1,14 +1,56 @@
-# Fix Homepage Left / Right Section Alignment
+# 手机版重新设计：答题室 + 画板优先布局
 
-## Problem
-The homepage main grid uses `items-center`, so the shorter left column (hero + steps) is vertically centered against the taller right column (the form panel). Visually, the left section sits in the middle of the right section instead of aligning with its top.
+## 目标
 
-## Proposed Change
-- In `src/routes/index.tsx`, update the `<main>` grid layout from `items-center` to `items-start content-center`.
-- `items-start` makes both the left hero section and the right form panel start at the same vertical line (top-aligned).
-- `content-center` keeps the overall grid centered vertically in the viewport, so the page still feels balanced.
-- Keep the existing gap (`gap-5`) and grid columns (`lg:grid-cols-[minmax(0,1fr)_440px]`).
+手机上玩不憋屈：画板拿到最大空间，答题室（原「聊天室」）常驻可见、不用另外点开，所有控件用拇指就能操作。
 
-## Verification
-- Preview the homepage on desktop and confirm the left hero block and the right "准备开玩" panel share the same top edge.
-- Check mobile layout to ensure no regression on the single-column view.
+## 主要改动
+
+### 1. 全站改名：聊天室 → 答题室
+「聊天」「聊天室」相关文案、按钮、aria-label 统一改为「答题室 / 答题」，输入框提示改为「输入你的答案…」。
+
+### 2. 手机版新布局（<1024px）
+
+```text
+┌──────────────────────────┐
+│ 精简头条：房号 · 轮次 · 倒计时 · 离开 │
+├──────────────────────────┤
+│ 题目条（掩码 / 你的题目）        │
+├──────────────────────────┤
+│                          │
+│        画板（主区域）        │
+│      工具列浮在画板底部        │
+│                          │
+├──────────────────────────┤
+│ 答题室（常驻，约 30% 高度）      │
+│ 最新几条 + 输入框固定在底         │
+└──────────────────────────┘
+```
+
+- 画板改为按可用高度自适应（`flex-1`），不再被固定 h-32 计分板和 h-44 提示卡挤压。
+- 答题室永远可见，占固定比例高度；输入框贴底，聚焦时随虚拟键盘上移（`dvh` + `env(safe-area-inset-bottom)`）。
+- 想看完整答题记录时，向上拖动答题室把手可展开到半屏，不再是「必须点开才有」。
+
+### 3. 计分板改为横向头像条
+手机上把纵向排行榜换成画板上方一行可横向滑动的头像条（头像 + 分数 + 画笔标记），高度约 44px，省下大量垂直空间。桌面维持现有侧栏。
+
+### 4. 画板工具与提示
+- 颜色/笔粗/橡皮/撤销/清空改为画板内浮动工具条，按钮 ≥44px 触控区。
+- 「画家灵感图」提示面板改成画板右上角的一个小按钮，点开才以弹层显示，不再固定占 h-44。
+
+### 5. 触控与细节
+- 画布支持 pointer events + `touch-action: none`，防止画画时页面滚动/双指缩放误触。
+- 头部在手机上折叠成两行以内，房号/主题标签缩短，长中文名 `truncate` 处理。
+- 选题、回合结算、最终排名弹层在小屏上改为贴底卡片，按钮全宽易点。
+- 遵守安全区（刘海/Home 指示条）。
+
+## 技术要点
+
+- 主要文件：`src/routes/room.$code.tsx`（布局与断点）、`src/components/game/ChatPanel.tsx`（改名 + 移动端贴底输入 + 拖动展开）、`src/components/game/Scoreboard.tsx`（新增横向紧凑变体）、`src/components/game/DrawBoard.tsx`（浮动工具条、触控优化）、`src/components/game/DrawingHintPanel.tsx`（改为弹层触发）。
+- 用 `lg:` 断点分流：桌面布局保持现状不变，只重写 `<lg` 分支。
+- 高度用 `h-[100dvh]` + `min-h-0` 链路，避免 iOS 地址栏导致的跳动。
+- 完成后用 Playwright 以 390x844 视口截图验证画板高度、答题室可见、键盘弹出后输入框不被遮挡。
+
+## 不改动
+
+游戏规则、后端、回合逻辑、桌面版视觉。

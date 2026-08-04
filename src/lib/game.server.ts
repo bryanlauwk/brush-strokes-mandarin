@@ -965,7 +965,6 @@ export async function lockWord(room: RoomRow, requestedWord: string) {
     .eq("room_id", room.id)
     .eq("drawer_id", room.drawer_id)
     .is("word", null)
-    .contains("choices", [requestedWord])
     .select("word")
     .maybeSingle();
 

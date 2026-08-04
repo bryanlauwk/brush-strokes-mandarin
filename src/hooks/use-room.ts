@@ -63,6 +63,7 @@ export function useRoom(code: string, identity: RoomIdentity) {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const turnRef = useRef<number>(-1);
   const roundRef = useRef<number>(-1);
+  const refreshRef = useRef<(() => void) | null>(null);
   const liveEndTimersRef = useRef<Record<string, number>>({});
 
   const playerId = identity?.playerId ?? null;
@@ -177,7 +178,16 @@ export function useRoom(code: string, identity: RoomIdentity) {
     };
 
     void refresh();
+    refreshRef.current = () => void refresh();
     const timer = window.setInterval(() => void refresh(), POLL_MS);
+
+    // Coming back from another tab/route must not wait for the next poll,
+    // otherwise players briefly see a stale turn or stale word choices.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
 
     const channel = supabase
       .channel(`room-${upper}`, { config: { broadcast: { self: false } } })
@@ -236,6 +246,9 @@ export function useRoom(code: string, identity: RoomIdentity) {
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      refreshRef.current = null;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
       Object.values(liveEndTimersRef.current).forEach((pendingTimer) =>
         window.clearTimeout(pendingTimer),
       );
@@ -288,6 +301,12 @@ export function useRoom(code: string, identity: RoomIdentity) {
 
   const clearScratch = useCallback(() => setScratch([]), []);
 
+  /** Pull a fresh snapshot now and ask every other client to do the same. */
+  const broadcastSync = useCallback(() => {
+    refreshRef.current?.();
+    void channelRef.current?.send({ type: "broadcast", event: "sync", payload: {} });
+  }, []);
+
   const me = players.find((p) => p.id === playerId) ?? null;
 
   return {
@@ -305,5 +324,6 @@ export function useRoom(code: string, identity: RoomIdentity) {
     appendLocalStroke,
     appendScratchStroke,
     clearScratch,
+    broadcastSync,
   };
 }

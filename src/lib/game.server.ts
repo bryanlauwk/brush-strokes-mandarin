@@ -908,6 +908,29 @@ export async function startTurn(room: RoomRow) {
     .update({ has_guessed: false, round_score: 0 })
     .eq("room_id", room.id);
 
+  // Claim the turn atomically BEFORE writing the choices. Several clients tick
+  // the state machine at the same time, so without this compare-and-set two
+  // callers could each generate a different set of choices for the same turn
+  // and players would see the selection change under them.
+  const { data: claimedTurn } = await supabaseAdmin
+    .from("rooms")
+    .update({
+      status: "choosing",
+      current_round: round,
+      drawer_id: drawer.id,
+      masked_word: null,
+      word_length: null,
+      revealed_word: null,
+      round_started_at: null,
+      round_ends_at: new Date(Date.now() + CHOOSE_SECONDS * 1000).toISOString(),
+    })
+    .eq("id", room.id)
+    .eq("turn_index", index)
+    .not("status", "in", "(choosing,drawing)")
+    .select("id")
+    .maybeSingle();
+  if (!claimedTurn) return;
+
   const nextUsedWords = Array.from(new Set([...usedWords, ...choices]));
   await saveTurnChoices(
     room.id,
@@ -921,20 +944,6 @@ export async function startTurn(room: RoomRow) {
     },
     supportsUsedWords,
   );
-
-  await supabaseAdmin
-    .from("rooms")
-    .update({
-      status: "choosing",
-      current_round: round,
-      drawer_id: drawer.id,
-      masked_word: null,
-      word_length: null,
-      revealed_word: null,
-      round_started_at: null,
-      round_ends_at: new Date(Date.now() + CHOOSE_SECONDS * 1000).toISOString(),
-    })
-    .eq("id", room.id);
 
   await supabaseAdmin
     .from("strokes")
@@ -998,6 +1007,24 @@ export async function lockWord(room: RoomRow, requestedWord: string) {
 }
 
 export async function endTurn(room: RoomRow, word: string | null) {
+  // Compare-and-set first: only the caller that actually moves the room out of
+  // choosing/drawing may score the turn, otherwise concurrent ticks would pay
+  // the drawer bonus twice and post duplicate reveals.
+  const { data: claimed } = await supabaseAdmin
+    .from("rooms")
+    .update({
+      status: "turn_end",
+      revealed_word: word,
+      masked_word: word ? [...word].join(" ") : null,
+      round_ends_at: new Date(Date.now() + TURN_END_SECONDS * 1000).toISOString(),
+    })
+    .eq("id", room.id)
+    .eq("turn_index", room.turn_index)
+    .in("status", ["choosing", "drawing"])
+    .select("id")
+    .maybeSingle();
+  if (!claimed) return;
+
   const players = await listPlayers(room.id);
   const correct = players.filter((p) => p.has_guessed && p.id !== room.drawer_id);
   const drawer = players.find((p) => p.id === room.drawer_id);
@@ -1008,15 +1035,6 @@ export async function endTurn(room: RoomRow, word: string | null) {
       .update({ score: drawer.score + bonus, round_score: bonus })
       .eq("id", drawer.id);
   }
-  await supabaseAdmin
-    .from("rooms")
-    .update({
-      status: "turn_end",
-      revealed_word: word,
-      masked_word: word ? [...word].join(" ") : null,
-      round_ends_at: new Date(Date.now() + TURN_END_SECONDS * 1000).toISOString(),
-    })
-    .eq("id", room.id);
   await say(room.id, room.current_round, "reveal", word ?? "（无）");
 }
 
@@ -1074,7 +1092,17 @@ export async function advance(room: RoomRow) {
 
   if (room.status === "turn_end" && now >= deadline) {
     const nextIndex = room.turn_index + 1;
-    await supabaseAdmin.from("rooms").update({ turn_index: nextIndex }).eq("id", room.id);
+    // Only one caller may bump the turn, otherwise two simultaneous ticks would
+    // skip a player's slot.
+    const { data: bumped } = await supabaseAdmin
+      .from("rooms")
+      .update({ turn_index: nextIndex })
+      .eq("id", room.id)
+      .eq("turn_index", room.turn_index)
+      .eq("status", "turn_end")
+      .select("id")
+      .maybeSingle();
+    if (!bumped) return;
     await startTurn({ ...room, turn_index: nextIndex });
   }
 }

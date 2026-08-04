@@ -201,7 +201,11 @@ function RoomPage() {
       }
     };
     void pull();
-    const t = setInterval(pull, 4000);
+    // While the drawer is waiting for the three options (the room flips to
+    // "choosing" a moment before the options land) poll fast so the picker does
+    // not appear seconds late.
+    const waitingForChoices = room.status === "choosing" && room.drawer_id === auth.playerId;
+    const t = setInterval(pull, waitingForChoices ? 700 : 4000);
     return () => {
       alive = false;
       clearInterval(t);

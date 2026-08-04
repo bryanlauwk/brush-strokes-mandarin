@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowDown, CheckCircle2, Flame, MessageCircle, Send } from "lucide-react";
+import {
+  ArrowDown,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Flame,
+  MessageCircle,
+  Send,
+} from "lucide-react";
 import type { ChatMessage } from "@/lib/game-types";
 import { cn } from "@/lib/utils";
 
@@ -8,9 +16,18 @@ type Props = {
   disabled: boolean;
   placeholder: string;
   onSend: (text: string) => void;
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
 };
 
-export function ChatPanel({ messages, disabled, placeholder, onSend }: Props) {
+export function ChatPanel({
+  messages,
+  disabled,
+  placeholder,
+  onSend,
+  expanded,
+  onToggleExpanded,
+}: Props) {
   const [value, setValue] = useState("");
   const [atBottom, setAtBottom] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -101,14 +118,27 @@ export function ChatPanel({ messages, disabled, placeholder, onSend }: Props) {
 
   return (
     <div className="studio-panel flex h-full max-h-full min-h-0 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-2 border-b-2 border-[var(--ink)] bg-secondary px-3 py-2">
-        <span className="grid size-8 place-items-center rounded-md border-2 border-[var(--ink)] bg-card">
+      <div className="flex shrink-0 items-center gap-2 border-b-2 border-[var(--ink)] bg-secondary px-3 py-1.5 sm:py-2">
+        <span className="grid size-7 place-items-center rounded-md border-2 border-[var(--ink)] bg-card sm:size-8">
           <MessageCircle className="size-4 text-primary" />
         </span>
-        <div className="min-w-0">
-          <p className="font-display text-lg leading-none">猜答案区</p>
-          <p className="text-xs text-muted-foreground">答案、提示和欢呼都在这里</p>
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-base leading-none sm:text-lg">答题室</p>
+          <p className="hidden text-xs text-muted-foreground sm:block">
+            答案、提示和欢呼都在这里
+          </p>
         </div>
+        {onToggleExpanded && (
+          <button
+            type="button"
+            onClick={onToggleExpanded}
+            aria-label={expanded ? "收起答题室" : "展开答题室"}
+            aria-expanded={expanded}
+            className="press grid size-9 shrink-0 place-items-center rounded-md border-2 border-[var(--ink)] bg-card shadow-[2px_2px_0_0_var(--ink)] lg:hidden"
+          >
+            {expanded ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}
+          </button>
+        )}
       </div>
 
       <div className="relative min-h-0 flex-1">
@@ -144,13 +174,14 @@ export function ChatPanel({ messages, disabled, placeholder, onSend }: Props) {
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 border-t-2 border-[var(--ink)] bg-card/75 p-2">
+      <div className="flex shrink-0 items-center gap-2 border-t-2 border-[var(--ink)] bg-card/75 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:pb-2">
         <input
           value={value}
           disabled={disabled}
           placeholder={placeholder}
           maxLength={40}
           onChange={(e) => setValue(e.target.value)}
+          onFocus={() => scrollToBottom()}
           onCompositionStart={() => {
             composingRef.current = true;
           }}
@@ -163,14 +194,14 @@ export function ChatPanel({ messages, disabled, placeholder, onSend }: Props) {
               submit();
             }
           }}
-          className="min-w-0 flex-1 rounded-md border-2 border-[var(--ink)] bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary disabled:opacity-50"
+          className="min-w-0 flex-1 rounded-md border-2 border-[var(--ink)] bg-background px-3 py-2.5 text-base outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary disabled:opacity-50 sm:py-2 sm:text-sm"
         />
         <button
           type="button"
           onClick={submit}
           disabled={disabled}
           aria-label="发送"
-          className="press flex size-10 shrink-0 items-center justify-center rounded-md border-2 border-[var(--ink)] bg-primary text-primary-foreground shadow-[2px_2px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
+          className="press flex size-11 shrink-0 items-center justify-center rounded-md border-2 border-[var(--ink)] bg-primary text-primary-foreground shadow-[2px_2px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50 sm:size-10"
         >
           <Send className="size-4" />
         </button>

@@ -10,11 +10,13 @@ export function Scoreboard({
   drawerId,
   meId,
   meAvatarSvg,
+  variant = "list",
 }: {
   players: Player[];
   drawerId: string | null;
   meId: string | null;
   meAvatarSvg?: string | null;
+  variant?: "list" | "strip";
 }) {
   const [localAvatarSvg, setLocalAvatarSvg] = useState<string | null>(null);
   const ranked = [...players].sort((a, b) => b.score - a.score);
@@ -23,6 +25,37 @@ export function Scoreboard({
   useEffect(() => {
     setLocalAvatarSvg(loadAvatarSvg());
   }, [meId]);
+
+  const fallbackSvg = meAvatarSvg ?? localAvatarSvg;
+  const withFallback = (p: Player) =>
+    p.id === meId && !p.avatar_svg && fallbackSvg ? { ...p, avatar_svg: fallbackSvg } : p;
+
+  if (variant === "strip") {
+    return (
+      <div className="studio-panel flex items-center gap-2 overflow-x-auto overscroll-x-contain px-2 py-1.5">
+        {ranked.map((p) => (
+          <div
+            key={p.id}
+            title={p.name}
+            className={cn(
+              "flex shrink-0 items-center gap-1.5 rounded-full border-2 border-border bg-card py-1 pr-2 pl-1",
+              p.has_guessed && "border-[var(--success)]/70 bg-[var(--success)]/10",
+              p.id === drawerId && "border-primary/70 bg-accent/60",
+              p.id === meId && "border-[var(--ink)]",
+            )}
+          >
+            <PlayerAvatar player={withFallback(p)} size="sm" />
+            <span className="max-w-16 truncate text-xs leading-none">{p.name}</span>
+            <span className="text-xs leading-none font-semibold tabular-nums">{p.score}</span>
+            {p.id === drawerId && <Pencil className="size-3 shrink-0 text-primary" />}
+            {p.has_guessed && p.id !== drawerId && (
+              <Check className="size-3 shrink-0 text-[var(--success)]" />
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="studio-panel flex h-full min-h-0 flex-col overflow-hidden">
@@ -41,8 +74,7 @@ export function Scoreboard({
       <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
         {ranked.map((p, i) => {
           const scoreWidth = topScore > 0 ? Math.max(12, Math.round((p.score / topScore) * 100)) : 0;
-          const fallbackSvg = meAvatarSvg ?? localAvatarSvg;
-          const displayPlayer = p.id === meId && !p.avatar_svg && fallbackSvg ? { ...p, avatar_svg: fallbackSvg } : p;
+          const displayPlayer = withFallback(p);
           return (
             <li
               key={p.id}

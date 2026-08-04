@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Copy, LogOut, MessageCircle, X } from "lucide-react";
+import { Copy, Lightbulb, LogOut, X } from "lucide-react";
 import { DrawBoard } from "@/components/game/DrawBoard";
 import { ChatPanel } from "@/components/game/ChatPanel";
 import { CharacterPicker } from "@/components/game/CharacterPicker";
@@ -103,7 +103,8 @@ function RoomPage() {
     choices: [],
   });
   const [now, setNow] = useState(() => Date.now());
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatExpanded, setChatExpanded] = useState(false);
+  const [hintOpen, setHintOpen] = useState(false);
   const [feedback, setFeedback] = useState<GameFeedbackEvent | null>(null);
   const feedbackIdRef = useRef(0);
   const roomFeedbackKeyRef = useRef<string | null>(null);
@@ -563,13 +564,15 @@ function RoomPage() {
   const chat = (
     <ChatPanel
       messages={messages}
+      expanded={chatExpanded}
+      onToggleExpanded={() => setChatExpanded((v) => !v)}
       disabled={iAmDrawer && room.status === "drawing"}
       placeholder={
         iAmDrawer && room.status === "drawing"
-          ? "你负责画，先别猜"
+          ? "你负责画，先别答"
           : guessed
-            ? "你已经猜中，可以聊天"
-            : "输入华语答案…"
+            ? "你已经答对，可以聊聊"
+            : "输入你的答案…"
       }
       onSend={(text) =>
         void guessFn({ data: { ...auth!, text } }).catch((e) =>
@@ -580,9 +583,9 @@ function RoomPage() {
   );
 
   return (
-    <main className="mx-auto flex h-[100dvh] max-w-6xl flex-col gap-3 overflow-hidden p-3 sm:p-5">
-      <header className="panel flex shrink-0 flex-wrap items-center gap-3 px-4 py-2 sm:py-3">
-        <Link to="/" className="font-display text-xl text-primary">
+    <main className="mx-auto flex h-[100dvh] max-w-6xl flex-col gap-2 overflow-hidden p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:gap-3 sm:p-5">
+      <header className="panel flex shrink-0 flex-wrap items-center gap-2 px-2.5 py-1.5 sm:gap-3 sm:px-4 sm:py-3">
+        <Link to="/" className="hidden font-display text-xl text-primary sm:block">
           画啦猜啦
         </Link>
         <button
@@ -593,23 +596,23 @@ function RoomPage() {
             void navigator.clipboard?.writeText(upper);
             toast.success(`号码 ${upper} 已复制`);
           }}
-          className="press flex items-center gap-1 rounded-md border-2 border-[var(--ink)] bg-secondary px-3 py-1 text-sm tracking-[0.2em] shadow-[2px_2px_0_0_var(--ink)]"
+          className="press flex items-center gap-1 rounded-md border-2 border-[var(--ink)] bg-secondary px-2.5 py-1 text-sm tracking-[0.2em] shadow-[2px_2px_0_0_var(--ink)]"
         >
           {upper}
           <Copy className="size-3.5" />
         </button>
-        <span className="rounded-full border-2 border-[var(--ink)] bg-accent px-3 py-1 text-xs font-semibold">
+        <span className="hidden rounded-full border-2 border-[var(--ink)] bg-accent px-3 py-1 text-xs font-semibold sm:inline">
           {currentRoomTheme}
         </span>
         {inGame && (
           <>
-            <span className="rounded-full border-2 border-[var(--ink)] bg-card px-3 py-1 text-xs sm:text-sm">
-              第 {room.current_round}/{room.total_rounds} 轮 · 这一轮 {turnInRound}/{turnsPerRound}{" "}
-              位
+            <span className="rounded-full border-2 border-[var(--ink)] bg-card px-2.5 py-1 text-[11px] sm:px-3 sm:text-sm">
+              第 {room.current_round}/{room.total_rounds} 轮 · {turnInRound}/{turnsPerRound}
+              <span className="hidden sm:inline"> 位</span>
             </span>
             <span
               className={cn(
-                "ml-auto flex size-11 items-center justify-center rounded-full border-2 border-[var(--ink)] font-display text-lg tabular-nums",
+                "ml-auto flex size-9 items-center justify-center rounded-full border-2 border-[var(--ink)] font-display text-base tabular-nums sm:size-11 sm:text-lg",
                 urgent ? "animate-urgent bg-primary text-primary-foreground" : "bg-accent",
               )}
             >
@@ -621,35 +624,50 @@ function RoomPage() {
           <button
             type="button"
             onClick={doLeave}
-            className="press flex items-center gap-1 rounded-md border-2 border-[var(--ink)] bg-card px-3 py-1 text-sm shadow-[2px_2px_0_0_var(--ink)] hover:bg-accent"
+            aria-label="离开房间"
+            className="press flex items-center gap-1 rounded-md border-2 border-[var(--ink)] bg-card px-2.5 py-1 text-sm shadow-[2px_2px_0_0_var(--ink)] hover:bg-accent"
           >
-            <LogOut className="size-3.5" /> 离开
+            <LogOut className="size-3.5" /> <span className="hidden sm:inline">离开</span>
           </button>
         </div>
       </header>
 
       {inGame && (
-        <div className="panel shrink-0 px-4 py-2 text-center">
-          <p className="text-xs text-muted-foreground">
+        <div className="panel shrink-0 px-3 py-1.5 text-center sm:px-4 sm:py-2">
+          <p className="truncate text-[11px] text-muted-foreground sm:text-xs">
             {iAmDrawer
               ? "你正在画："
               : `${drawer?.name ?? "画画人"} 正在画 · ${room.word_length ?? "?"} 个字`}
           </p>
-          <p className="font-display text-2xl tracking-[0.3em] break-all">{wordDisplay || "…"}</p>
+          <p className="font-display text-xl tracking-[0.25em] break-all sm:text-2xl sm:tracking-[0.3em]">
+            {wordDisplay || "…"}
+          </p>
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto_auto] gap-3 lg:grid-cols-[220px_minmax(0,1fr)_290px] lg:grid-rows-1">
-        <div className="order-2 h-32 min-h-0 lg:order-1 lg:h-auto">
-          <Scoreboard
-            players={players}
-            drawerId={room.drawer_id}
-            meId={identity.playerId}
-            meAvatarSvg={avatarSvg}
-          />
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] gap-2 lg:grid-cols-[220px_minmax(0,1fr)_290px] lg:grid-rows-1 lg:gap-3">
+        <div className="order-1 min-w-0 shrink-0 lg:order-1 lg:h-auto lg:min-h-0">
+          {/* Mobile: horizontal avatar strip. Desktop keeps the tall leaderboard. */}
+          <div className="lg:hidden">
+            <Scoreboard
+              players={players}
+              drawerId={room.drawer_id}
+              meId={identity.playerId}
+              meAvatarSvg={avatarSvg}
+              variant="strip"
+            />
+          </div>
+          <div className="hidden h-full min-h-0 lg:block">
+            <Scoreboard
+              players={players}
+              drawerId={room.drawer_id}
+              meId={identity.playerId}
+              meAvatarSvg={avatarSvg}
+            />
+          </div>
         </div>
 
-        <div className="order-1 min-h-0 lg:order-2">
+        <div className="relative order-2 min-h-0 min-w-0 lg:order-2">
           <DrawBoard
             strokes={isLobby ? scratch : strokes}
             live={live}
@@ -810,18 +828,16 @@ function RoomPage() {
           />
         </div>
 
+        {/* Mobile: 答题室 is always on screen under the canvas; desktop keeps
+            the right column with the drawer hint stacked above it. */}
         <div
-          className={cn(
-            "order-3 min-h-0 overflow-hidden",
-            drawingHint
-              ? "h-44 lg:flex lg:h-auto lg:flex-col lg:gap-3"
-              : "hidden lg:block lg:h-full",
-          )}
+          className="order-3 min-h-0 min-w-0 overflow-hidden lg:flex lg:h-full lg:flex-col lg:gap-3"
+          style={{ ["--chat-h" as string]: chatExpanded ? "56dvh" : "30dvh" }}
         >
-          {drawingHint && <div className="shrink-0">{drawingHint}</div>}
+          {drawingHint && <div className="hidden shrink-0 lg:block">{drawingHint}</div>}
           <div
             className={cn(
-              "hidden min-h-0 overflow-hidden lg:block",
+              "h-[var(--chat-h)] min-h-0 overflow-hidden transition-[height] duration-200 lg:h-auto",
               drawingHint ? "lg:flex-1" : "lg:h-full",
             )}
           >
@@ -830,32 +846,34 @@ function RoomPage() {
         </div>
       </div>
 
-      {/* Mobile: chat lives in a bottom sheet so it never pushes the canvas away */}
-      <button
-        type="button"
-        onClick={() => setChatOpen(true)}
-        className="press fixed right-4 bottom-4 z-40 flex items-center gap-1 rounded-full border-2 border-[var(--ink)] bg-primary px-4 py-2 text-sm text-primary-foreground shadow-[3px_3px_0_0_var(--ink)] lg:hidden"
-      >
-        <MessageCircle className="size-4" /> 聊天
-      </button>
-      {chatOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-background/60 backdrop-blur-[2px] lg:hidden">
+      {/* Mobile: the drawer hint opens on demand instead of eating canvas space */}
+      {drawingHint && (
+        <button
+          type="button"
+          onClick={() => setHintOpen(true)}
+          className="press fixed right-3 bottom-[38dvh] z-40 flex items-center gap-1 rounded-full border-2 border-[var(--ink)] bg-primary px-3 py-2 text-sm text-primary-foreground shadow-[3px_3px_0_0_var(--ink)] lg:hidden"
+        >
+          <Lightbulb className="size-4" /> 提示图
+        </button>
+      )}
+      {drawingHint && hintOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-[2px] lg:hidden">
           <button
             type="button"
-            aria-label="关闭聊天"
-            onClick={() => setChatOpen(false)}
-            className="flex-1"
+            aria-label="关闭提示图"
+            onClick={() => setHintOpen(false)}
+            className="absolute inset-0"
           />
-          <div className="relative h-[60vh] p-2">
+          <div className="relative w-full max-w-sm">
             <button
               type="button"
-              aria-label="关闭聊天"
-              onClick={() => setChatOpen(false)}
-              className="absolute -top-2 right-4 z-10 grid size-9 place-items-center rounded-full border-2 border-[var(--ink)] bg-card shadow-[2px_2px_0_0_var(--ink)]"
+              aria-label="关闭提示图"
+              onClick={() => setHintOpen(false)}
+              className="absolute -top-3 -right-2 z-10 grid size-9 place-items-center rounded-full border-2 border-[var(--ink)] bg-card shadow-[2px_2px_0_0_var(--ink)]"
             >
               <X className="size-4" />
             </button>
-            {chat}
+            {drawingHint}
           </div>
         </div>
       )}
@@ -873,11 +891,13 @@ function Overlay({ children, transparent }: { children: React.ReactNode; transpa
   return (
     <div
       className={cn(
-        "absolute inset-0 flex items-center justify-center p-4",
+        "absolute inset-0 flex items-center justify-center overflow-y-auto overscroll-contain p-2 sm:p-4",
         transparent ? "pointer-events-none" : "bg-background/85 backdrop-blur-[2px]",
       )}
     >
-      <div className={cn(transparent && "pointer-events-auto")}>{children}</div>
+      <div className={cn("my-auto max-h-full w-full max-w-md", transparent && "pointer-events-auto")}>
+        {children}
+      </div>
     </div>
   );
 }

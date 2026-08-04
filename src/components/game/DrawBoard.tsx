@@ -229,10 +229,10 @@ export function DrawBoard({
   const activeLabel = tool === "pen" ? "笔" : tool === "eraser" ? "擦" : "填色";
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
+    <div className="flex h-full min-h-0 flex-col gap-2 sm:gap-3">
       <div className="flex min-h-0 flex-1 items-center justify-center">
-        <div className="studio-panel relative flex h-full max-h-full w-full flex-col overflow-hidden p-2 sm:p-3">
-          <div className="mb-2 flex shrink-0 items-center gap-2 px-1">
+        <div className="studio-panel relative flex h-full max-h-full w-full flex-col overflow-hidden p-1.5 sm:p-3">
+          <div className="mb-2 hidden shrink-0 items-center gap-2 px-1 lg:flex">
             <span className="grid size-8 place-items-center rounded-md border-2 border-[var(--ink)] bg-secondary">
               <Brush className="size-4 text-primary" />
             </span>
@@ -244,6 +244,18 @@ export function DrawBoard({
             </div>
             {modeLabel && (
               <span className="ml-auto shrink-0 rounded-full border-2 border-[var(--ink)] bg-card px-3 py-1 text-xs font-semibold">
+                {modeLabel}
+              </span>
+            )}
+          </div>
+
+          {/* Mobile: one-line status strip instead of the tall header block. */}
+          <div className="mb-1.5 flex shrink-0 items-center gap-2 px-1 lg:hidden">
+            <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+              {canDraw ? `大画纸 · ${activeLabel} ${size}px` : (lockReason ?? "看大家怎么画")}
+            </p>
+            {modeLabel && (
+              <span className="shrink-0 rounded-full border-2 border-[var(--ink)] bg-card px-2 py-0.5 text-[11px] font-semibold">
                 {modeLabel}
               </span>
             )}
@@ -279,12 +291,12 @@ export function DrawBoard({
 
       <div
         className={cn(
-          "studio-panel flex shrink-0 flex-wrap items-center justify-center gap-3 p-2 sm:p-3",
+          "studio-panel flex shrink-0 items-center gap-2 overflow-x-auto overscroll-x-contain p-1.5 sm:flex-wrap sm:justify-center sm:gap-3 sm:overflow-visible sm:p-3",
           !canDraw && "pointer-events-none opacity-45 saturate-50",
         )}
         aria-disabled={!canDraw}
       >
-        <div className="grid grid-cols-6 gap-1">
+        <div className="grid shrink-0 grid-cols-6 gap-1">
           {PALETTE.map((c) => (
             <button
               key={c}
@@ -306,7 +318,7 @@ export function DrawBoard({
           ))}
         </div>
 
-        <div className="flex items-center gap-1 rounded-md border-2 border-border bg-card/70 p-1">
+        <div className="flex shrink-0 items-center gap-1 rounded-md border-2 border-border bg-card/70 p-1">
           {BRUSH_SIZES.map((s) => (
             <button
               key={s}
@@ -327,7 +339,7 @@ export function DrawBoard({
           ))}
         </div>
 
-        <div className="flex items-center gap-1 rounded-md border-2 border-border bg-card/70 p-1">
+        <div className="flex shrink-0 items-center gap-1 rounded-md border-2 border-border bg-card/70 p-1">
           <ToolButton
             disabled={!canDraw}
             active={tool === "pen"}

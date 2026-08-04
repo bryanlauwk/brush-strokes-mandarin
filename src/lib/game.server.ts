@@ -585,6 +585,7 @@ export async function authPlayer(
 ) {
   const initialRoom = await getRoomByCode(code);
   const room = initialRoom;
+  if (!room) throw new IdentityError("找不到这个号码");
   if (!room) throw new Error("找不到这个号码");
   const { data: tok } = await supabaseAdmin
     .from("player_tokens")

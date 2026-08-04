@@ -15,6 +15,7 @@ import {
 import { PlayerAvatar } from "@/components/game/PlayerAvatar";
 import { Scoreboard } from "@/components/game/Scoreboard";
 import { createDefaultAvatar, isPresetCharacterAvatar } from "@/lib/character-avatars";
+import { retryTransient } from "@/lib/retry";
 import { useRoom } from "@/hooks/use-room";
 import {
   DIFFICULTIES,

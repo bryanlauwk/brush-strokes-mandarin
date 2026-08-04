@@ -577,6 +577,26 @@ export async function reconcileRoomPresence(room: RoomRow) {
   };
 }
 
+/** Thrown when the caller's stored identity no longer matches this room. */
+export class IdentityError extends Error {
+  readonly identityInvalid = true;
+}
+
+/** Auth that returns null instead of throwing for stale identities. */
+export async function tryAuthPlayer(
+  code: string,
+  playerId: string,
+  token: string,
+  clientId?: string | null,
+) {
+  try {
+    return await authPlayer(code, playerId, token, clientId);
+  } catch (error) {
+    if (error instanceof IdentityError) return null;
+    throw error;
+  }
+}
+
 export async function authPlayer(
   code: string,
   playerId: string,
@@ -586,20 +606,19 @@ export async function authPlayer(
   const initialRoom = await getRoomByCode(code);
   const room = initialRoom;
   if (!room) throw new IdentityError("找不到这个号码");
-  if (!room) throw new Error("找不到这个号码");
   const { data: tok } = await supabaseAdmin
     .from("player_tokens")
     .select("token")
     .eq("player_id", playerId)
     .maybeSingle();
-  if (!tok || tok.token !== token) throw new Error("身份验证失败");
+  if (!tok || tok.token !== token) throw new IdentityError("身份验证失败");
   const { data: player } = await supabaseAdmin
     .from("players")
     .select("*")
     .eq("id", playerId)
     .eq("room_id", room.id)
     .maybeSingle();
-  if (!player) throw new Error("你已经不在这局了");
+  if (!player) throw new IdentityError("你已经不在这局了");
 
   const now = new Date().toISOString();
   if (clientId && !player.client_id) {

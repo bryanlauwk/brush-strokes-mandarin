@@ -54,8 +54,10 @@ async def main():
         await a.screenshot(path=str(SHOTS / "1_lobby_a.png"))
 
         # 用例 2: 开始游戏 -> 选题
-        await a.get_by_role("button", name="开始").first.click()
-        await a.wait_for_timeout(3000)
+        start = a.get_by_role("button", name="开始这一局")
+        await start.wait_for(state="visible", timeout=20000)
+        await start.click()
+        await a.wait_for_timeout(4000)
         await a.screenshot(path=str(SHOTS / "2_choosing_a.png"))
         await b.screenshot(path=str(SHOTS / "2_choosing_b.png"))
 

@@ -571,7 +571,10 @@ export const getRoomSnapshot = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
-    const { room } = await g.authPlayer(data.code, data.playerId, data.token, data.clientId);
+    const authed = await g.tryAuthPlayer(data.code, data.playerId, data.token, data.clientId);
+    // Stale identity: tell the client to rejoin instead of throwing a runtime error.
+    if (!authed) return { authError: true as const };
+    const { room } = authed;
 
     const players = await g.listPlayers(room.id);
     const [{ data: strokes }, { data: messages }] = await Promise.all([
@@ -591,6 +594,7 @@ export const getRoomSnapshot = createServerFn({ method: "POST" })
     ]);
 
     return {
+      authError: false as const,
       room,
       players,
       strokes: ((strokes ?? []) as unknown as { payload: Stroke }[]).map((r) => r.payload),

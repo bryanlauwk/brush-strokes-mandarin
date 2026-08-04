@@ -115,6 +115,9 @@ function RoomPage() {
   const choiceRequestRef = useRef(false);
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const [choosingWord, setChoosingWord] = useState(false);
+  // Turn key that this client already locked a word for. Lets us drop the
+  // "choosing" overlay immediately instead of waiting for the next snapshot.
+  const [lockedTurnKey, setLockedTurnKey] = useState<string | null>(null);
 
   const joinFn = useServerFn(joinRoom);
   const privFn = useServerFn(getPrivateState);

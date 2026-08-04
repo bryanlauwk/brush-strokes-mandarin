@@ -380,7 +380,7 @@ function Index() {
             ref={createButtonRef}
             type="button"
             onClick={() => requestEntry("create")}
-            disabled={busy || !trimmedName}
+            disabled={busy}
             className="press flex w-full items-center justify-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
           >
             {busy ? "准备中…" : "创建房间"}
@@ -425,7 +425,7 @@ function Index() {
               <button
                 type="button"
                 onClick={() => requestEntry("join")}
-                disabled={busy || !trimmedName || !codeComplete || codeStatus === "missing"}
+                disabled={busy || codeStatus === "missing"}
                 className="press rounded-md border-2 border-[var(--ink)] bg-accent px-4 font-display text-lg text-accent-foreground shadow-[4px_4px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
               >
                 {busy && tab === "join" ? "加入中…" : "加入"}

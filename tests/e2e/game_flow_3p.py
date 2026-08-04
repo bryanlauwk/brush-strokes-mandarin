@@ -56,7 +56,11 @@ async def find_picker(pages, timeout_ms=15000):
 
 
 async def wait_converged(pages, timeout_ms=25000):
-    """等所有玩家的题目视图收敛，返回 (是否一致, 各自视图)。"""
+    """等所有玩家的题目视图收敛，返回 (是否一致, 各自视图)。
+
+    收敛条件：所有猜题者看到同一个遮罩与同一个字数，且画家已拿回真实题目
+    （重连后私有题目需要重新拉取，会比房间快照晚一两秒）。
+    """
     waited = 0
     views = []
     while waited < timeout_ms:
@@ -64,7 +68,11 @@ async def wait_converged(pages, timeout_ms=25000):
         if all(views) and not any("? 个字" in v[0] for v in views):
             masks = {v[1] for v in views if "你正在画" not in v[0]}
             lens = {v[0].split("·")[-1].strip() for v in views if "你正在画" not in v[0]}
-            if len(masks) == 1 and len(lens) == 1:
+            drawer_view = next((v for v in views if "你正在画" in v[0]), None)
+            drawer_ready = drawer_view is not None and "_" not in drawer_view[1]
+            drawer_len = len(drawer_view[1].split()) if drawer_view else 0
+            mask_len = len(next(iter(masks)).split()) if len(masks) == 1 else -1
+            if len(masks) == 1 and len(lens) == 1 and drawer_ready and drawer_len == mask_len:
                 return True, views
         await pages[0].wait_for_timeout(500)
         waited += 500

@@ -346,9 +346,15 @@ function RoomPage() {
           word: result.word,
           choices: [],
         }));
+        // Hide the picker locally right away; the snapshot may take a poll or
+        // two to flip to "drawing" on slow mobile networks.
+        setLockedTurnKey(`${room.current_round}-${room.turn_index}`);
         // Push the locked word to everybody immediately instead of waiting for
         // the next poll, so all players enter the drawing round together.
         broadcastSync();
+        // Mobile networks drop the odd request: nudge a few more times so the
+        // blank canvas appears without waiting for the slow poll.
+        [250, 700, 1500].forEach((delay) => window.setTimeout(() => broadcastSync(), delay));
         if (result.word !== word) {
           toast.info(`倒计时已先锁定「${result.word}」`);
         }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { getRoomSnapshot, roomExists } from "@/lib/game.functions";
+import { retryTransient } from "@/lib/retry";
 import type { ChatMessage, Player, Room, Stroke } from "@/lib/game-types";
 
 export type LiveStroke = {

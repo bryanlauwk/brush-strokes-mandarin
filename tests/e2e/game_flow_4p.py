@@ -53,20 +53,27 @@ async def impair(context, latency_ms, loss):
     await context.route("**/*", handler)
 
 
-async def set_name(page, name):
-    for ph in ("画画人", "例如：Bryan"):
-        box = page.get_by_placeholder(ph)
-        if await box.count():
-            await box.first.fill(name)
-            return
+async def set_name(page, name, timeout_ms=45000):
+    """弱网下 hydration 会明显变慢，这里轮询等待输入框出现。"""
+    waited = 0
+    while waited < timeout_ms:
+        for ph in ("画画人", "例如：Bryan"):
+            box = page.get_by_placeholder(ph)
+            if await box.count():
+                await box.first.fill(name)
+                return
+        await page.wait_for_timeout(500)
+        waited += 500
     raise AssertionError("找不到名字输入框")
 
 
 async def join_room(page, code, name):
     await page.goto(f"{BASE}/room/{code}", wait_until="domcontentloaded")
-    await page.wait_for_timeout(3000)
+    await page.wait_for_timeout(1500)
     await set_name(page, name)
-    await page.get_by_role("button", name="加入这一局").click()
+    btn = page.get_by_role("button", name="加入这一局")
+    await btn.wait_for(state="visible", timeout=30000)
+    await btn.click()
 
 
 async def word_view(page):

@@ -151,14 +151,20 @@ export function useRoom(code: string, identity: RoomIdentity) {
 
     const refresh = async () => {
       try {
-        const snap = await getRoomSnapshot({
-          data: {
-            code: upper,
-            playerId,
-            token,
-            clientId: clientId ?? undefined,
-          },
-        });
+        // On lossy networks the snapshot request can be dropped entirely; retry
+        // briefly so the room does not sit on a stale view until the next poll.
+        const snap = await retryTransient(
+          () =>
+            getRoomSnapshot({
+              data: {
+                code: upper,
+                playerId,
+                token,
+                clientId: clientId ?? undefined,
+              },
+            }),
+          { attempts: 3, baseDelayMs: 250 },
+        );
         setIdentityInvalid(false);
         applySnapshot(
           snap as unknown as {

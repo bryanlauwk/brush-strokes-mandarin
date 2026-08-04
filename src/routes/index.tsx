@@ -8,7 +8,14 @@ import { createRoom, joinRoom, roomExists } from "@/lib/game.functions";
 import { ROOM_THEME_OPTIONS, type RoomTheme } from "@/lib/game-themes";
 import { createDefaultAvatar, isPresetCharacterAvatar } from "@/lib/character-avatars";
 import homeUkiyoBg from "@/assets/home-ukiyo-bg.png.asset.json";
-import { loadAvatarSvg, loadNickname, saveAvatarSvg, saveIdentity, saveNickname } from "@/lib/player-identity";
+import {
+  getOrCreateClientId,
+  loadAvatarSvg,
+  loadNickname,
+  saveAvatarSvg,
+  saveIdentity,
+  saveNickname,
+} from "@/lib/player-identity";
 import "@/styles/home-ukiyo.css";
 
 const appTitle = "画啦猜啦 · 马来西亚华语画猜派对";
@@ -78,11 +85,16 @@ function Index() {
     const savedName = loadNickname();
     const savedAvatar = loadAvatarSvg();
     setName(savedName);
-    setAvatarSvg(isPresetCharacterAvatar(savedAvatar) ? savedAvatar : createDefaultAvatar(savedName || "画画人"));
+    setAvatarSvg(
+      isPresetCharacterAvatar(savedAvatar)
+        ? savedAvatar
+        : createDefaultAvatar(savedName || "画画人"),
+    );
   }, []);
 
   const trimmedName = name.trim();
-  const activeTheme = ROOM_THEME_OPTIONS.find((theme) => theme.value === roomTheme) ?? ROOM_THEME_OPTIONS[0];
+  const activeTheme =
+    ROOM_THEME_OPTIONS.find((theme) => theme.value === roomTheme) ?? ROOM_THEME_OPTIONS[0];
   const codeComplete = code.length === CODE_LENGTH;
 
   // 自动校验：号码输满后，去后台确认这个房间还在不在。
@@ -113,11 +125,17 @@ function Index() {
     if (codeHint) return { tone: "error" as const, text: codeHint };
     if (!code) return null;
     if (!codeComplete)
-      return { tone: "hint" as const, text: `号码是 ${CODE_LENGTH} 位，还差 ${CODE_LENGTH - code.length} 位。` };
+      return {
+        tone: "hint" as const,
+        text: `号码是 ${CODE_LENGTH} 位，还差 ${CODE_LENGTH - code.length} 位。`,
+      };
     if (codeStatus === "checking") return { tone: "hint" as const, text: "查看这局还在不在…" };
     if (codeStatus === "found") return { tone: "ok" as const, text: "找到这一局了，可以进去。" };
     if (codeStatus === "missing")
-      return { tone: "error" as const, text: "找不到这个号码，可能已经结束或打错了。" };
+      return {
+        tone: "error" as const,
+        text: "找不到这个号码，可能已经结束或打错了。",
+      };
     if (codeStatus === "error") return { tone: "error" as const, text: "网络不稳，等下再试一次。" };
     return null;
   })();
@@ -132,9 +150,12 @@ function Index() {
     codeHintTimer.current = window.setTimeout(() => setCodeHint(null), 2600);
   };
 
-  useEffect(() => () => {
-    if (codeHintTimer.current) window.clearTimeout(codeHintTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (codeHintTimer.current) window.clearTimeout(codeHintTimer.current);
+    },
+    [],
+  );
 
   const focusControl = (target: HTMLElement | null) => {
     target?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -147,7 +168,10 @@ function Index() {
       focusControl(nameRef.current);
       return;
     }
-    window.setTimeout(() => focusControl(intent === "create" ? themeRef.current : codeRef.current), 0);
+    window.setTimeout(
+      () => focusControl(intent === "create" ? themeRef.current : codeRef.current),
+      0,
+    );
   };
 
   const validateName = () => {
@@ -190,7 +214,14 @@ function Index() {
     const svg = avatarSvg ?? createDefaultAvatar(trimmedName);
     setBusy(true);
     try {
-      const res = await createFn({ data: { name: trimmedName, avatarSvg: svg, roomTheme } });
+      const res = await createFn({
+        data: {
+          name: trimmedName,
+          avatarSvg: svg,
+          roomTheme,
+          clientId: getOrCreateClientId(),
+        },
+      });
       saveNickname(trimmedName);
       saveAvatarSvg(svg);
       saveIdentity(res);
@@ -206,7 +237,14 @@ function Index() {
     const svg = avatarSvg ?? createDefaultAvatar(trimmedName);
     setBusy(true);
     try {
-      const res = await joinFn({ data: { code, name: trimmedName, avatarSvg: svg } });
+      const res = await joinFn({
+        data: {
+          code,
+          name: trimmedName,
+          avatarSvg: svg,
+          clientId: getOrCreateClientId(),
+        },
+      });
       saveNickname(trimmedName);
       saveAvatarSvg(svg);
       saveIdentity(res);
@@ -258,7 +296,9 @@ function Index() {
               <DoorOpen className="size-5" />
               开始玩
             </button>
-            <span className="text-sm text-muted-foreground">免注册，选角即玩 · 右边填好就能开局</span>
+            <span className="text-sm text-muted-foreground">
+              免注册，选角即玩 · 右边填好就能开局
+            </span>
           </div>
         </div>
 
@@ -282,7 +322,9 @@ function Index() {
         <div className="relative overflow-hidden rounded-md border-2 border-[var(--ink)] bg-[var(--wash)] p-4">
           <span className="absolute -right-2 -top-2 text-3xl opacity-25">✦</span>
           <p className="font-display text-2xl text-primary">准备开玩</p>
-          <p className="mt-1 text-sm text-muted-foreground">填名字、选角色，然后开房或输入朋友的号码。</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            填名字、选角色，然后开房或输入朋友的号码。
+          </p>
         </div>
 
         <div className="mt-4 space-y-4">
@@ -310,9 +352,18 @@ function Index() {
             />
           </div>
 
-          <CharacterPicker value={avatarSvg} onChange={setAvatarSvg} name={trimmedName || "画画人"} compact />
+          <CharacterPicker
+            value={avatarSvg}
+            onChange={setAvatarSvg}
+            name={trimmedName || "画画人"}
+            compact
+          />
 
-          <div role="tablist" aria-label="开房或加入" className="home-tabs grid grid-cols-2 gap-2 rounded-md border-2 border-[var(--ink)] bg-card/70 p-1">
+          <div
+            role="tablist"
+            aria-label="开房或加入"
+            className="home-tabs grid grid-cols-2 gap-2 rounded-md border-2 border-[var(--ink)] bg-card/70 p-1"
+          >
             {(["create", "join"] as const).map((key) => (
               <button
                 key={key}
@@ -347,45 +398,45 @@ function Index() {
             className="space-y-4"
           >
             <div>
-            <label className="mb-2 block text-sm font-semibold" htmlFor="room-theme">
-              主题房
-            </label>
-            <div className="relative">
-              <select
-                id="room-theme"
-                ref={themeRef}
-                value={roomTheme}
-                onChange={(event) => setRoomTheme(event.target.value as RoomTheme)}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  e.preventDefault();
-                  focusControl(createButtonRef.current);
-                }}
-                className={`${field} appearance-none pr-10 font-semibold`}
-              >
-                {ROOM_THEME_OPTIONS.map((theme) => (
-                  <option key={theme.value} value={theme.value}>
-                    {theme.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-primary" />
-            </div>
-            <p className="mt-2 rounded-md border-2 border-border bg-card/70 px-3 py-2 text-sm leading-6 text-muted-foreground">
-              {activeTheme.description}
-            </p>
+              <label className="mb-2 block text-sm font-semibold" htmlFor="room-theme">
+                主题房
+              </label>
+              <div className="relative">
+                <select
+                  id="room-theme"
+                  ref={themeRef}
+                  value={roomTheme}
+                  onChange={(event) => setRoomTheme(event.target.value as RoomTheme)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    e.preventDefault();
+                    focusControl(createButtonRef.current);
+                  }}
+                  className={`${field} appearance-none pr-10 font-semibold`}
+                >
+                  {ROOM_THEME_OPTIONS.map((theme) => (
+                    <option key={theme.value} value={theme.value}>
+                      {theme.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-primary" />
+              </div>
+              <p className="mt-2 rounded-md border-2 border-border bg-card/70 px-3 py-2 text-sm leading-6 text-muted-foreground">
+                {activeTheme.description}
+              </p>
             </div>
 
-          <button
-            ref={createButtonRef}
-            type="button"
-            onClick={() => requestEntry("create")}
-            disabled={busy}
-            className="press flex w-full items-center justify-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
-          >
-            {busy ? "准备中…" : "创建房间"}
-            <ArrowRight className="size-5" />
-          </button>
+            <button
+              ref={createButtonRef}
+              type="button"
+              onClick={() => requestEntry("create")}
+              disabled={busy}
+              className="press flex w-full items-center justify-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
+            >
+              {busy ? "准备中…" : "创建房间"}
+              <ArrowRight className="size-5" />
+            </button>
           </div>
 
           <div role="tabpanel" id="panel-join" aria-labelledby="tab-join" hidden={tab !== "join"}>
@@ -448,7 +499,10 @@ function Index() {
           </div>
         </div>
 
-        <Link to="/how-to-play" className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-primary underline underline-offset-4">
+        <Link
+          to="/how-to-play"
+          className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-primary underline underline-offset-4"
+        >
           怎么玩
           <ArrowRight className="size-3.5" />
         </Link>

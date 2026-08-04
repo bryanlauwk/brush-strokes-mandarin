@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowDown, CheckCircle2, Flame, MessageCircle, Send } from "lucide-react";
 import type { ChatMessage } from "@/lib/game-types";
 import { cn } from "@/lib/utils";
@@ -30,14 +30,21 @@ export function ChatPanel({ messages, disabled, placeholder, onSend }: Props) {
     if (next) setUnreadCount(0);
   }, []);
 
-  const scrollToBottom = useCallback((smooth = false) => {
-    const el = listRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
-    setBottomState(true);
-  }, [setBottomState]);
+  const scrollToBottom = useCallback(
+    (smooth = false) => {
+      const el = listRef.current;
+      if (!el) return;
+      if (smooth) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      else el.scrollTop = el.scrollHeight;
+      setBottomState(true);
+    },
+    [setBottomState],
+  );
 
-  useEffect(() => {
+  // Run after the new rows are committed to the DOM so scrollHeight already
+  // includes the incoming message. A normal effect plus rAF could lose a race
+  // with the one-second room polling render.
+  useLayoutEffect(() => {
     if (messages.length === 0) {
       hydratedRef.current = false;
       lastMessageIdRef.current = null;
@@ -51,22 +58,36 @@ export function ChatPanel({ messages, disabled, placeholder, onSend }: Props) {
 
     if (!hydratedRef.current) {
       hydratedRef.current = true;
-      requestAnimationFrame(() => scrollToBottom());
+      scrollToBottom();
       return;
     }
 
     if (latestId === null || latestId === previousId) return;
 
     if (atBottomRef.current) {
-      requestAnimationFrame(() => scrollToBottom());
+      scrollToBottom();
       return;
     }
 
-    const newMessages = previousId === null
-      ? messages.length
-      : messages.filter((message) => message.id > previousId).length;
+    const newMessages =
+      previousId === null
+        ? messages.length
+        : messages.filter((message) => message.id > previousId).length;
     setUnreadCount((count) => count + Math.max(newMessages, 1));
   }, [messages, scrollToBottom]);
+
+  // Keep the bottom anchored when the panel itself changes height (desktop
+  // grid resize, mobile sheet opening, or virtual keyboard). Manual readers
+  // who scrolled up are deliberately left where they are.
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      if (atBottomRef.current) el.scrollTop = el.scrollHeight;
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const submit = () => {
     const text = value.trim();
@@ -79,7 +100,7 @@ export function ChatPanel({ messages, disabled, placeholder, onSend }: Props) {
   const showJumpButton = !atBottom || unreadCount > 0;
 
   return (
-    <div className="studio-panel flex h-full min-h-0 flex-col overflow-hidden">
+    <div className="studio-panel flex h-full max-h-full min-h-0 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-2 border-b-2 border-[var(--ink)] bg-secondary px-3 py-2">
         <span className="grid size-8 place-items-center rounded-md border-2 border-[var(--ink)] bg-card">
           <MessageCircle className="size-4 text-primary" />
@@ -96,7 +117,7 @@ export function ChatPanel({ messages, disabled, placeholder, onSend }: Props) {
           onScroll={(e) => {
             setBottomState(isNearBottom(e.currentTarget));
           }}
-          className="h-full space-y-2 overflow-y-auto overscroll-contain p-3 text-sm"
+          className="h-full min-h-0 space-y-2 overflow-y-auto overscroll-contain p-3 text-sm"
         >
           {messages.length === 0 ? (
             <div className="flex h-full min-h-32 flex-col items-center justify-center rounded-md border-2 border-dashed border-border bg-card/55 px-4 text-center text-muted-foreground">
@@ -183,10 +204,16 @@ function MessageRow({ message }: { message: ChatMessage }) {
     );
   }
   if (message.kind === "system") {
-    return <p className="px-2 py-1 text-center text-xs text-muted-foreground italic">{message.text}</p>;
+    return (
+      <p className="px-2 py-1 text-center text-xs text-muted-foreground italic">{message.text}</p>
+    );
   }
   return (
-    <p className={cn("rounded-md border border-border bg-secondary/45 px-2 py-2 [overflow-wrap:anywhere]")}>
+    <p
+      className={cn(
+        "rounded-md border border-border bg-secondary/45 px-2 py-2 [overflow-wrap:anywhere]",
+      )}
+    >
       <span className="font-semibold">{message.player_name}：</span>
       <span className="text-foreground/85">{message.text}</span>
     </p>

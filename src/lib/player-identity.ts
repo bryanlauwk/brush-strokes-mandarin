@@ -1,7 +1,13 @@
-export type Identity = { code: string; playerId: string; token: string };
+export type Identity = {
+  code: string;
+  playerId: string;
+  token: string;
+  clientId: string;
+};
 
 const NAME_KEY = "hy.nickname";
 const AVATAR_KEY = "hy.avatarSvg";
+const CLIENT_ID_KEY = "hy.clientId";
 
 function key(code: string) {
   return `hy.player.${code.toUpperCase()}`;
@@ -9,7 +15,9 @@ function key(code: string) {
 
 export function saveIdentity(id: Identity) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(key(id.code), JSON.stringify(id));
+  const clientId = id.clientId || getOrCreateClientId();
+  localStorage.setItem(CLIENT_ID_KEY, clientId);
+  localStorage.setItem(key(id.code), JSON.stringify({ ...id, clientId }));
 }
 
 export function loadIdentity(code: string): Identity | null {
@@ -17,12 +25,29 @@ export function loadIdentity(code: string): Identity | null {
   try {
     const raw = localStorage.getItem(key(code));
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Identity;
+    const parsed = JSON.parse(raw) as Partial<Identity>;
     if (!parsed?.playerId || !parsed?.token) return null;
-    return { ...parsed, code: code.toUpperCase() };
+    const identity = {
+      code: code.toUpperCase(),
+      playerId: parsed.playerId,
+      token: parsed.token,
+      clientId: parsed.clientId || getOrCreateClientId(),
+    };
+    // Upgrade identities saved before clientId was introduced.
+    localStorage.setItem(key(code), JSON.stringify(identity));
+    return identity;
   } catch {
     return null;
   }
+}
+
+export function getOrCreateClientId() {
+  if (typeof window === "undefined") return "";
+  const stored = localStorage.getItem(CLIENT_ID_KEY);
+  if (stored) return stored;
+  const clientId = crypto.randomUUID();
+  localStorage.setItem(CLIENT_ID_KEY, clientId);
+  return clientId;
 }
 
 export function clearIdentity(code: string) {

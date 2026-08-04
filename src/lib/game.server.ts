@@ -3,9 +3,19 @@ import { DEFAULT_ROOM_THEME, normalizeRoomTheme, type RoomTheme } from "@/lib/ga
 
 export const CHOOSE_SECONDS = 15;
 export const TURN_END_SECONDS = 6;
+export const PRESENCE_STALE_MS = 8_000;
+export const RECONNECT_GRACE_MS = 30_000;
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const LOCAL_CATEGORIES = new Set(["马来西亚", "本地吃喝", "本地地点", "本地生活", "节庆", "校园", "自然"]);
+const LOCAL_CATEGORIES = new Set([
+  "马来西亚",
+  "本地吃喝",
+  "本地地点",
+  "本地生活",
+  "节庆",
+  "校园",
+  "自然",
+]);
 
 const DIFFICULTY_ALIASES: Record<string, "容易" | "普通" | "挑战" | "高手"> = {
   简单: "容易",
@@ -32,7 +42,11 @@ type RoomSecretRow = {
 };
 
 function makeWordEntries(rows: WordTuple[]): WordEntry[] {
-  return rows.map(([word, category, difficulty]) => ({ word, category, difficulty }));
+  return rows.map(([word, category, difficulty]) => ({
+    word,
+    category,
+    difficulty,
+  }));
 }
 
 const LOCAL_WORD_BANK = makeWordEntries([
@@ -462,6 +476,10 @@ export type PlayerRow = {
   has_guessed: boolean;
   is_host: boolean;
   avatar: number;
+  client_id: string | null;
+  connection_status: "connected" | "disconnected";
+  disconnected_at: string | null;
+  last_seen: string;
   joined_at: string;
 };
 
@@ -479,12 +497,94 @@ export async function listPlayers(roomId: string) {
     .from("players")
     .select("*")
     .eq("room_id", roomId)
+    .eq("connection_status", "connected")
     .order("joined_at", { ascending: true });
   return (data ?? []) as PlayerRow[];
 }
 
-export async function authPlayer(code: string, playerId: string, token: string) {
-  const room = await getRoomByCode(code);
+export async function listRetainedPlayers(roomId: string) {
+  const { data } = await supabaseAdmin
+    .from("players")
+    .select("*")
+    .eq("room_id", roomId)
+    .order("joined_at", { ascending: true });
+  return (data ?? []) as PlayerRow[];
+}
+
+/**
+ * Convert missed heartbeats into an explicit disconnected state, retain that
+ * row for a reconnect grace period, then purge it. Only connected rows are
+ * returned to callers, so ghosts cannot affect counts, turns, or readiness.
+ */
+export async function reconcileRoomPresence(room: RoomRow) {
+  const now = Date.now();
+  const staleBefore = new Date(now - PRESENCE_STALE_MS).toISOString();
+  const expiredBefore = new Date(now - RECONNECT_GRACE_MS).toISOString();
+  const expiredHeartbeatBefore = new Date(
+    now - PRESENCE_STALE_MS - RECONNECT_GRACE_MS,
+  ).toISOString();
+
+  // Presence is request-driven, so a room with nobody left may not run this
+  // function at the moment the final heartbeat becomes stale. Purge those
+  // rows from their last heartbeat instead of incorrectly starting a fresh
+  // grace period days later when somebody finally opens the room again.
+  await supabaseAdmin
+    .from("players")
+    .delete()
+    .eq("room_id", room.id)
+    .eq("connection_status", "connected")
+    .lt("last_seen", expiredHeartbeatBefore);
+
+  await supabaseAdmin
+    .from("players")
+    .update({
+      connection_status: "disconnected",
+      disconnected_at: new Date(now).toISOString(),
+    })
+    .eq("room_id", room.id)
+    .eq("connection_status", "connected")
+    .lt("last_seen", staleBefore);
+
+  await supabaseAdmin
+    .from("players")
+    .delete()
+    .eq("room_id", room.id)
+    .eq("connection_status", "disconnected")
+    .lt("disconnected_at", expiredBefore);
+
+  const active = await listPlayers(room.id);
+  if (active.some((player) => player.id === room.host_id)) return { room, players: active };
+
+  // A disconnected host must not stall the clock for everybody else.
+  const nextHost = active[0] ?? null;
+  await supabaseAdmin.from("players").update({ is_host: false }).eq("room_id", room.id);
+  if (nextHost) {
+    await supabaseAdmin.from("players").update({ is_host: true }).eq("id", nextHost.id);
+  }
+  await supabaseAdmin
+    .from("rooms")
+    .update({ host_id: nextHost?.id ?? null })
+    .eq("id", room.id);
+
+  return {
+    room: { ...room, host_id: nextHost?.id ?? null },
+    players: nextHost
+      ? active.map((player) => ({
+          ...player,
+          is_host: player.id === nextHost.id,
+        }))
+      : active,
+  };
+}
+
+export async function authPlayer(
+  code: string,
+  playerId: string,
+  token: string,
+  clientId?: string | null,
+) {
+  const initialRoom = await getRoomByCode(code);
+  const room = initialRoom;
   if (!room) throw new Error("找不到这个号码");
   const { data: tok } = await supabaseAdmin
     .from("player_tokens")
@@ -499,7 +599,32 @@ export async function authPlayer(code: string, playerId: string, token: string) 
     .eq("room_id", room.id)
     .maybeSingle();
   if (!player) throw new Error("你已经不在这局了");
-  return { room, player: player as PlayerRow };
+
+  const now = new Date().toISOString();
+  if (clientId && !player.client_id) {
+    // Best-effort upgrade for identities created before persistent client IDs.
+    await supabaseAdmin
+      .from("players")
+      .update({ client_id: clientId })
+      .eq("id", playerId)
+      .is("client_id", null);
+  }
+  const { data: connectedPlayer } = await supabaseAdmin
+    .from("players")
+    .update({
+      last_seen: now,
+      connection_status: "connected",
+      disconnected_at: null,
+    })
+    .eq("id", playerId)
+    .select("*")
+    .single();
+
+  const presence = await reconcileRoomPresence(room);
+  return {
+    room: presence.room,
+    player: (connectedPlayer ?? player) as PlayerRow,
+  };
 }
 
 export async function say(
@@ -528,7 +653,11 @@ function difficultyFromLength(word: string): WordEntry["difficulty"] {
   return "高手";
 }
 
-function toWordEntry(row: { word?: string | null; category?: string | null; difficulty?: string | null }): WordEntry | null {
+function toWordEntry(row: {
+  word?: string | null;
+  category?: string | null;
+  difficulty?: string | null;
+}): WordEntry | null {
   const word = (row.word ?? "").trim();
   if (!word) return null;
   const mapped = normalizeDifficulty(row.difficulty);
@@ -565,12 +694,20 @@ function normalizeWordArray(raw: unknown) {
 
 function isMissingColumn(error: { code?: string; message?: string } | null, column: string) {
   const text = `${error?.code ?? ""} ${error?.message ?? ""}`.toLowerCase();
-  return text.includes(column.toLowerCase()) || text.includes("could not find") || text.includes("schema cache");
+  return (
+    text.includes(column.toLowerCase()) ||
+    text.includes("could not find") ||
+    text.includes("schema cache")
+  );
 }
 
 async function getRoomSecret(roomId: string, includeUsedWords: boolean) {
   const columns = includeUsedWords ? "word, choices, used_words" : "word, choices";
-  const result = await supabaseAdmin.from("room_secrets").select(columns).eq("room_id", roomId).maybeSingle();
+  const result = await supabaseAdmin
+    .from("room_secrets")
+    .select(columns)
+    .eq("room_id", roomId)
+    .maybeSingle();
   if (result.error && includeUsedWords && isMissingColumn(result.error, "used_words")) {
     return getRoomSecret(roomId, false);
   }
@@ -603,9 +740,14 @@ async function getUsedWords(roomId: string, resetHistory: boolean) {
   return { usedWords, supportsUsedWords };
 }
 
-async function saveTurnChoices(roomId: string, payload: Record<string, unknown>, supportsUsedWords: boolean) {
+async function saveTurnChoices(
+  roomId: string,
+  payload: Record<string, unknown>,
+  supportsUsedWords: boolean,
+) {
   const saved = await supabaseAdmin.from("room_secrets").upsert(payload as never);
-  if (!saved.error || !supportsUsedWords || !isMissingColumn(saved.error, "used_words")) return saved;
+  if (!saved.error || !supportsUsedWords || !isMissingColumn(saved.error, "used_words"))
+    return saved;
 
   const { used_words: _usedWords, ...fallbackPayload } = payload;
   return supabaseAdmin.from("room_secrets").upsert(fallbackPayload as never);
@@ -613,33 +755,56 @@ async function saveTurnChoices(roomId: string, payload: Record<string, unknown>,
 
 function entryMatchesTheme(entry: WordEntry, theme: RoomTheme) {
   if (theme === "全部主题") return true;
-  if (theme === "马来西亚日常") return LOCAL_CATEGORIES.has(entry.category) || entry.category.startsWith("本地");
+  if (theme === "马来西亚日常")
+    return LOCAL_CATEGORIES.has(entry.category) || entry.category.startsWith("本地");
   const keyword = theme.replace("我爱", "");
-  return entry.category === theme || entry.category.includes(keyword) || entry.word.includes(keyword);
+  return (
+    entry.category === theme || entry.category.includes(keyword) || entry.word.includes(keyword)
+  );
 }
 
 function themedWords(localWords: WordEntry[], dbWords: WordEntry[], theme: RoomTheme) {
-  const localPool = theme === "全部主题" ? localWords : localWords.filter((entry) => entryMatchesTheme(entry, theme));
+  const localPool =
+    theme === "全部主题"
+      ? localWords
+      : localWords.filter((entry) => entryMatchesTheme(entry, theme));
   const dbPool = dbWords.filter((entry) => entryMatchesTheme(entry, theme));
   return dedupeWords([...localPool, ...dbPool]);
 }
 
-async function pickChoices(difficulty: string, excludedWords: Set<string>, roomTheme?: string | null) {
+async function pickChoices(
+  difficulty: string,
+  excludedWords: Set<string>,
+  roomTheme?: string | null,
+) {
   const selectedDifficulty = normalizeDifficulty(difficulty);
   const selectedTheme = normalizeRoomTheme(roomTheme ?? DEFAULT_ROOM_THEME);
   const { data } = await supabaseAdmin.from("words").select("word, category, difficulty");
-  const dbWords = ((data ?? []) as { word?: string | null; category?: string | null; difficulty?: string | null }[])
+  const dbWords = (
+    (data ?? []) as {
+      word?: string | null;
+      category?: string | null;
+      difficulty?: string | null;
+    }[]
+  )
     .map(toWordEntry)
     .filter((entry): entry is WordEntry => Boolean(entry));
 
   const allLocalWords = dedupeWords([...LOCAL_WORD_BANK, ...themeWords()]);
-  const basePool = themedWords(allLocalWords, dbWords, selectedTheme).filter((entry) => !excludedWords.has(entry.word));
-  const difficultyPool = basePool.filter((entry) => selectedDifficulty === "全部" || entry.difficulty === selectedDifficulty);
-  const pool = difficultyPool.length >= 3 || selectedDifficulty === "全部" ? difficultyPool : basePool;
+  const basePool = themedWords(allLocalWords, dbWords, selectedTheme).filter(
+    (entry) => !excludedWords.has(entry.word),
+  );
+  const difficultyPool = basePool.filter(
+    (entry) => selectedDifficulty === "全部" || entry.difficulty === selectedDifficulty,
+  );
+  const pool =
+    difficultyPool.length >= 3 || selectedDifficulty === "全部" ? difficultyPool : basePool;
   const picked: WordEntry[] = [];
 
   const takeFrom = (candidates: WordEntry[]) => {
-    const options = shuffle(candidates.filter((entry) => !picked.some((p) => p.word === entry.word)));
+    const options = shuffle(
+      candidates.filter((entry) => !picked.some((p) => p.word === entry.word)),
+    );
     const choice = options[0];
     if (choice) picked.push(choice);
   };
@@ -648,7 +813,12 @@ async function pickChoices(difficulty: string, excludedWords: Set<string>, roomT
     takeFrom(pool.filter((entry) => LOCAL_CATEGORIES.has(entry.category)));
   }
   if (selectedDifficulty === "全部" && Math.random() < 0.28) {
-    takeFrom(pool.filter((entry) => entry.difficulty === "挑战" || entry.difficulty === "高手" || [...entry.word].length >= 4));
+    takeFrom(
+      pool.filter(
+        (entry) =>
+          entry.difficulty === "挑战" || entry.difficulty === "高手" || [...entry.word].length >= 4,
+      ),
+    );
   }
   if (selectedTheme !== "全部主题" && Math.random() < 0.35) {
     takeFrom(pool.filter((entry) => [...entry.word].length >= 4));
@@ -779,11 +949,37 @@ export async function startTurn(room: RoomRow) {
   );
 }
 
-export async function lockWord(room: RoomRow, word: string) {
-  await supabaseAdmin
+export async function lockWord(room: RoomRow, requestedWord: string) {
+  if (!room.drawer_id) return null;
+
+  // Claim the secret row first. The `word is null` predicate is a compare-and-
+  //-set: a click and the timeout fallback may race, but only one can win and
+  // the loser can no longer overwrite the selected word.
+  const { data: claimed } = await supabaseAdmin
     .from("room_secrets")
-    .update({ word, choices: [], updated_at: new Date().toISOString() })
-    .eq("room_id", room.id);
+    .update({
+      word: requestedWord,
+      choices: [],
+      updated_at: new Date().toISOString(),
+    })
+    .eq("room_id", room.id)
+    .eq("drawer_id", room.drawer_id)
+    .is("word", null)
+    .contains("choices", [requestedWord])
+    .select("word")
+    .maybeSingle();
+
+  let word = (claimed?.word as string | null) ?? null;
+  if (!word) {
+    const { data: existing } = await supabaseAdmin
+      .from("room_secrets")
+      .select("word")
+      .eq("room_id", room.id)
+      .maybeSingle();
+    word = (existing?.word as string | null) ?? null;
+  }
+  if (!word) return null;
+
   const now = Date.now();
   await supabaseAdmin
     .from("rooms")
@@ -794,7 +990,12 @@ export async function lockWord(room: RoomRow, word: string) {
       round_started_at: new Date(now).toISOString(),
       round_ends_at: new Date(now + room.draw_seconds * 1000).toISOString(),
     })
-    .eq("id", room.id);
+    .eq("id", room.id)
+    .eq("status", "choosing")
+    .eq("turn_index", room.turn_index)
+    .eq("drawer_id", room.drawer_id);
+
+  return word;
 }
 
 export async function endTurn(room: RoomRow, word: string | null) {
@@ -826,12 +1027,19 @@ export async function advance(room: RoomRow) {
   const deadline = room.round_ends_at ? Date.parse(room.round_ends_at) : 0;
 
   if (room.status === "choosing") {
+    const { data: secret } = await supabaseAdmin
+      .from("room_secrets")
+      .select("word, choices")
+      .eq("room_id", room.id)
+      .maybeSingle();
+    const lockedWord = (secret?.word as string | null) ?? null;
+    // Recover the second half of a successful claim if its caller disappeared
+    // between updating the secret row and moving the room to drawing.
+    if (lockedWord) {
+      await lockWord(room, lockedWord);
+      return;
+    }
     if (now >= deadline) {
-      const { data: secret } = await supabaseAdmin
-        .from("room_secrets")
-        .select("choices")
-        .eq("room_id", room.id)
-        .maybeSingle();
       const choices = (secret?.choices as string[] | null) ?? [];
       if (choices.length) await lockWord(room, choices[0]);
       else await endTurn(room, null);
@@ -892,7 +1100,11 @@ export async function scoreGuess(room: RoomRow, player: PlayerRow, text: string)
     const points = 100 + Math.round((200 * remaining) / Math.max(room.draw_seconds, 1));
     await supabaseAdmin
       .from("players")
-      .update({ has_guessed: true, score: player.score + points, round_score: points })
+      .update({
+        has_guessed: true,
+        score: player.score + points,
+        round_score: points,
+      })
       .eq("id", player.id);
     await say(
       room.id,
@@ -911,7 +1123,14 @@ export async function scoreGuess(room: RoomRow, player: PlayerRow, text: string)
   const shared = [...new Set(guess)].filter((c) => target.includes(c)).length;
   const close = guess.length === target.length && shared >= Math.ceil(target.length / 2);
   if (close) {
-    await say(room.id, room.current_round, "close", `${player.name} 很靠近了！`, player.id, player.name);
+    await say(
+      room.id,
+      room.current_round,
+      "close",
+      `${player.name} 很靠近了！`,
+      player.id,
+      player.name,
+    );
   }
   return { correct: false, close };
 }

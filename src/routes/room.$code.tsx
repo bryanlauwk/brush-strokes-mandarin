@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -7,12 +7,24 @@ import { DrawBoard } from "@/components/game/DrawBoard";
 import { ChatPanel } from "@/components/game/ChatPanel";
 import { CharacterPicker } from "@/components/game/CharacterPicker";
 import { DrawingHintPanel } from "@/components/game/DrawingHintPanel";
-import { GameFeedback, type GameFeedbackEvent, type GameFeedbackKind } from "@/components/game/GameFeedback";
+import {
+  GameFeedback,
+  type GameFeedbackEvent,
+  type GameFeedbackKind,
+} from "@/components/game/GameFeedback";
 import { PlayerAvatar } from "@/components/game/PlayerAvatar";
 import { Scoreboard } from "@/components/game/Scoreboard";
 import { createDefaultAvatar, isPresetCharacterAvatar } from "@/lib/character-avatars";
 import { useRoom } from "@/hooks/use-room";
-import { DIFFICULTIES, ROOM_THEME_OPTIONS, normalizeRoomTheme, type Difficulty, type Player, type RoomTheme, type Stroke } from "@/lib/game-types";
+import {
+  DIFFICULTIES,
+  ROOM_THEME_OPTIONS,
+  normalizeRoomTheme,
+  type Difficulty,
+  type Player,
+  type RoomTheme,
+  type Stroke,
+} from "@/lib/game-types";
 import { cn } from "@/lib/utils";
 import {
   chooseWord,
@@ -27,6 +39,7 @@ import {
 } from "@/lib/game.functions";
 import {
   clearIdentity,
+  getOrCreateClientId,
   loadAvatarSvg,
   loadIdentity,
   loadNickname,
@@ -39,9 +52,15 @@ export const Route = createFileRoute("/room/$code")({
   head: () => ({
     meta: [
       { title: "游戏桌 · 画啦猜啦" },
-      { name: "description", content: "朋友一起画画、猜华语答案、比谁反应快。" },
+      {
+        name: "description",
+        content: "朋友一起画画、猜华语答案、比谁反应快。",
+      },
       { property: "og:title", content: "游戏桌 · 画啦猜啦" },
-      { property: "og:description", content: "输入号码即可加入，一起画画猜答案。" },
+      {
+        property: "og:description",
+        content: "输入号码即可加入，一起画画猜答案。",
+      },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -64,12 +83,20 @@ function RoomPage() {
   const navigate = useNavigate();
   const upper = code.toUpperCase();
 
-  const [identity, setIdentity] = useState<{ playerId: string; token: string } | null>(null);
+  const [identity, setIdentity] = useState<{
+    playerId: string;
+    token: string;
+    clientId: string;
+  } | null>(null);
   const [ready, setReady] = useState(false);
   const [nickname, setNickname] = useState("");
   const [avatarSvg, setAvatarSvg] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
-  const [priv, setPriv] = useState<{ isDrawer: boolean; word: string | null; choices: string[] }>({
+  const [priv, setPriv] = useState<{
+    isDrawer: boolean;
+    word: string | null;
+    choices: string[];
+  }>({
     isDrawer: false,
     word: null,
     choices: [],
@@ -83,6 +110,9 @@ function RoomPage() {
   const [bots, setBots] = useState<{ playerId: string; token: string }[]>([]);
   const [botBusy, setBotBusy] = useState(false);
   const botChoosingRef = useRef<string | null>(null);
+  const choiceRequestRef = useRef(false);
+  const [selectedWord, setSelectedWord] = useState<string | null>(null);
+  const [choosingWord, setChoosingWord] = useState(false);
 
   const joinFn = useServerFn(joinRoom);
   const privFn = useServerFn(getPrivateState);
@@ -94,18 +124,30 @@ function RoomPage() {
   const settingsFn = useServerFn(updateSettings);
   const leaveFn = useServerFn(leaveRoom);
 
-  const triggerFeedback = useCallback((kind: GameFeedbackKind, title: string, subtitle?: string) => {
-    feedbackIdRef.current += 1;
-    setFeedback({ id: feedbackIdRef.current, kind, title, subtitle });
-  }, []);
+  const triggerFeedback = useCallback(
+    (kind: GameFeedbackKind, title: string, subtitle?: string) => {
+      feedbackIdRef.current += 1;
+      setFeedback({ id: feedbackIdRef.current, kind, title, subtitle });
+    },
+    [],
+  );
 
   useEffect(() => {
     const stored = loadIdentity(upper);
     const savedName = loadNickname();
     const savedAvatar = loadAvatarSvg();
-    if (stored) setIdentity({ playerId: stored.playerId, token: stored.token });
+    if (stored)
+      setIdentity({
+        playerId: stored.playerId,
+        token: stored.token,
+        clientId: stored.clientId,
+      });
     setNickname(savedName);
-    setAvatarSvg(isPresetCharacterAvatar(savedAvatar) ? savedAvatar : createDefaultAvatar(savedName || "画画人"));
+    setAvatarSvg(
+      isPresetCharacterAvatar(savedAvatar)
+        ? savedAvatar
+        : createDefaultAvatar(savedName || "画画人"),
+    );
     setReady(true);
   }, [upper]);
 
@@ -117,6 +159,7 @@ function RoomPage() {
     scratch,
     live,
     missing,
+    identityInvalid,
     me,
     broadcastLive,
     broadcastLiveEnd,
@@ -125,7 +168,18 @@ function RoomPage() {
     clearScratch,
   } = useRoom(upper, identity);
 
-  const auth = identity ? { code: upper, playerId: identity.playerId, token: identity.token } : null;
+  const auth = useMemo(
+    () =>
+      identity
+        ? {
+            code: upper,
+            playerId: identity.playerId,
+            token: identity.token,
+            clientId: identity.clientId,
+          }
+        : null,
+    [identity, upper],
+  );
   const roomJoinReady = nickname.trim().length > 0;
 
   useEffect(() => {
@@ -179,11 +233,17 @@ function RoomPage() {
       triggerFeedback(
         "round-start",
         room.drawer_id === identity.playerId ? "轮到你画！" : "开画啦！",
-        room.drawer_id === identity.playerId ? "朋友们等着猜，放胆画。" : `${drawerName} 开始画了，快看线索。`,
+        room.drawer_id === identity.playerId
+          ? "朋友们等着猜，放胆画。"
+          : `${drawerName} 开始画了，快看线索。`,
       );
     }
     if (room.status === "turn_end") {
-      triggerFeedback("round-end", "答案揭晓", room.revealed_word ? `答案是「${room.revealed_word}」` : "这一回合结束");
+      triggerFeedback(
+        "round-end",
+        "答案揭晓",
+        room.revealed_word ? `答案是「${room.revealed_word}」` : "这一回合结束",
+      );
     }
     if (room.status === "ended") {
       triggerFeedback("round-end", "最后排名", "这一局结束，来看谁最会猜。");
@@ -202,6 +262,21 @@ function RoomPage() {
     if (room && room.status !== "waiting") clearScratch();
   }, [room?.status, clearScratch]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!identityInvalid) return;
+    clearIdentity(upper);
+    setIdentity(null);
+    toast.info("连接已过期，请重新加入；系统会接回原本的玩家位置。", {
+      id: "identity-expired",
+    });
+  }, [identityInvalid, upper]);
+
+  useEffect(() => {
+    choiceRequestRef.current = false;
+    setChoosingWord(false);
+    setSelectedWord(null);
+  }, [room?.turn_index, room?.status]);
+
   // Test mode: if a test player is the drawer, auto-pick a word so the turn keeps moving.
   useEffect(() => {
     if (!room || room.status !== "choosing" || !bots.length) return;
@@ -212,15 +287,52 @@ function RoomPage() {
     botChoosingRef.current = key;
     void (async () => {
       try {
-        const botAuth = { code: upper, playerId: bot.playerId, token: bot.token };
+        const botAuth = {
+          code: upper,
+          playerId: bot.playerId,
+          token: bot.token,
+        };
         const state = await privFn({ data: botAuth });
         const word = state.choices?.[0];
-        if (word) await chooseFn({ data: { ...botAuth, word } });
+        if (word)
+          await chooseFn({
+            data: { ...botAuth, word, turnIndex: room.turn_index },
+          });
       } catch {
         botChoosingRef.current = null;
       }
     })();
-  }, [room?.status, room?.drawer_id, room?.current_round, room?.turn_index, bots, upper, privFn, chooseFn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [room, bots, upper, privFn, chooseFn]);
+
+  const handleChooseWord = useCallback(
+    async (word: string) => {
+      if (!auth || !room || room.status !== "choosing" || choiceRequestRef.current) return;
+      choiceRequestRef.current = true;
+      setSelectedWord(word);
+      setChoosingWord(true);
+      try {
+        const result = await chooseFn({
+          data: { ...auth, word, turnIndex: room.turn_index },
+        });
+        setSelectedWord(result.word);
+        setPriv((previous) => ({
+          ...previous,
+          word: result.word,
+          choices: [],
+        }));
+        if (result.word !== word) {
+          toast.info(`倒计时已先锁定「${result.word}」`);
+        }
+      } catch (error) {
+        choiceRequestRef.current = false;
+        setSelectedWord(null);
+        toast.error(error instanceof Error ? error.message : "选题失败，请再试一次");
+      } finally {
+        setChoosingWord(false);
+      }
+    },
+    [auth, room, chooseFn],
+  );
 
   const handleStroke = useCallback(
     (stroke: Stroke) => {
@@ -245,11 +357,22 @@ function RoomPage() {
 
     setJoining(true);
     try {
-      const res = await joinFn({ data: { code: upper, name: trimmedName, avatarSvg: svg } });
+      const res = await joinFn({
+        data: {
+          code: upper,
+          name: trimmedName,
+          avatarSvg: svg,
+          clientId: getOrCreateClientId(),
+        },
+      });
       saveNickname(trimmedName);
       saveAvatarSvg(svg);
       saveIdentity(res);
-      setIdentity({ playerId: res.playerId, token: res.token });
+      setIdentity({
+        playerId: res.playerId,
+        token: res.token,
+        clientId: res.clientId,
+      });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "加入失败");
     } finally {
@@ -268,7 +391,14 @@ function RoomPage() {
     setBotBusy(true);
     try {
       const name = `测试玩家${bots.length + 1}`;
-      const res = await joinFn({ data: { code: upper, name, avatarSvg: createDefaultAvatar(name) } });
+      const res = await joinFn({
+        data: {
+          code: upper,
+          name,
+          avatarSvg: createDefaultAvatar(name),
+          clientId: crypto.randomUUID(),
+        },
+      });
       setBots((prev) => [...prev, { playerId: res.playerId, token: res.token }]);
       toast.success(`${name} 已加入（仅本地测试）`);
     } catch (e) {
@@ -282,7 +412,11 @@ function RoomPage() {
     setBotBusy(true);
     try {
       await Promise.all(
-        bots.map((b) => leaveFn({ data: { code: upper, playerId: b.playerId, token: b.token } }).catch(() => undefined)),
+        bots.map((b) =>
+          leaveFn({
+            data: { code: upper, playerId: b.playerId, token: b.token },
+          }).catch(() => undefined),
+        ),
       );
       setBots([]);
     } finally {
@@ -290,15 +424,25 @@ function RoomPage() {
     }
   };
 
-  if (!ready) return <Shell><p className="text-muted-foreground">载入中…</p></Shell>;
+  if (!ready)
+    return (
+      <Shell>
+        <p className="text-muted-foreground">载入中…</p>
+      </Shell>
+    );
 
   if (missing) {
     return (
       <Shell>
         <div className="panel max-w-md p-6 text-center">
           <h1 className="font-display text-2xl">找不到这一局</h1>
-          <p className="mt-2 text-sm text-muted-foreground">号码 {upper} 可能已经结束，或输入有误。</p>
-          <Link to="/" className="mt-4 inline-block rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-2 text-primary-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
+            号码 {upper} 可能已经结束，或输入有误。
+          </p>
+          <Link
+            to="/"
+            className="mt-4 inline-block rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-2 text-primary-foreground"
+          >
             回到主页
           </Link>
         </div>
@@ -329,7 +473,12 @@ function RoomPage() {
             className="mt-1 w-full rounded-md border-2 border-[var(--ink)] bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-primary"
           />
           <div className="mt-4">
-            <CharacterPicker value={avatarSvg} onChange={setAvatarSvg} name={nickname || "画画人"} compact />
+            <CharacterPicker
+              value={avatarSvg}
+              onChange={setAvatarSvg}
+              name={nickname || "画画人"}
+              compact
+            />
           </div>
           <button
             type="button"
@@ -344,7 +493,12 @@ function RoomPage() {
     );
   }
 
-  if (!room) return <Shell><p className="text-muted-foreground">正在连接这一局…</p></Shell>;
+  if (!room)
+    return (
+      <Shell>
+        <p className="text-muted-foreground">正在连接这一局…</p>
+      </Shell>
+    );
 
   const currentRoomTheme = normalizeRoomTheme(room.room_theme);
   const drawer = players.find((p) => p.id === room.drawer_id) ?? null;
@@ -369,10 +523,13 @@ function RoomPage() {
   const turnInRound = (room.turn_index % turnsPerRound) + 1;
   const urgent = inGame && room.status === "drawing" && secondsLeft <= 10;
   const withLocalAvatar = (player: Player) =>
-    player.id === identity.playerId && !player.avatar_svg && avatarSvg ? { ...player, avatar_svg: avatarSvg } : player;
-  const drawingHint = auth && iAmDrawer && room.status === "drawing" && priv.word ? (
-    <DrawingHintPanel auth={auth} turnIndex={room.turn_index} word={priv.word} compact />
-  ) : null;
+    player.id === identity.playerId && !player.avatar_svg && avatarSvg
+      ? { ...player, avatar_svg: avatarSvg }
+      : player;
+  const drawingHint =
+    auth && iAmDrawer && room.status === "drawing" && priv.word ? (
+      <DrawingHintPanel auth={auth} turnIndex={room.turn_index} word={priv.word} compact />
+    ) : null;
 
   const chat = (
     <ChatPanel
@@ -418,7 +575,8 @@ function RoomPage() {
         {inGame && (
           <>
             <span className="rounded-full border-2 border-[var(--ink)] bg-card px-3 py-1 text-xs sm:text-sm">
-              第 {room.current_round}/{room.total_rounds} 轮 · 这一轮 {turnInRound}/{turnsPerRound} 位
+              第 {room.current_round}/{room.total_rounds} 轮 · 这一轮 {turnInRound}/{turnsPerRound}{" "}
+              位
             </span>
             <span
               className={cn(
@@ -444,7 +602,9 @@ function RoomPage() {
       {inGame && (
         <div className="panel shrink-0 px-4 py-2 text-center">
           <p className="text-xs text-muted-foreground">
-            {iAmDrawer ? "你正在画：" : `${drawer?.name ?? "画画人"} 正在画 · ${room.word_length ?? "?"} 个字`}
+            {iAmDrawer
+              ? "你正在画："
+              : `${drawer?.name ?? "画画人"} 正在画 · ${room.word_length ?? "?"} 个字`}
           </p>
           <p className="font-display text-2xl tracking-[0.3em] break-all">{wordDisplay || "…"}</p>
         </div>
@@ -452,7 +612,12 @@ function RoomPage() {
 
       <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto_auto] gap-3 lg:grid-cols-[220px_minmax(0,1fr)_290px] lg:grid-rows-1">
         <div className="order-2 h-32 min-h-0 lg:order-1 lg:h-auto">
-          <Scoreboard players={players} drawerId={room.drawer_id} meId={identity.playerId} meAvatarSvg={avatarSvg} />
+          <Scoreboard
+            players={players}
+            drawerId={room.drawer_id}
+            meId={identity.playerId}
+            meAvatarSvg={avatarSvg}
+          />
         </div>
 
         <div className="order-1 min-h-0 lg:order-2">
@@ -461,7 +626,9 @@ function RoomPage() {
             live={live}
             canDraw={isLobby || (iAmDrawer && room.status === "drawing")}
             lockReason={lockReason}
-            modeLabel={isLobby ? "自由涂鸦" : iAmDrawer && room.status === "drawing" ? "轮到你画" : undefined}
+            modeLabel={
+              isLobby ? "自由涂鸦" : iAmDrawer && room.status === "drawing" ? "轮到你画" : undefined
+            }
             onStroke={handleStroke}
             onLive={broadcastLive}
             onLiveEnd={broadcastLiveEnd}
@@ -480,7 +647,12 @@ function RoomPage() {
                       roomTheme={currentRoomTheme}
                       devTools={
                         import.meta.env.DEV
-                          ? { botCount: bots.length, busy: botBusy, onAdd: addTestPlayer, onClear: removeTestPlayers }
+                          ? {
+                              botCount: bots.length,
+                              busy: botBusy,
+                              onAdd: addTestPlayer,
+                              onClear: removeTestPlayers,
+                            }
                           : null
                       }
                       onSettings={(s) =>
@@ -507,15 +679,26 @@ function RoomPage() {
                             <button
                               key={w}
                               type="button"
-                              onClick={() =>
-                                void chooseFn({ data: { ...auth!, word: w } }).catch(() => undefined)
-                              }
-                              className="press animate-pop-in rounded-md border-2 border-[var(--ink)] bg-card px-4 py-2 font-display text-lg shadow-[3px_3px_0_0_var(--ink)] hover:bg-accent"
+                              onClick={() => void handleChooseWord(w)}
+                              disabled={choosingWord}
+                              aria-pressed={selectedWord === w}
+                              className={cn(
+                                "press animate-pop-in rounded-md border-2 border-[var(--ink)] px-4 py-2 font-display text-lg shadow-[3px_3px_0_0_var(--ink)] disabled:cursor-wait",
+                                selectedWord === w
+                                  ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2"
+                                  : "bg-card hover:bg-accent",
+                                choosingWord && selectedWord !== w && "opacity-45",
+                              )}
                             >
-                              {w}
+                              {selectedWord === w ? `✓ ${w}` : w}
                             </button>
                           ))}
                         </div>
+                        {selectedWord && (
+                          <p className="mt-3 text-sm font-semibold" role="status">
+                            已选「{selectedWord}」{choosingWord ? "，正在锁定…" : ""}
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <p className="font-display text-xl">{drawer?.name ?? "画画人"} 正在选题…</p>
@@ -541,8 +724,12 @@ function RoomPage() {
                               style={{ animationDelay: `${i * 90}ms` }}
                             >
                               <PlayerAvatar player={withLocalAvatar(p)} size="sm" />
-                              <span className="max-w-32 truncate" title={p.name}>{p.name}</span>
-                              <span className="font-semibold text-[var(--success)]">+{p.round_score}</span>
+                              <span className="max-w-32 truncate" title={p.name}>
+                                {p.name}
+                              </span>
+                              <span className="font-semibold text-[var(--success)]">
+                                +{p.round_score}
+                              </span>
                             </li>
                           ))}
                       </ul>
@@ -565,7 +752,9 @@ function RoomPage() {
                             >
                               <span>{["🥇", "🥈", "🥉"][i] ?? `${i + 1}.`}</span>
                               <PlayerAvatar player={withLocalAvatar(p)} size="sm" />
-                              <span className="max-w-32 truncate" title={p.name}>{p.name}</span>
+                              <span className="max-w-32 truncate" title={p.name}>
+                                {p.name}
+                              </span>
                               <span className="tabular-nums">· {p.score}</span>
                             </li>
                           ))}
@@ -593,12 +782,21 @@ function RoomPage() {
 
         <div
           className={cn(
-            "order-3 min-h-0",
-            drawingHint ? "h-44 lg:flex lg:h-auto lg:flex-col lg:gap-3" : "hidden lg:block",
+            "order-3 min-h-0 overflow-hidden",
+            drawingHint
+              ? "h-44 lg:flex lg:h-auto lg:flex-col lg:gap-3"
+              : "hidden lg:block lg:h-full",
           )}
         >
           {drawingHint && <div className="shrink-0">{drawingHint}</div>}
-          <div className={cn("hidden min-h-0 lg:block", drawingHint && "lg:flex-1")}>{chat}</div>
+          <div
+            className={cn(
+              "hidden min-h-0 overflow-hidden lg:block",
+              drawingHint ? "lg:flex-1" : "lg:h-full",
+            )}
+          >
+            {chat}
+          </div>
         </div>
       </div>
 
@@ -675,8 +873,18 @@ function WaitingCard({
   drawSeconds: number;
   difficulty: string;
   roomTheme: RoomTheme;
-  devTools?: { botCount: number; busy: boolean; onAdd: () => void; onClear: () => void } | null;
-  onSettings: (s: { totalRounds: number; drawSeconds: number; difficulty: Difficulty; roomTheme: RoomTheme }) => void;
+  devTools?: {
+    botCount: number;
+    busy: boolean;
+    onAdd: () => void;
+    onClear: () => void;
+  } | null;
+  onSettings: (s: {
+    totalRounds: number;
+    drawSeconds: number;
+    difficulty: Difficulty;
+    roomTheme: RoomTheme;
+  }) => void;
   onStart: () => void;
 }) {
   const currentDifficulty = asDifficulty(difficulty);
@@ -706,7 +914,9 @@ function WaitingCard({
             }
           >
             {ROOM_THEME_OPTIONS.map((theme) => (
-              <option key={theme.value} value={theme.value}>{theme.label}</option>
+              <option key={theme.value} value={theme.value}>
+                {theme.label}
+              </option>
             ))}
           </select>
         </label>
@@ -726,7 +936,9 @@ function WaitingCard({
             }
           >
             {DIFFICULTIES.map((d) => (
-              <option key={d} value={d}>{d}</option>
+              <option key={d} value={d}>
+                {d}
+              </option>
             ))}
           </select>
         </label>
@@ -746,7 +958,9 @@ function WaitingCard({
             }
           >
             {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
-              <option key={n} value={n}>{n}</option>
+              <option key={n} value={n}>
+                {n}
+              </option>
             ))}
           </select>
         </label>
@@ -766,7 +980,9 @@ function WaitingCard({
             }
           >
             {[40, 60, 80, 100, 120].map((n) => (
-              <option key={n} value={n}>{n}</option>
+              <option key={n} value={n}>
+                {n}
+              </option>
             ))}
           </select>
         </label>

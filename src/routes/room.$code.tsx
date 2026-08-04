@@ -725,7 +725,8 @@ function RoomPage() {
                   </Overlay>
                 )}
 
-                {room.status === "choosing" && (
+                {room.status === "choosing" &&
+                  lockedTurnKey !== `${room.current_round}-${room.turn_index}` && (
                   <Overlay>
                     {iAmDrawer ? (
                       <div className="text-center">

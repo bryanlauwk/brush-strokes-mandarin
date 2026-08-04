@@ -158,6 +158,10 @@ async def main():
             if online == "4":
                 break
         print("在线人数:", online)
+        for n, pg in zip(names, pages):
+            txt = await pg.evaluate("() => document.body.innerText.slice(0, 200)")
+            await pg.screenshot(path=str(SHOTS / f"0_join_{n}.png"))
+            print(f"  [{n}] {txt!r}")
         assert online == "4", f"四人应全部在线，实际 {online}"
         await host.screenshot(path=str(SHOTS / "1_lobby.png"))
 

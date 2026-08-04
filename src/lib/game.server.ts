@@ -926,7 +926,8 @@ export async function startTurn(room: RoomRow) {
     })
     .eq("id", room.id)
     .eq("turn_index", index)
-    .not("status", "in", "(choosing,drawing)")
+    .neq("status", "choosing")
+    .neq("status", "drawing")
     .select("id")
     .maybeSingle();
   if (!claimedTurn) return;

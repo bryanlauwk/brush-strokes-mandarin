@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { getRoomSnapshot, roomExists } from "@/lib/game.functions";
+import { retryTransient } from "@/lib/retry";
 import type { ChatMessage, Player, Room, Stroke } from "@/lib/game-types";
 
 export type LiveStroke = {
@@ -151,14 +152,20 @@ export function useRoom(code: string, identity: RoomIdentity) {
 
     const refresh = async () => {
       try {
-        const snap = await getRoomSnapshot({
-          data: {
-            code: upper,
-            playerId,
-            token,
-            clientId: clientId ?? undefined,
-          },
-        });
+        // On lossy networks the snapshot request can be dropped entirely; retry
+        // briefly so the room does not sit on a stale view until the next poll.
+        const snap = await retryTransient(
+          () =>
+            getRoomSnapshot({
+              data: {
+                code: upper,
+                playerId,
+                token,
+                clientId: clientId ?? undefined,
+              },
+            }),
+          { attempts: 3, baseDelayMs: 250 },
+        );
         setIdentityInvalid(false);
         applySnapshot(
           snap as unknown as {

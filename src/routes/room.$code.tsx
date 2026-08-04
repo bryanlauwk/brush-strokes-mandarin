@@ -218,6 +218,21 @@ function RoomPage() {
     return () => clearInterval(t);
   }, [auth?.playerId, isHost, room?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Local test bots need a heartbeat, otherwise presence reconcile drops them.
+  useEffect(() => {
+    if (!import.meta.env.DEV || !bots.length) return;
+    const beat = () => {
+      bots.forEach((b) => {
+        void privFn({
+          data: { code: upper, playerId: b.playerId, token: b.token },
+        }).catch(() => undefined);
+      });
+    };
+    beat();
+    const t = setInterval(beat, 4000);
+    return () => clearInterval(t);
+  }, [bots, upper, privFn]);
+
   useEffect(() => {
     if (!room || !identity) return;
     const key = `${room.status}:${room.turn_index}:${room.current_round}`;

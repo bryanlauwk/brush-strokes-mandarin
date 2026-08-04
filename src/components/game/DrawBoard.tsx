@@ -18,10 +18,13 @@ type Props = {
 
 const WIDTH = 1200;
 const HEIGHT = 900;
-const LIVE_SEND_MS = 30;
+const LIVE_SEND_MS = 50;
 const MIN_POINT_DISTANCE = 0.0022;
 
-function drawLine(ctx: CanvasRenderingContext2D, s: { color: string; size: number; points: [number, number][] }) {
+function drawLine(
+  ctx: CanvasRenderingContext2D,
+  s: { color: string; size: number; points: [number, number][] },
+) {
   const pts = s.points;
   if (!pts?.length) return;
 
@@ -51,7 +54,11 @@ function drawLine(ctx: CanvasRenderingContext2D, s: { color: string; size: numbe
   ctx.stroke();
 }
 
-function posFromClient(canvas: HTMLCanvasElement, clientX: number, clientY: number): [number, number] {
+function posFromClient(
+  canvas: HTMLCanvasElement,
+  clientX: number,
+  clientY: number,
+): [number, number] {
   const rect = canvas.getBoundingClientRect();
   return [
     Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)),
@@ -76,18 +83,18 @@ export function DrawBoard({
   onLiveEnd,
   overlay,
 }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const committedCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const transientCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef<LiveStroke | null>(null);
   const lastSentRef = useRef(0);
-  const rafRef = useRef<number | null>(null);
-  const paintRef = useRef<() => void>(() => undefined);
   const [color, setColor] = useState(PALETTE[0]);
   const [size, setSize] = useState(BRUSH_SIZES[1]);
   const [tool, setTool] = useState<"pen" | "eraser" | "fill">("pen");
-  const [, forceRender] = useState(0);
 
-  const paint = useCallback(() => {
-    const canvas = canvasRef.current;
+  // Committed history is expensive to replay, so keep it on its own layer and
+  // rebuild that layer only when the committed stroke list changes.
+  const paintCommitted = useCallback(() => {
+    const canvas = committedCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -105,33 +112,45 @@ export function DrawBoard({
         ctx.fillStyle = s.color ?? "#fffdf7";
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
       } else if (s.kind === "line") {
-        drawLine(ctx, { color: s.color ?? "#000", size: s.size ?? 8, points: s.points ?? [] });
+        drawLine(ctx, {
+          color: s.color ?? "#000",
+          size: s.size ?? 8,
+          points: s.points ?? [],
+        });
       }
     }
-    for (const s of Object.values(live)) drawLine(ctx, s);
-    if (drawingRef.current) drawLine(ctx, drawingRef.current);
-  }, [strokes, live]);
-
-  paintRef.current = paint;
-
-  const schedulePaint = useCallback(() => {
-    if (rafRef.current) return;
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      paintRef.current();
-    });
-  }, []);
+  }, [strokes]);
 
   useEffect(() => {
-    schedulePaint();
-  }, [schedulePaint, strokes, live]);
+    paintCommitted();
+  }, [paintCommitted]);
 
-  useEffect(
-    () => () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    },
-    [],
-  );
+  // Remote in-progress strokes live on a cheap transient layer. Repainting
+  // this layer never replays the committed history underneath it.
+  useEffect(() => {
+    const canvas = transientCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+    for (const stroke of Object.values(live)) drawLine(ctx, stroke);
+    if (drawingRef.current) drawLine(ctx, drawingRef.current);
+  }, [live, strokes]);
+
+  const paintLocalIncrement = useCallback((fromIndex: number) => {
+    const canvas = transientCanvasRef.current;
+    const current = drawingRef.current;
+    if (!canvas || !current) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Include two previous points so the quadratic join stays continuous, but
+    // never redraw the full stroke on pointermove.
+    drawLine(ctx, {
+      ...current,
+      points: current.points.slice(Math.max(0, fromIndex - 2)),
+    });
+  }, []);
 
   const addPoint = useCallback((point: [number, number]) => {
     const current = drawingRef.current;
@@ -142,13 +161,16 @@ export function DrawBoard({
 
   const addPointerPoints = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
-      const native = e.nativeEvent as PointerEvent & { getCoalescedEvents?: () => PointerEvent[] };
+      const native = e.nativeEvent as PointerEvent & {
+        getCoalescedEvents?: () => PointerEvent[];
+      };
       const events = native.getCoalescedEvents?.() ?? [native];
+      const fromIndex = drawingRef.current?.points.length ?? 0;
       let changed = false;
       for (const event of events) {
         changed = addPoint(posFromClient(e.currentTarget, event.clientX, event.clientY)) || changed;
       }
-      return changed;
+      return changed ? fromIndex : -1;
     },
     [addPoint],
   );
@@ -160,7 +182,6 @@ export function DrawBoard({
 
     if (tool === "fill") {
       onStroke({ id: crypto.randomUUID(), kind: "fill", color });
-      schedulePaint();
       return;
     }
     drawingRef.current = {
@@ -171,14 +192,15 @@ export function DrawBoard({
     };
     lastSentRef.current = performance.now();
     onLive({ ...drawingRef.current, points: [...drawingRef.current.points] });
-    schedulePaint();
+    paintLocalIncrement(0);
   };
 
   const handleMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const current = drawingRef.current;
     if (!canDraw || !current) return;
-    if (!addPointerPoints(e)) return;
-    schedulePaint();
+    const fromIndex = addPointerPoints(e);
+    if (fromIndex < 0) return;
+    paintLocalIncrement(fromIndex);
 
     const now = performance.now();
     if (now - lastSentRef.current > LIVE_SEND_MS) {
@@ -188,7 +210,8 @@ export function DrawBoard({
   };
 
   const handleUp = (e?: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e && drawingRef.current) addPointerPoints(e);
+    const fromIndex = e && drawingRef.current ? addPointerPoints(e) : -1;
+    if (fromIndex >= 0) paintLocalIncrement(fromIndex);
     const current = drawingRef.current;
     drawingRef.current = null;
     if (!current) return;
@@ -201,8 +224,6 @@ export function DrawBoard({
     };
     onStroke(finalStroke);
     onLiveEnd(current.id);
-    schedulePaint();
-    forceRender((n) => n + 1);
   };
 
   const activeLabel = tool === "pen" ? "笔" : tool === "eraser" ? "擦" : "填色";
@@ -231,7 +252,14 @@ export function DrawBoard({
           <div className="flex min-h-0 flex-1 items-center justify-center">
             <div className="paper relative aspect-[4/3] max-h-full w-full max-w-full overflow-hidden rounded-md border-2 border-[var(--ink)] shadow-[4px_4px_0_0_var(--ink)]">
               <canvas
-                ref={canvasRef}
+                ref={committedCanvasRef}
+                width={WIDTH}
+                height={HEIGHT}
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 block h-full w-full"
+              />
+              <canvas
+                ref={transientCanvasRef}
                 width={WIDTH}
                 height={HEIGHT}
                 onPointerDown={handleDown}
@@ -256,72 +284,89 @@ export function DrawBoard({
         )}
         aria-disabled={!canDraw}
       >
-          <div className="grid grid-cols-6 gap-1">
-            {PALETTE.map((c) => (
-              <button
-                key={c}
-                type="button"
-                disabled={!canDraw}
-                aria-label={`颜色 ${c}`}
-                onClick={() => {
-                  setColor(c);
-                  if (tool === "eraser") setTool("pen");
-                }}
-                style={{ backgroundColor: c }}
-                className={cn(
-                  "press size-7 rounded-md border-2 border-[var(--ink)] shadow-[1px_1px_0_0_var(--ink)]",
-                  color === c && tool !== "eraser" ? "scale-110 ring-2 ring-primary" : "hover:scale-105",
-                )}
+        <div className="grid grid-cols-6 gap-1">
+          {PALETTE.map((c) => (
+            <button
+              key={c}
+              type="button"
+              disabled={!canDraw}
+              aria-label={`颜色 ${c}`}
+              onClick={() => {
+                setColor(c);
+                if (tool === "eraser") setTool("pen");
+              }}
+              style={{ backgroundColor: c }}
+              className={cn(
+                "press size-7 rounded-md border-2 border-[var(--ink)] shadow-[1px_1px_0_0_var(--ink)]",
+                color === c && tool !== "eraser"
+                  ? "scale-110 ring-2 ring-primary"
+                  : "hover:scale-105",
+              )}
+            />
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1 rounded-md border-2 border-border bg-card/70 p-1">
+          {BRUSH_SIZES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              disabled={!canDraw}
+              aria-label={`笔刷 ${s}`}
+              onClick={() => setSize(s)}
+              className={cn(
+                "press flex size-9 items-center justify-center rounded-md border-2 border-[var(--ink)] bg-card shadow-[1px_1px_0_0_var(--ink)]",
+                size === s && "bg-accent",
+              )}
+            >
+              <span
+                className="rounded-full bg-[var(--ink)]"
+                style={{ width: s / 1.6 + 4, height: s / 1.6 + 4 }}
               />
-            ))}
-          </div>
+            </button>
+          ))}
+        </div>
 
-          <div className="flex items-center gap-1 rounded-md border-2 border-border bg-card/70 p-1">
-            {BRUSH_SIZES.map((s) => (
-              <button
-                key={s}
-                type="button"
-                disabled={!canDraw}
-                aria-label={`笔刷 ${s}`}
-                onClick={() => setSize(s)}
-                className={cn(
-                  "press flex size-9 items-center justify-center rounded-md border-2 border-[var(--ink)] bg-card shadow-[1px_1px_0_0_var(--ink)]",
-                  size === s && "bg-accent",
-                )}
-              >
-                <span
-                  className="rounded-full bg-[var(--ink)]"
-                  style={{ width: s / 1.6 + 4, height: s / 1.6 + 4 }}
-                />
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-1 rounded-md border-2 border-border bg-card/70 p-1">
-            <ToolButton disabled={!canDraw} active={tool === "pen"} onClick={() => setTool("pen")} label="画笔">
-              <Pencil className="size-4" />
-            </ToolButton>
-            <ToolButton disabled={!canDraw} active={tool === "eraser"} onClick={() => setTool("eraser")} label="擦掉">
-              <Eraser className="size-4" />
-            </ToolButton>
-            <ToolButton disabled={!canDraw} active={tool === "fill"} onClick={() => setTool("fill")} label="填色">
-              <PaintBucket className="size-4" />
-            </ToolButton>
-            <ToolButton
-              disabled={!canDraw}
-              onClick={() => onStroke({ id: crypto.randomUUID(), kind: "undo" })}
-              label="退一步"
-            >
-              <RotateCcw className="size-4" />
-            </ToolButton>
-            <ToolButton
-              disabled={!canDraw}
-              onClick={() => onStroke({ id: crypto.randomUUID(), kind: "clear" })}
-              label="清空画纸"
-            >
-              <Trash2 className="size-4" />
-            </ToolButton>
-          </div>
+        <div className="flex items-center gap-1 rounded-md border-2 border-border bg-card/70 p-1">
+          <ToolButton
+            disabled={!canDraw}
+            active={tool === "pen"}
+            onClick={() => setTool("pen")}
+            label="画笔"
+          >
+            <Pencil className="size-4" />
+          </ToolButton>
+          <ToolButton
+            disabled={!canDraw}
+            active={tool === "eraser"}
+            onClick={() => setTool("eraser")}
+            label="擦掉"
+          >
+            <Eraser className="size-4" />
+          </ToolButton>
+          <ToolButton
+            disabled={!canDraw}
+            active={tool === "fill"}
+            onClick={() => setTool("fill")}
+            label="填色"
+          >
+            <PaintBucket className="size-4" />
+          </ToolButton>
+          <ToolButton
+            disabled={!canDraw}
+            onClick={() => onStroke({ id: crypto.randomUUID(), kind: "undo" })}
+            label="退一步"
+          >
+            <RotateCcw className="size-4" />
+          </ToolButton>
+          <ToolButton
+            disabled={!canDraw}
+            onClick={() => onStroke({ id: crypto.randomUUID(), kind: "clear" })}
+            label="清空画纸"
+          >
+            <Trash2 className="size-4" />
+          </ToolButton>
+        </div>
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ const identity = z.object({
   code: z.string().min(4).max(8),
   playerId: z.string().uuid(),
   token: z.string().min(10).max(128),
+  clientId: z.string().uuid().optional(),
 });
 
 const difficulty = z.enum(["全部", "容易", "普通", "挑战", "高手", "简单", "中等", "困难"]);
@@ -15,6 +16,7 @@ const profile = z.object({
   name: z.string().max(30),
   avatarSvg: z.string().max(5000).nullable().optional(),
   roomTheme: roomTheme.optional(),
+  clientId: z.string().uuid(),
 });
 function insertPlayerMessage(error: { message?: string } | null) {
   const detail = (error?.message ?? "").trim();
@@ -23,13 +25,16 @@ function insertPlayerMessage(error: { message?: string } | null) {
 
 type PlayerInsert = Record<string, unknown>;
 
-type SupabaseAdmin = Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"];
+type SupabaseAdmin = Awaited<
+  typeof import("@/integrations/supabase/client.server")
+>["supabaseAdmin"];
 
 function cleanAvatarSvg(raw?: string | null) {
   const svg = (raw ?? "").trim();
   if (!svg) return null;
   if (svg.length > 5000) return null;
   if (!svg.startsWith("<svg ") || !svg.endsWith("</svg>")) return null;
+  // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u001f]/.test(svg)) return null;
   const lowered = svg.toLowerCase();
   if (
@@ -48,32 +53,62 @@ function cleanAvatarSvg(raw?: string | null) {
 
 function isMissingColumn(error: { code?: string; message?: string } | null, column: string) {
   const text = `${error?.code ?? ""} ${error?.message ?? ""}`.toLowerCase();
-  return text.includes(column.toLowerCase()) || text.includes("could not find") || text.includes("schema cache");
+  return (
+    text.includes(column.toLowerCase()) ||
+    text.includes("could not find") ||
+    text.includes("schema cache")
+  );
 }
 
 async function insertRoom(supabaseAdmin: SupabaseAdmin, payload: Record<string, unknown>) {
-  const withTheme = await supabaseAdmin.from("rooms").insert(payload as never).select("*").single();
+  const withTheme = await supabaseAdmin
+    .from("rooms")
+    .insert(payload as never)
+    .select("*")
+    .single();
   if (!withTheme.error || !isMissingColumn(withTheme.error, "room_theme")) return withTheme;
 
   const { room_theme: _roomTheme, ...fallbackPayload } = payload;
-  return supabaseAdmin.from("rooms").insert(fallbackPayload as never).select("*").single();
+  return supabaseAdmin
+    .from("rooms")
+    .insert(fallbackPayload as never)
+    .select("*")
+    .single();
 }
 
-async function updateRoomSettings(supabaseAdmin: SupabaseAdmin, roomId: string, payload: Record<string, unknown>) {
-  const withTheme = await supabaseAdmin.from("rooms").update(payload as never).eq("id", roomId);
+async function updateRoomSettings(
+  supabaseAdmin: SupabaseAdmin,
+  roomId: string,
+  payload: Record<string, unknown>,
+) {
+  const withTheme = await supabaseAdmin
+    .from("rooms")
+    .update(payload as never)
+    .eq("id", roomId);
   if (!withTheme.error || !isMissingColumn(withTheme.error, "room_theme")) return withTheme;
 
   const { room_theme: _roomTheme, ...fallbackPayload } = payload;
-  return supabaseAdmin.from("rooms").update(fallbackPayload as never).eq("id", roomId);
+  return supabaseAdmin
+    .from("rooms")
+    .update(fallbackPayload as never)
+    .eq("id", roomId);
 }
 
 async function insertPlayer(supabaseAdmin: SupabaseAdmin, payload: PlayerInsert) {
-  const withAvatar = await supabaseAdmin.from("players").insert(payload as never).select("*").single();
+  const withAvatar = await supabaseAdmin
+    .from("players")
+    .insert(payload as never)
+    .select("*")
+    .single();
   if (!withAvatar.error || !isMissingColumn(withAvatar.error, "avatar_svg")) return withAvatar;
 
   // Older databases may not have the avatar column yet — still let the player in.
   const { avatar_svg: _avatarSvg, ...fallbackPayload } = payload;
-  return supabaseAdmin.from("players").insert(fallbackPayload as never).select("*").single();
+  return supabaseAdmin
+    .from("players")
+    .insert(fallbackPayload as never)
+    .select("*")
+    .single();
 }
 
 async function parkRoomForLowPlayers(
@@ -119,7 +154,10 @@ export const createRoom = createServerFn({ method: "POST" })
       code = g.makeCode();
     }
 
-    const { data: room, error } = await insertRoom(supabaseAdmin, { code, room_theme: selectedTheme });
+    const { data: room, error } = await insertRoom(supabaseAdmin, {
+      code,
+      room_theme: selectedTheme,
+    });
     if (error || !room) throw new Error("开局失败");
 
     const { data: player, error: pErr } = await insertPlayer(supabaseAdmin, {
@@ -128,6 +166,10 @@ export const createRoom = createServerFn({ method: "POST" })
       is_host: true,
       avatar: Math.floor(Math.random() * 8),
       avatar_svg: avatarSvg,
+      client_id: data.clientId,
+      connection_status: "connected",
+      disconnected_at: null,
+      last_seen: new Date().toISOString(),
     });
     if (pErr || !player) throw new Error(insertPlayerMessage(pErr));
 
@@ -137,39 +179,109 @@ export const createRoom = createServerFn({ method: "POST" })
     await supabaseAdmin.from("room_secrets").insert({ room_id: room.id });
     await g.say(room.id, 0, "system", `${name} 开了一局 · ${selectedTheme}`);
 
-    return { code: room.code, playerId: player.id, token };
+    return {
+      code: room.code,
+      playerId: player.id,
+      token,
+      clientId: data.clientId,
+    };
   });
 
 export const joinRoom = createServerFn({ method: "POST" })
-  .inputValidator((d) =>
-    profile.extend({ code: z.string().min(4).max(8) }).parse(d),
-  )
+  .inputValidator((d) => profile.extend({ code: z.string().min(4).max(8) }).parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
     const room = await g.getRoomByCode(data.code);
     if (!room) throw new Error("找不到这个号码，请再检查一次");
 
+    await g.reconcileRoomPresence(room);
+    const avatarSvg = cleanAvatarSvg(data.avatarSvg);
+    const reconnect = async () => {
+      const { data: existing } = await supabaseAdmin
+        .from("players")
+        .select("*")
+        .eq("room_id", room.id)
+        .eq("client_id", data.clientId)
+        .maybeSingle();
+      if (!existing) return null;
+
+      const name = g.cleanName(data.name);
+      const { data: player, error: reconnectError } = await supabaseAdmin
+        .from("players")
+        .update({
+          name,
+          avatar_svg: avatarSvg,
+          connection_status: "connected",
+          disconnected_at: null,
+          last_seen: new Date().toISOString(),
+        })
+        .eq("id", existing.id)
+        .select("*")
+        .single();
+      if (reconnectError || !player) throw new Error(insertPlayerMessage(reconnectError));
+
+      const { data: savedToken } = await supabaseAdmin
+        .from("player_tokens")
+        .select("token")
+        .eq("player_id", player.id)
+        .maybeSingle();
+      const token = savedToken?.token ?? g.makeToken();
+      if (!savedToken) {
+        await supabaseAdmin.from("player_tokens").insert({ player_id: player.id, token });
+      }
+      const refreshedRoom = await g.getRoomByCode(room.code);
+      if (refreshedRoom) await g.reconcileRoomPresence(refreshedRoom);
+      await g.say(room.id, room.current_round, "system", `${name} 重新连上线`);
+      return {
+        code: room.code,
+        playerId: player.id,
+        token,
+        clientId: data.clientId,
+      };
+    };
+
+    const resumed = await reconnect();
+    if (resumed) return resumed;
+
     const players = await g.listPlayers(room.id);
     if (players.length >= 12) throw new Error("这一局满了（最多 12 人）");
 
     let name = g.cleanName(data.name);
     if (players.some((p) => p.name === name)) name = `${name}2`.slice(0, 12);
-    const avatarSvg = cleanAvatarSvg(data.avatarSvg);
 
     const { data: player, error } = await insertPlayer(supabaseAdmin, {
       room_id: room.id,
       name,
       avatar: Math.floor(Math.random() * 8),
       avatar_svg: avatarSvg,
+      client_id: data.clientId,
+      connection_status: "connected",
+      disconnected_at: null,
+      last_seen: new Date().toISOString(),
     });
-    if (error || !player) throw new Error(insertPlayerMessage(error));
+    if (error || !player) {
+      // Two tabs from the same browser can submit together. The database's
+      // (room_id, client_id) unique index picks one row; the loser resumes it.
+      if (error?.code === "23505") {
+        const concurrentResume = await reconnect();
+        if (concurrentResume) return concurrentResume;
+      }
+      throw new Error(insertPlayerMessage(error));
+    }
 
     const token = g.makeToken();
     await supabaseAdmin.from("player_tokens").insert({ player_id: player.id, token });
+    const refreshedRoom = await g.getRoomByCode(room.code);
+    if (refreshedRoom) await g.reconcileRoomPresence(refreshedRoom);
     await g.say(room.id, room.current_round, "system", `${name} 加入这局`);
 
-    return { code: room.code, playerId: player.id, token };
+    return {
+      code: room.code,
+      playerId: player.id,
+      token,
+      clientId: data.clientId,
+    };
   });
 
 export const getPrivateState = createServerFn({ method: "POST" })
@@ -177,7 +289,12 @@ export const getPrivateState = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
-    const { room, player } = await g.authPlayer(data.code, data.playerId, data.token);
+    const { room, player } = await g.authPlayer(
+      data.code,
+      data.playerId,
+      data.token,
+      data.clientId,
+    );
 
     await supabaseAdmin
       .from("players")
@@ -214,7 +331,12 @@ export const updateSettings = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
-    const { room, player } = await g.authPlayer(data.code, data.playerId, data.token);
+    const { room, player } = await g.authPlayer(
+      data.code,
+      data.playerId,
+      data.token,
+      data.clientId,
+    );
     if (room.host_id !== player.id) throw new Error("只有主持人可以改设置");
     if (room.status !== "waiting" && room.status !== "ended") throw new Error("这一局已经开始了");
 
@@ -233,7 +355,12 @@ export const startGame = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
-    const { room, player } = await g.authPlayer(data.code, data.playerId, data.token);
+    const { room, player } = await g.authPlayer(
+      data.code,
+      data.playerId,
+      data.token,
+      data.clientId,
+    );
     if (room.host_id !== player.id) throw new Error("只有主持人可以开始");
 
     const players = await g.listPlayers(room.id);
@@ -265,13 +392,26 @@ export const startGame = createServerFn({ method: "POST" })
   });
 
 export const chooseWord = createServerFn({ method: "POST" })
-  .inputValidator((d) => identity.extend({ word: z.string().min(1).max(12) }).parse(d))
+  .inputValidator((d) =>
+    identity
+      .extend({
+        word: z.string().min(1).max(12),
+        turnIndex: z.number().int().nonnegative(),
+      })
+      .parse(d),
+  )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
-    const { room, player } = await g.authPlayer(data.code, data.playerId, data.token);
+    const { room, player } = await g.authPlayer(
+      data.code,
+      data.playerId,
+      data.token,
+      data.clientId,
+    );
     if (room.drawer_id !== player.id) throw new Error("现在还没轮到你选题");
     if (room.status !== "choosing") throw new Error("现在不能选题");
+    if (room.turn_index !== data.turnIndex) throw new Error("这一轮的选题已经结束");
 
     const { data: secret } = await supabaseAdmin
       .from("room_secrets")
@@ -281,15 +421,21 @@ export const chooseWord = createServerFn({ method: "POST" })
     const choices = (secret?.choices as string[] | null) ?? [];
     if (!choices.includes(data.word)) throw new Error("这个题目不能选");
 
-    await g.lockWord(room, data.word);
-    return { ok: true };
+    const lockedWord = await g.lockWord(room, data.word);
+    if (!lockedWord) throw new Error("题目没有锁定，请再试一次");
+    return { ok: true, word: lockedWord };
   });
 
 export const submitGuess = createServerFn({ method: "POST" })
   .inputValidator((d) => identity.extend({ text: z.string().min(1).max(40) }).parse(d))
   .handler(async ({ data }) => {
     const g = await import("./game.server");
-    const { room, player } = await g.authPlayer(data.code, data.playerId, data.token);
+    const { room, player } = await g.authPlayer(
+      data.code,
+      data.playerId,
+      data.token,
+      data.clientId,
+    );
     const result = await g.scoreGuess(room, player, data.text);
     await g.advance({ ...room });
     return result;
@@ -304,7 +450,10 @@ export const pushStroke = createServerFn({ method: "POST" })
           kind: z.enum(["line", "fill", "clear", "undo"]),
           color: z.string().max(32).optional(),
           size: z.number().min(0).max(80).optional(),
-          points: z.array(z.tuple([z.number(), z.number()])).max(4000).optional(),
+          points: z
+            .array(z.tuple([z.number(), z.number()]))
+            .max(4000)
+            .optional(),
         }),
       })
       .parse(d),
@@ -312,7 +461,12 @@ export const pushStroke = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
-    const { room, player } = await g.authPlayer(data.code, data.playerId, data.token);
+    const { room, player } = await g.authPlayer(
+      data.code,
+      data.playerId,
+      data.token,
+      data.clientId,
+    );
     if (room.drawer_id !== player.id) throw new Error("只有画画的人可以动笔");
     if (room.status !== "drawing") throw new Error("现在还不能画");
 
@@ -330,7 +484,12 @@ export const tick = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
-    const { room, player } = await g.authPlayer(data.code, data.playerId, data.token);
+    const { room, player } = await g.authPlayer(
+      data.code,
+      data.playerId,
+      data.token,
+      data.clientId,
+    );
     await supabaseAdmin
       .from("players")
       .update({ last_seen: new Date().toISOString() })
@@ -357,13 +516,19 @@ export const leaveRoom = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
-    const { room, player } = await g.authPlayer(data.code, data.playerId, data.token);
+    const { room, player } = await g.authPlayer(
+      data.code,
+      data.playerId,
+      data.token,
+      data.clientId,
+    );
 
     await supabaseAdmin.from("players").delete().eq("id", player.id);
     await g.say(room.id, room.current_round, "system", `${player.name} 离开这局`);
 
     const rest = await g.listPlayers(room.id);
-    if (rest.length === 0) {
+    const retained = await g.listRetainedPlayers(room.id);
+    if (retained.length === 0) {
       await supabaseAdmin.from("rooms").delete().eq("id", room.id);
       return { ok: true };
     }
@@ -374,7 +539,13 @@ export const leaveRoom = createServerFn({ method: "POST" })
     }
 
     if (rest.length < 2) {
-      await parkRoomForLowPlayers(supabaseAdmin, room.id, nextHost?.id ?? room.host_id, room.current_round);
+      const activeHost = rest.find((candidate) => candidate.id === room.host_id);
+      await parkRoomForLowPlayers(
+        supabaseAdmin,
+        room.id,
+        nextHost?.id ?? activeHost?.id ?? rest[0]?.id ?? null,
+        room.current_round,
+      );
       return { ok: true };
     }
 
@@ -400,7 +571,7 @@ export const getRoomSnapshot = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const g = await import("./game.server");
-    const { room } = await g.authPlayer(data.code, data.playerId, data.token);
+    const { room } = await g.authPlayer(data.code, data.playerId, data.token, data.clientId);
 
     const players = await g.listPlayers(room.id);
     const [{ data: strokes }, { data: messages }] = await Promise.all([

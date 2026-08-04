@@ -1,4 +1,9 @@
-export { DEFAULT_ROOM_THEME, ROOM_THEME_OPTIONS, ROOM_THEMES, normalizeRoomTheme } from "./game-themes";
+export {
+  DEFAULT_ROOM_THEME,
+  ROOM_THEME_OPTIONS,
+  ROOM_THEMES,
+  normalizeRoomTheme,
+} from "./game-themes";
 export type { RoomTheme } from "./game-themes";
 
 export const DIFFICULTIES = ["全部", "容易", "普通", "挑战", "高手"] as const;
@@ -34,6 +39,10 @@ export type Player = {
   is_host: boolean;
   avatar: number;
   avatar_svg?: string | null;
+  client_id?: string | null;
+  connection_status?: "connected" | "disconnected";
+  disconnected_at?: string | null;
+  last_seen: string;
   joined_at: string;
 };
 

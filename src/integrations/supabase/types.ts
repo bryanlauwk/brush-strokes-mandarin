@@ -82,6 +82,9 @@ export type Database = {
         Row: {
           avatar: number
           avatar_svg: string | null
+          client_id: string | null
+          connection_status: string
+          disconnected_at: string | null
           has_guessed: boolean
           id: string
           is_host: boolean
@@ -95,6 +98,9 @@ export type Database = {
         Insert: {
           avatar?: number
           avatar_svg?: string | null
+          client_id?: string | null
+          connection_status?: string
+          disconnected_at?: string | null
           has_guessed?: boolean
           id?: string
           is_host?: boolean
@@ -108,6 +114,9 @@ export type Database = {
         Update: {
           avatar?: number
           avatar_svg?: string | null
+          client_id?: string | null
+          connection_status?: string
+          disconnected_at?: string | null
           has_guessed?: boolean
           id?: string
           is_host?: boolean

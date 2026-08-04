@@ -13,7 +13,11 @@ export type LiveStroke = {
   round?: number;
 };
 
-export type RoomIdentity = { playerId: string; token: string } | null;
+export type RoomIdentity = {
+  playerId: string;
+  token: string;
+  clientId: string;
+} | null;
 
 const POLL_MS = 1000;
 const LIVE_END_GRACE_MS = 1800;
@@ -28,10 +32,20 @@ function mergeStrokes(snapshot: Stroke[], optimistic: Stroke[]) {
 }
 
 function sameKnownTurn(marker: TurnMarker, currentTurn: number, currentRound: number) {
-  if (typeof marker.turnIndex === "number" && marker.turnIndex >= 0 && currentTurn >= 0 && marker.turnIndex !== currentTurn) {
+  if (
+    typeof marker.turnIndex === "number" &&
+    marker.turnIndex >= 0 &&
+    currentTurn >= 0 &&
+    marker.turnIndex !== currentTurn
+  ) {
     return false;
   }
-  if (typeof marker.round === "number" && marker.round >= 0 && currentRound >= 0 && marker.round !== currentRound) {
+  if (
+    typeof marker.round === "number" &&
+    marker.round >= 0 &&
+    currentRound >= 0 &&
+    marker.round !== currentRound
+  ) {
     return false;
   }
   return true;
@@ -45,6 +59,7 @@ export function useRoom(code: string, identity: RoomIdentity) {
   const [scratch, setScratch] = useState<Stroke[]>([]);
   const [live, setLive] = useState<Record<string, LiveStroke>>({});
   const [missing, setMissing] = useState(false);
+  const [identityInvalid, setIdentityInvalid] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const turnRef = useRef<number>(-1);
   const roundRef = useRef<number>(-1);
@@ -52,6 +67,7 @@ export function useRoom(code: string, identity: RoomIdentity) {
 
   const playerId = identity?.playerId ?? null;
   const token = identity?.token ?? null;
+  const clientId = identity?.clientId ?? null;
 
   const clearLiveEndTimer = useCallback((id: string) => {
     const timer = liveEndTimersRef.current[id];
@@ -83,10 +99,12 @@ export function useRoom(code: string, identity: RoomIdentity) {
     const upper = code.toUpperCase();
 
     setMissing(false);
+    setIdentityInvalid(false);
     turnRef.current = -1;
     roundRef.current = -1;
 
-    const matchesCurrentTurn = (marker: TurnMarker) => sameKnownTurn(marker, turnRef.current, roundRef.current);
+    const matchesCurrentTurn = (marker: TurnMarker) =>
+      sameKnownTurn(marker, turnRef.current, roundRef.current);
 
     const applySnapshot = (snap: {
       room: Room;
@@ -99,7 +117,8 @@ export function useRoom(code: string, identity: RoomIdentity) {
       setPlayers(snap.players);
       setMessages(snap.messages);
       const hadTurn = turnRef.current >= 0 && roundRef.current >= 0;
-      const turnChanged = snap.room.turn_index !== turnRef.current || snap.room.current_round !== roundRef.current;
+      const turnChanged =
+        snap.room.turn_index !== turnRef.current || snap.room.current_round !== roundRef.current;
       turnRef.current = snap.room.turn_index;
       roundRef.current = snap.room.current_round;
       if (hadTurn && turnChanged) {
@@ -132,17 +151,28 @@ export function useRoom(code: string, identity: RoomIdentity) {
     const refresh = async () => {
       try {
         const snap = await getRoomSnapshot({
-          data: { code: upper, playerId, token },
+          data: {
+            code: upper,
+            playerId,
+            token,
+            clientId: clientId ?? undefined,
+          },
         });
-        applySnapshot(snap as unknown as {
-          room: Room;
-          players: Player[];
-          messages: ChatMessage[];
-          strokes: Stroke[];
-        });
+        setIdentityInvalid(false);
+        applySnapshot(
+          snap as unknown as {
+            room: Room;
+            players: Player[];
+            messages: ChatMessage[];
+            strokes: Stroke[];
+          },
+        );
       } catch (err) {
         const message = err instanceof Error ? err.message : "";
         if (message.includes("找不到这个号码")) setMissing(true);
+        if (message.includes("身份验证失败") || message.includes("已经不在这局")) {
+          setIdentityInvalid(true);
+        }
       }
     };
 
@@ -169,7 +199,11 @@ export function useRoom(code: string, identity: RoomIdentity) {
         });
       })
       .on("broadcast", { event: "live-end" }, ({ payload }) => {
-        const { id, turnIndex, round } = payload as { id: string; turnIndex?: number; round?: number };
+        const { id, turnIndex, round } = payload as {
+          id: string;
+          turnIndex?: number;
+          round?: number;
+        };
         if (!matchesCurrentTurn({ turnIndex, round })) return;
         clearLiveEndTimer(id);
         liveEndTimersRef.current[id] = window.setTimeout(() => {
@@ -202,20 +236,26 @@ export function useRoom(code: string, identity: RoomIdentity) {
     return () => {
       cancelled = true;
       window.clearInterval(timer);
-      Object.values(liveEndTimersRef.current).forEach((pendingTimer) => window.clearTimeout(pendingTimer));
+      Object.values(liveEndTimersRef.current).forEach((pendingTimer) =>
+        window.clearTimeout(pendingTimer),
+      );
       liveEndTimersRef.current = {};
       if (channelRef.current) {
         void supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
     };
-  }, [code, playerId, token, clearLiveEndTimer]);
+  }, [code, playerId, token, clientId, clearLiveEndTimer]);
 
   const broadcastLive = useCallback((stroke: LiveStroke) => {
     void channelRef.current?.send({
       type: "broadcast",
       event: "live",
-      payload: { ...stroke, turnIndex: turnRef.current, round: roundRef.current },
+      payload: {
+        ...stroke,
+        turnIndex: turnRef.current,
+        round: roundRef.current,
+      },
     });
   }, []);
 
@@ -239,7 +279,11 @@ export function useRoom(code: string, identity: RoomIdentity) {
   // Free doodling in the lobby: never persisted, only shared over the channel.
   const appendScratchStroke = useCallback((stroke: Stroke) => {
     setScratch((prev) => (prev.some((x) => x.id === stroke.id) ? prev : [...prev, stroke]));
-    void channelRef.current?.send({ type: "broadcast", event: "scratch", payload: stroke });
+    void channelRef.current?.send({
+      type: "broadcast",
+      event: "scratch",
+      payload: stroke,
+    });
   }, []);
 
   const clearScratch = useCallback(() => setScratch([]), []);
@@ -254,6 +298,7 @@ export function useRoom(code: string, identity: RoomIdentity) {
     scratch,
     live,
     missing,
+    identityInvalid,
     me,
     broadcastLive,
     broadcastLiveEnd,

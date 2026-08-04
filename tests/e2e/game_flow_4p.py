@@ -73,22 +73,28 @@ async def set_name(page, name, timeout_ms=45000):
     raise AssertionError(f"找不到名字输入框 ({name}) 页面文本: {body!r}")
 
 
-async def join_room(page, code, name, attempts=4):
+async def in_room(page):
+    """进房后加入表单会消失。"""
+    return await page.get_by_placeholder("例如：Bryan").count() == 0
+
+
+async def join_room(page, code, name, attempts=6):
     """弱网下 join 请求可能整包丢失，真实玩家会再点一次；这里模拟同样的行为。"""
     await page.goto(f"{BASE}/room/{code}", wait_until="domcontentloaded")
     await page.wait_for_timeout(1500)
     for attempt in range(attempts):
+        if await in_room(page):
+            return
         await set_name(page, name)
         btn = page.get_by_role("button", name="加入这一局")
         try:
-            await btn.wait_for(state="visible", timeout=30000)
+            await btn.click(timeout=15000)
         except Exception:
-            return  # 已经进房了
-        await btn.click()
-        # 等进房成功（加入表单消失）
+            await page.wait_for_timeout(1000)
+            continue
         waited = 0
         while waited < 12000:
-            if not await btn.count():
+            if await in_room(page):
                 return
             await page.wait_for_timeout(500)
             waited += 500

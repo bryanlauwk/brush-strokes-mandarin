@@ -74,6 +74,7 @@ function Index() {
   const [tab, setTab] = useState<EntryTab>("create");
   const [codeHint, setCodeHint] = useState<string | null>(null);
   const [codeStatus, setCodeStatus] = useState<CodeStatus>("idle");
+  const [joinError, setJoinError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const nameRef = useRef<HTMLInputElement | null>(null);
   const themeRef = useRef<HTMLSelectElement | null>(null);
@@ -123,6 +124,7 @@ function Index() {
 
   const codeMessage = (() => {
     if (codeHint) return { tone: "error" as const, text: codeHint };
+    if (joinError) return { tone: "error" as const, text: joinError };
     if (!code) return null;
     if (!codeComplete)
       return {
@@ -143,6 +145,7 @@ function Index() {
   const handleCodeChange = (raw: string) => {
     const { clean, dropped } = sanitizeCode(raw);
     setCode(clean);
+    setJoinError(null);
     // 提示要停留一下，不然下一个按键就把它冲掉了。
     if (!dropped) return;
     if (codeHintTimer.current) window.clearTimeout(codeHintTimer.current);
@@ -176,7 +179,7 @@ function Index() {
 
   const validateName = () => {
     if (!trimmedName) {
-      toast.error("先输入你的名字");
+      toast.error("先填你的名字，再开房或加入");
       focusControl(nameRef.current);
       return false;
     }
@@ -185,17 +188,18 @@ function Index() {
 
   const validateJoinCode = () => {
     if (!code) {
-      toast.error("先输入房间号码");
+      toast.error("先输入房间号码（5 位）");
+      setJoinError("还没输入房间号码。");
       focusControl(codeRef.current);
       return false;
     }
     if (!codeComplete) {
-      toast.error(`房间号码是 ${CODE_LENGTH} 位`);
+      toast.error(`房间号码是 ${CODE_LENGTH} 位，还差 ${CODE_LENGTH - code.length} 位`);
       focusControl(codeRef.current);
       return false;
     }
     if (codeStatus === "missing") {
-      toast.error("找不到这个号码，检查一下再试。");
+      toast.error("找不到这个房间，可能已结束或号码打错了。");
       focusControl(codeRef.current);
       return false;
     }
@@ -236,6 +240,7 @@ function Index() {
     if (!validateName() || !validateJoinCode()) return;
     const svg = avatarSvg ?? createDefaultAvatar(trimmedName);
     setBusy(true);
+    setJoinError(null);
     try {
       const res = await joinFn({
         data: {
@@ -250,7 +255,18 @@ function Index() {
       saveIdentity(res);
       void navigate({ to: "/room/$code", params: { code: res.code } });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "加入失败");
+      const raw = e instanceof Error ? e.message : "";
+      const full = raw.includes("满");
+      const missing = raw.includes("找不到");
+      const text = full
+        ? "这一局人满了（最多 12 人），换一个号码或自己开一间。"
+        : missing
+          ? "找不到这个房间，可能已结束或号码打错了。"
+          : raw || "加入失败，网络不稳，等下再试。";
+      toast.error(text);
+      setJoinError(text);
+      if (missing) setCodeStatus("missing");
+      focusControl(codeRef.current);
       setBusy(false);
     }
   };

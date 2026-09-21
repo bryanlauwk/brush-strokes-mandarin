@@ -592,8 +592,8 @@ function RoomPage() {
   );
 
   return (
-    <main className="mx-auto flex h-[100dvh] max-w-6xl flex-col gap-2 overflow-hidden p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:gap-3 sm:p-5">
-      <header className="panel flex shrink-0 flex-wrap items-center gap-2 px-2.5 py-1.5 sm:gap-3 sm:px-4 sm:py-3">
+    <main className="game-shell mx-auto flex h-[100dvh] max-w-[1440px] flex-col gap-2 overflow-hidden p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:gap-3 sm:p-5">
+      <header className="panel game-header flex shrink-0 flex-wrap items-center gap-2 px-2.5 py-1.5 sm:gap-3 sm:px-4 sm:py-3">
         <Link to="/" className="hidden font-display text-xl text-primary sm:block">
           画啦猜啦
         </Link>
@@ -642,7 +642,7 @@ function RoomPage() {
       </header>
 
       {inGame && (
-        <div className="panel shrink-0 px-3 py-1.5 text-center sm:px-4 sm:py-2">
+        <div className="panel game-word-banner shrink-0 px-3 py-1.5 text-center sm:px-4 sm:py-2">
           <p className="truncate text-[11px] text-muted-foreground sm:text-xs">
             {iAmDrawer
               ? "你正在画："
@@ -654,7 +654,7 @@ function RoomPage() {
         </div>
       )}
 
-      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] gap-2 lg:grid-cols-[220px_minmax(0,1fr)_290px] lg:grid-rows-1 lg:gap-3">
+      <div className="game-stage grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] gap-2 lg:grid-cols-[230px_minmax(0,1fr)_310px] lg:grid-rows-1 lg:gap-3">
         <div className="order-1 min-w-0 shrink-0 lg:order-1 lg:h-auto lg:min-h-0">
           {/* Mobile: horizontal avatar strip. Desktop keeps the tall leaderboard. */}
           <div className="lg:hidden">
@@ -727,42 +727,42 @@ function RoomPage() {
 
                 {room.status === "choosing" &&
                   lockedTurnKey !== `${room.current_round}-${room.turn_index}` && (
-                  <Overlay>
-                    {iAmDrawer ? (
-                      <div className="text-center">
-                        <p className="font-display text-xl">选一个题目开始画</p>
-                        <div className="mt-3 flex flex-wrap justify-center gap-2">
-                          {priv.choices.map((w) => (
-                            <button
-                              key={w}
-                              type="button"
-                              data-testid="word-choice"
-                              onClick={() => void handleChooseWord(w)}
-                              disabled={choosingWord}
-                              aria-pressed={selectedWord === w}
-                              className={cn(
-                                "press animate-pop-in rounded-md border-2 border-[var(--ink)] px-4 py-2 font-display text-lg shadow-[3px_3px_0_0_var(--ink)] disabled:cursor-wait",
-                                selectedWord === w
-                                  ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2"
-                                  : "bg-card hover:bg-accent",
-                                choosingWord && selectedWord !== w && "opacity-45",
-                              )}
-                            >
-                              {selectedWord === w ? `✓ ${w}` : w}
-                            </button>
-                          ))}
+                    <Overlay>
+                      {iAmDrawer ? (
+                        <div className="text-center">
+                          <p className="font-display text-xl">选一个题目开始画</p>
+                          <div className="mt-3 flex flex-wrap justify-center gap-2">
+                            {priv.choices.map((w) => (
+                              <button
+                                key={w}
+                                type="button"
+                                data-testid="word-choice"
+                                onClick={() => void handleChooseWord(w)}
+                                disabled={choosingWord}
+                                aria-pressed={selectedWord === w}
+                                className={cn(
+                                  "press animate-pop-in rounded-md border-2 border-[var(--ink)] px-4 py-2 font-display text-lg shadow-[3px_3px_0_0_var(--ink)] disabled:cursor-wait",
+                                  selectedWord === w
+                                    ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2"
+                                    : "bg-card hover:bg-accent",
+                                  choosingWord && selectedWord !== w && "opacity-45",
+                                )}
+                              >
+                                {selectedWord === w ? `✓ ${w}` : w}
+                              </button>
+                            ))}
+                          </div>
+                          {selectedWord && (
+                            <p className="mt-3 text-sm font-semibold" role="status">
+                              已选「{selectedWord}」{choosingWord ? "，正在锁定…" : ""}
+                            </p>
+                          )}
                         </div>
-                        {selectedWord && (
-                          <p className="mt-3 text-sm font-semibold" role="status">
-                            已选「{selectedWord}」{choosingWord ? "，正在锁定…" : ""}
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="font-display text-xl">{drawer?.name ?? "画画人"} 正在选题…</p>
-                    )}
-                  </Overlay>
-                )}
+                      ) : (
+                        <p className="font-display text-xl">{drawer?.name ?? "画画人"} 正在选题…</p>
+                      )}
+                    </Overlay>
+                  )}
 
                 {room.status === "turn_end" && (
                   <Overlay>
@@ -893,7 +893,9 @@ function RoomPage() {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  return <main className="flex min-h-screen items-center justify-center p-6">{children}</main>;
+  return (
+    <main className="game-shell flex min-h-screen items-center justify-center p-6">{children}</main>
+  );
 }
 
 function Overlay({ children, transparent }: { children: React.ReactNode; transparent?: boolean }) {
@@ -905,7 +907,9 @@ function Overlay({ children, transparent }: { children: React.ReactNode; transpa
         transparent ? "pointer-events-none" : "bg-background/85 backdrop-blur-[2px]",
       )}
     >
-      <div className={cn("my-auto max-h-full w-full max-w-md", transparent && "pointer-events-auto")}>
+      <div
+        className={cn("my-auto max-h-full w-full max-w-md", transparent && "pointer-events-auto")}
+      >
         {children}
       </div>
     </div>

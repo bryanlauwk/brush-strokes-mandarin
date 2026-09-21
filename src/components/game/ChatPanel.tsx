@@ -6,10 +6,12 @@ import {
   ChevronUp,
   Flame,
   MessageCircle,
-  Send,
+  ArrowUp,
+  Sparkles,
 } from "lucide-react";
 import type { ChatMessage } from "@/lib/game-types";
 import { cn } from "@/lib/utils";
+import "@/styles/arcade-social.css";
 
 type Props = {
   messages: ChatMessage[];
@@ -51,7 +53,8 @@ export function ChatPanel({
     (smooth = false) => {
       const el = listRef.current;
       if (!el) return;
-      if (smooth) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      if (smooth && !window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
       else el.scrollTop = el.scrollHeight;
       setBottomState(true);
     },
@@ -108,7 +111,7 @@ export function ChatPanel({
 
   const submit = () => {
     const text = value.trim();
-    if (!text || disabled) return;
+    if (!text || disabled || composingRef.current) return;
     onSend(text);
     setValue("");
     scrollToBottom(true);
@@ -117,43 +120,48 @@ export function ChatPanel({
   const showJumpButton = !atBottom || unreadCount > 0;
 
   return (
-    <div className="studio-panel flex h-full max-h-full min-h-0 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-2 border-b-2 border-[var(--ink)] bg-secondary px-3 py-1.5 sm:py-2">
-        <span className="grid size-7 place-items-center rounded-md border-2 border-[var(--ink)] bg-card sm:size-8">
-          <MessageCircle className="size-4 text-primary" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="font-display text-base leading-none sm:text-lg">答题室</p>
-          <p className="hidden text-xs text-muted-foreground sm:block">
-            答案、提示和欢呼都在这里
-          </p>
+    <section className="social-chat" aria-label="猜答案与聊天">
+      <div className="social-chat-header">
+        <div className="social-chat-heading">
+          <span className="social-live-dot" aria-hidden="true" />
+          <h2>放胆猜</h2>
+          <span className="social-eyebrow">LIVE CHAT</span>
         </div>
         {onToggleExpanded && (
           <button
             type="button"
             onClick={onToggleExpanded}
-            aria-label={expanded ? "收起答题室" : "展开答题室"}
+            aria-label={expanded ? "收起聊天" : "展开聊天"}
             aria-expanded={expanded}
-            className="press grid size-9 shrink-0 place-items-center rounded-md border-2 border-[var(--ink)] bg-card shadow-[2px_2px_0_0_var(--ink)] lg:hidden"
+            className="social-chat-toggle"
           >
             {expanded ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}
           </button>
         )}
       </div>
 
-      <div className="relative min-h-0 flex-1">
+      <div className="social-chat-body">
         <div
           ref={listRef}
+          role="log"
+          tabIndex={0}
+          aria-label="聊天消息"
+          aria-live="polite"
+          aria-relevant="additions text"
           onScroll={(e) => {
             setBottomState(isNearBottom(e.currentTarget));
           }}
-          className="h-full min-h-0 space-y-2 overflow-y-auto overscroll-contain p-3 text-sm"
+          className="social-message-list"
         >
           {messages.length === 0 ? (
-            <div className="flex h-full min-h-32 flex-col items-center justify-center rounded-md border-2 border-dashed border-border bg-card/55 px-4 text-center text-muted-foreground">
-              <MessageCircle className="mb-2 size-6 text-primary" />
-              <p className="font-medium text-foreground">这里还很安静</p>
-              <p className="mt-1 text-xs">等第一位朋友开口或猜中答案。</p>
+            <div className="social-chat-empty">
+              <span className="social-chat-empty-icon">
+                <MessageCircle aria-hidden="true" />
+              </span>
+              <div>
+                <p>第一个乱猜的，会是谁？</p>
+                <span>答案、吐槽、笑声，都发这里。</span>
+              </div>
             </div>
           ) : (
             messages.map((m) => <MessageRow key={m.id} message={m} />)
@@ -163,10 +171,7 @@ export function ChatPanel({
           <button
             type="button"
             onClick={() => scrollToBottom(true)}
-            className={cn(
-              "press absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border-2 border-[var(--ink)] px-3 py-1 text-xs shadow-[2px_2px_0_0_var(--ink)]",
-              unreadCount > 0 ? "bg-primary text-primary-foreground" : "bg-card",
-            )}
+            className={cn("social-chat-jump", unreadCount > 0 && "social-chat-jump-unread")}
           >
             <ArrowDown className="size-3" />
             {unreadCount > 0 ? `${unreadCount} 条新消息` : "回到最新"}
@@ -174,12 +179,15 @@ export function ChatPanel({
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 border-t-2 border-[var(--ink)] bg-card/75 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:pb-2">
+      <div className="social-chat-composer" role="group" aria-label="发送答案或消息">
         <input
+          aria-label={disabled ? "这回合由你画画，暂时不能发送答案" : "输入答案或聊天消息"}
           value={value}
           disabled={disabled}
           placeholder={placeholder}
           maxLength={40}
+          autoComplete="off"
+          enterKeyHint="send"
           onChange={(e) => setValue(e.target.value)}
           onFocus={() => scrollToBottom()}
           onCompositionStart={() => {
@@ -189,64 +197,73 @@ export function ChatPanel({
             composingRef.current = false;
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !composingRef.current && !e.nativeEvent.isComposing) {
+            if (
+              e.key === "Enter" &&
+              !composingRef.current &&
+              !e.nativeEvent.isComposing &&
+              e.nativeEvent.keyCode !== 229
+            ) {
               e.preventDefault();
               submit();
             }
           }}
-          className="min-w-0 flex-1 rounded-md border-2 border-[var(--ink)] bg-background px-3 py-2.5 text-base outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary disabled:opacity-50 sm:py-2 sm:text-sm"
+          className="social-chat-input"
         />
         <button
           type="button"
           onClick={submit}
-          disabled={disabled}
-          aria-label="发送"
-          className="press flex size-11 shrink-0 items-center justify-center rounded-md border-2 border-[var(--ink)] bg-primary text-primary-foreground shadow-[2px_2px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50 sm:size-10"
+          disabled={disabled || !value.trim()}
+          aria-label="发送答案或消息"
+          className="social-chat-send"
         >
-          <Send className="size-4" />
+          <ArrowUp className="size-5" aria-hidden="true" />
         </button>
       </div>
-    </div>
+    </section>
   );
 }
 
 function MessageRow({ message }: { message: ChatMessage }) {
   if (message.kind === "correct") {
     return (
-      <p className="animate-pop-in flex items-start gap-2 rounded-md border-2 border-[var(--success)] bg-[var(--success)]/15 px-2 py-2 font-medium text-[var(--success)]">
-        <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-        <span>{message.text}</span>
-      </p>
+      <div className="social-event social-event-correct">
+        <CheckCircle2 aria-hidden="true" />
+        <p>
+          <span className="social-event-label">命中！</span>
+          {message.text}
+        </p>
+      </div>
     );
   }
   if (message.kind === "close") {
     return (
-      <p className="animate-pop-in flex items-start gap-2 rounded-md bg-accent/70 px-2 py-2 text-accent-foreground">
-        <Flame className="mt-0.5 size-4 shrink-0 text-primary" />
-        <span>{message.text}</span>
-      </p>
+      <div className="social-event social-event-close">
+        <Flame aria-hidden="true" />
+        <p>
+          <span className="social-event-label">就差一点</span>
+          {message.text}
+        </p>
+      </div>
     );
   }
   if (message.kind === "reveal") {
     return (
-      <p className="stamp animate-pop-in rounded-md bg-card px-2 py-2 text-center font-display text-base">
-        答案是「{message.text}」
-      </p>
+      <div className="social-reveal">
+        <span>
+          <Sparkles aria-hidden="true" />
+          答案揭晓
+        </span>
+        <strong>{message.text}</strong>
+      </div>
     );
   }
   if (message.kind === "system") {
-    return (
-      <p className="px-2 py-1 text-center text-xs text-muted-foreground italic">{message.text}</p>
-    );
+    return <p className="social-system-message">{message.text}</p>;
   }
   return (
-    <p
-      className={cn(
-        "rounded-md border border-border bg-secondary/45 px-2 py-2 [overflow-wrap:anywhere]",
-      )}
-    >
-      <span className="font-semibold">{message.player_name}：</span>
-      <span className="text-foreground/85">{message.text}</span>
-    </p>
+    <div className="social-message">
+      <span className="social-message-name">{message.player_name || "玩家"}</span>
+      <p>{message.text}</p>
+    </div>
   );
 }

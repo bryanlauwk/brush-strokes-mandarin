@@ -2,7 +2,29 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Copy, Lightbulb, LogOut, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ChevronDown,
+  Copy,
+  Crown,
+  Lightbulb,
+  LoaderCircle,
+  LogOut,
+  Pencil,
+  Play,
+  Radio,
+  RotateCcw,
+  Share2,
+  SlidersHorizontal,
+  Sparkles,
+  Trophy,
+  Users,
+  X,
+} from "lucide-react";
+import { Brand } from "@/components/arcade/Brand";
+import { SoundToggle } from "@/components/arcade/SoundToggle";
 import { DrawBoard } from "@/components/game/DrawBoard";
 import { ChatPanel } from "@/components/game/ChatPanel";
 import { CharacterPicker } from "@/components/game/CharacterPicker";
@@ -48,19 +70,20 @@ import {
   saveIdentity,
   saveNickname,
 } from "@/lib/player-identity";
+import "@/styles/arcade-room.css";
 
 export const Route = createFileRoute("/room/$code")({
   head: () => ({
     meta: [
-      { title: "游戏桌 · 画啦猜啦" },
+      { title: "今晚这一局 · 乱画俱乐部" },
       {
         name: "description",
-        content: "朋友一起画画、猜华语答案、比谁反应快。",
+        content: "你的朋友，你的主场。一人乱画，全场开猜。",
       },
-      { property: "og:title", content: "游戏桌 · 画啦猜啦" },
+      { property: "og:title", content: "朋友喊你入局 · 乱画俱乐部" },
       {
         property: "og:description",
-        content: "输入号码即可加入，一起画画猜答案。",
+        content: "带上你的脑洞，来乱画俱乐部开一局。",
       },
       { name: "robots", content: "noindex" },
     ],
@@ -105,6 +128,13 @@ function RoomPage() {
   const [now, setNow] = useState(() => Date.now());
   const [chatExpanded, setChatExpanded] = useState(false);
   const [hintOpen, setHintOpen] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [viewport, setViewport] = useState<{
+    height: number;
+    top: number;
+    keyboard: boolean;
+  } | null>(null);
   const [feedback, setFeedback] = useState<GameFeedbackEvent | null>(null);
   const feedbackIdRef = useRef(0);
   const roomFeedbackKeyRef = useRef<string | null>(null);
@@ -191,6 +221,54 @@ function RoomPage() {
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(t);
+  }, []);
+
+  // Both resize-content browsers and Safari's visual viewport need to leave
+  // the answer composer above the keyboard without distorting the canvas.
+  useEffect(() => {
+    const visual = window.visualViewport;
+    let restingHeight = window.innerHeight;
+    let measuredWidth = window.innerWidth;
+    let frame = 0;
+    const measure = () => {
+      const height = Math.round(visual?.height ?? window.innerHeight);
+      const editing = document.activeElement?.matches("input, textarea") ?? false;
+      if (window.innerWidth !== measuredWidth) {
+        restingHeight = window.innerHeight;
+        measuredWidth = window.innerWidth;
+      }
+      if (!editing) restingHeight = Math.max(restingHeight, window.innerHeight);
+      const next = {
+        height,
+        top: Math.round(visual?.offsetTop ?? 0),
+        keyboard: editing && restingHeight - height > 120,
+      };
+      setViewport((previous) =>
+        previous?.height === next.height &&
+        previous.top === next.top &&
+        previous.keyboard === next.keyboard
+          ? previous
+          : next,
+      );
+    };
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    };
+    measure();
+    window.addEventListener("resize", schedule);
+    visual?.addEventListener("resize", schedule);
+    visual?.addEventListener("scroll", schedule);
+    document.addEventListener("focusin", schedule);
+    document.addEventListener("focusout", schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", schedule);
+      visual?.removeEventListener("resize", schedule);
+      visual?.removeEventListener("scroll", schedule);
+      document.removeEventListener("focusin", schedule);
+      document.removeEventListener("focusout", schedule);
+    };
   }, []);
 
   // Private state (the drawer's word / word choices)
@@ -303,6 +381,14 @@ function RoomPage() {
     setSelectedWord(null);
   }, [room?.turn_index, room?.status]);
 
+  useEffect(() => {
+    setLockedTurnKey(null);
+  }, [room?.current_round, room?.turn_index]);
+
+  useEffect(() => {
+    if (room?.status === "waiting" || room?.status === "ended") setLockedTurnKey(null);
+  }, [room?.status]);
+
   // Test mode: if a test player is the drawer, auto-pick a word so the turn keeps moving.
   useEffect(() => {
     if (!room || room.status !== "choosing" || !bots.length) return;
@@ -383,6 +469,7 @@ function RoomPage() {
   );
 
   const doJoin = async () => {
+    if (joining) return;
     const trimmedName = nickname.trim();
     if (!trimmedName) {
       toast.error("先输入你的名字");
@@ -463,26 +550,70 @@ function RoomPage() {
     }
   };
 
+  const copyInvite = async (link = false) => {
+    try {
+      if (!navigator.clipboard) throw new Error("clipboard-unavailable");
+      await navigator.clipboard.writeText(link ? window.location.href : upper);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2200);
+      toast.success(link ? "邀请链接复制好了，丢进群里吧。" : `房间号 ${upper} 已复制`);
+    } catch {
+      toast.error(`复制没成功，直接把房间号 ${upper} 发给朋友也行。`);
+    }
+  };
+
+  const shareInvite = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "乱画俱乐部 · 朋友喊你入局",
+          text: `房间 ${upper}，就差你了。画得越歪，笑得越大声。`,
+          url: window.location.href,
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
+        await copyInvite(true);
+      }
+    } else {
+      await copyInvite(true);
+    }
+  };
+
+  const doStart = async () => {
+    if (!auth || starting) return;
+    setStarting(true);
+    try {
+      await startFn({ data: auth });
+      broadcastSync();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "还没开成，再试一次。");
+    } finally {
+      setStarting(false);
+    }
+  };
+
   if (!ready)
     return (
       <Shell>
-        <p className="text-muted-foreground">载入中…</p>
+        <div className="arcade-room-loading" role="status">
+          <LoaderCircle className="animate-spin" />
+          <p>正在点亮你的主场…</p>
+        </div>
       </Shell>
     );
 
   if (missing) {
     return (
       <Shell>
-        <div className="panel max-w-md p-6 text-center">
-          <h1 className="font-display text-2xl">找不到这一局</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            号码 {upper} 可能已经结束，或输入有误。
-          </p>
-          <Link
-            to="/"
-            className="mt-4 inline-block rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-2 text-primary-foreground"
-          >
-            回到主页
+        <div className="arcade-room-entry arcade-room-empty">
+          <span className="arcade-room-eyebrow">PARTY NOT FOUND</span>
+          <div className="arcade-room-error-code" aria-hidden="true">
+            404
+          </div>
+          <h1>这局，走散了。</h1>
+          <p>房间 {upper} 不在了。检查一下号码，或自己组个新局。</p>
+          <Link to="/" className="arcade-room-primary">
+            回俱乐部开一局 <ArrowRight size={18} />
           </Link>
         </div>
       </Shell>
@@ -492,41 +623,64 @@ function RoomPage() {
   if (!identity) {
     return (
       <Shell>
-        <div className="panel w-full max-w-md p-5 sm:p-6">
-          <h1 className="font-display text-2xl">加入 {upper}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">输入名字，选个角色，就可以进房。</p>
-          <label className="mt-4 block text-sm font-medium" htmlFor="nick">
-            你的名字
-          </label>
-          <input
-            id="nick"
-            value={nickname}
-            maxLength={12}
-            onChange={(e) => setNickname(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return;
-              e.preventDefault();
+        <div className="arcade-room-entry">
+          <div className="arcade-room-entry-top">
+            <span className="arcade-room-eyebrow">YOU'RE ON THE LIST</span>
+            <span className="arcade-room-code-small">{upper}</span>
+          </div>
+          <h1>
+            朋友等你，
+            <br />
+            <span>上线乱画。</span>
+          </h1>
+          <p>取个名，选个分身。今晚的笑点就靠你了。</p>
+          <form
+            onKeyDown={(event) => {
+              if (
+                event.key === "Enter" &&
+                (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)
+              )
+                event.preventDefault();
+            }}
+            onSubmit={(event) => {
+              event.preventDefault();
               if (roomJoinReady) void doJoin();
             }}
-            placeholder="例如：Bryan"
-            className="mt-1 w-full rounded-md border-2 border-[var(--ink)] bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-primary"
-          />
-          <div className="mt-4">
+          >
+            <label className="arcade-room-field" htmlFor="nick">
+              今晚怎么叫你？
+              <input
+                id="nick"
+                value={nickname}
+                maxLength={12}
+                autoComplete="nickname"
+                onChange={(event) => setNickname(event.target.value)}
+                placeholder="例如：不加辣"
+                required
+              />
+            </label>
             <CharacterPicker
               value={avatarSvg}
               onChange={setAvatarSvg}
-              name={nickname || "画画人"}
+              name={nickname || "夜猫子"}
               compact
             />
-          </div>
-          <button
-            type="button"
-            onClick={doJoin}
-            disabled={joining || !roomJoinReady}
-            className="mt-4 w-full rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-2 font-display text-lg text-primary-foreground shadow-[3px_3px_0_0_var(--ink)] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {joining ? "加入中…" : roomJoinReady ? "加入这一局" : "先输入名字"}
-          </button>
+            <button
+              type="submit"
+              disabled={joining || !roomJoinReady}
+              className="arcade-room-primary"
+            >
+              {joining ? (
+                <LoaderCircle size={18} className="animate-spin" />
+              ) : (
+                <ArrowRight size={18} />
+              )}
+              {joining ? "正在入场…" : "我来了，入局！"}
+            </button>
+          </form>
+          <Link to="/" className="arcade-room-back">
+            <ArrowLeft size={14} /> 返回俱乐部
+          </Link>
         </div>
       </Shell>
     );
@@ -535,357 +689,569 @@ function RoomPage() {
   if (!room)
     return (
       <Shell>
-        <p className="text-muted-foreground">正在连接这一局…</p>
+        <div className="arcade-room-loading" role="status">
+          <Radio size={30} />
+          <p>正在连接房间 {upper}…</p>
+          <span>如果刚刚断线，会接回你的原位。</span>
+        </div>
       </Shell>
     );
 
   const currentRoomTheme = normalizeRoomTheme(room.room_theme);
-  const drawer = players.find((p) => p.id === room.drawer_id) ?? null;
+  const drawer = players.find((player) => player.id === room.drawer_id) ?? null;
   const iAmDrawer = room.drawer_id === identity.playerId;
   const secondsLeft = room.round_ends_at
     ? Math.max(0, Math.ceil((Date.parse(room.round_ends_at) - now) / 1000))
     : 0;
   const inGame = room.status !== "waiting" && room.status !== "ended";
   const isLobby = room.status === "waiting";
-  const lockReason = (() => {
-    if (isLobby) return "等开局，先随便涂两笔";
-    if (room.status === "choosing") return "画画人在选题目…";
-    if (room.status === "drawing") return `轮到 ${drawer?.name ?? "画画人"} 画，你负责猜`;
-    if (room.status === "turn_end") return "这一回合结束了";
-    return "这一局结束了";
-  })();
   const guessed = !!me?.has_guessed;
-
-  const wordDisplay = iAmDrawer && priv.word ? [...priv.word].join(" ") : (room.masked_word ?? "");
+  const connectedPlayers = players.filter((player) => player.connection_status !== "disconnected");
+  const canStart = connectedPlayers.length >= 2;
+  const wordDisplay = iAmDrawer && priv.word ? priv.word : (room.masked_word ?? "");
   const frozenOrder = Array.isArray(room.turn_order) ? room.turn_order.filter(Boolean) : [];
   const turnsPerRound = Math.max(frozenOrder.length || players.length, 1);
   const turnInRound = (room.turn_index % turnsPerRound) + 1;
-  const urgent = inGame && room.status === "drawing" && secondsLeft <= 10;
+  const urgent = room.status === "drawing" && secondsLeft <= 10;
+  const progress = Math.min(100, Math.max(0, (secondsLeft / room.draw_seconds) * 100));
+  const rankedPlayers = [...players].sort((a, b) => b.score - a.score);
+  const roundWinners = [...players]
+    .filter((player) => player.round_score > 0)
+    .sort((a, b) => b.round_score - a.round_score);
   const withLocalAvatar = (player: Player) =>
     player.id === identity.playerId && !player.avatar_svg && avatarSvg
       ? { ...player, avatar_svg: avatarSvg }
       : player;
-  const drawingHint =
-    auth && iAmDrawer && room.status === "drawing" && priv.word ? (
-      <DrawingHintPanel auth={auth} turnIndex={room.turn_index} word={priv.word} compact />
-    ) : null;
+  const drawingHint = auth && iAmDrawer && room.status === "drawing" && priv.word;
+  const lockReason =
+    room.status === "choosing"
+      ? `${drawer?.name ?? "画手"} 正在挑题，准备开猜。`
+      : room.status === "drawing"
+        ? guessed
+          ? "猜中了！欣赏一下朋友的神作。"
+          : "认真看画，脑洞打开。"
+        : "答案揭晓，下位画手准备。";
 
   const chat = (
     <ChatPanel
       messages={messages}
-      expanded={chatExpanded}
-      onToggleExpanded={() => setChatExpanded((v) => !v)}
+      expanded={inGame && chatExpanded}
+      onToggleExpanded={inGame ? () => setChatExpanded((value) => !value) : undefined}
       disabled={iAmDrawer && room.status === "drawing"}
       placeholder={
-        iAmDrawer && room.status === "drawing"
-          ? "你负责画，先别答"
-          : guessed
-            ? "你已经答对，可以聊聊"
-            : "输入你的答案…"
+        isLobby || room.status === "ended"
+          ? "先跟大家打个招呼…"
+          : iAmDrawer && room.status === "drawing"
+            ? "画手不能剧透哦"
+            : guessed
+              ? "猜中啦，来点掌声…"
+              : "脑洞来了？输入答案…"
       }
       onSend={(text) =>
-        void guessFn({ data: { ...auth!, text } }).catch((e) =>
-          toast.error(e instanceof Error ? e.message : "发送失败"),
+        void guessFn({ data: { ...auth!, text } }).catch((error) =>
+          toast.error(error instanceof Error ? error.message : "发送失败，再试一次。"),
         )
       }
     />
   );
 
   return (
-    <main className="game-shell mx-auto flex h-[100dvh] max-w-[1440px] flex-col gap-2 overflow-hidden p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:gap-3 sm:p-5">
-      <header className="panel game-header flex shrink-0 flex-wrap items-center gap-2 px-2.5 py-1.5 sm:gap-3 sm:px-4 sm:py-3">
-        <Link to="/" className="hidden font-display text-xl text-primary sm:block">
-          画啦猜啦
-        </Link>
-        <button
-          type="button"
-          title="复制号码"
-          aria-label={`复制号码 ${upper}`}
-          onClick={() => {
-            void navigator.clipboard?.writeText(upper);
-            toast.success(`号码 ${upper} 已复制`);
-          }}
-          className="press flex items-center gap-1 rounded-md border-2 border-[var(--ink)] bg-secondary px-2.5 py-1 text-sm tracking-[0.2em] shadow-[2px_2px_0_0_var(--ink)]"
-        >
-          {upper}
-          <Copy className="size-3.5" />
-        </button>
-        <span className="hidden rounded-full border-2 border-[var(--ink)] bg-accent px-3 py-1 text-xs font-semibold sm:inline">
-          {currentRoomTheme}
-        </span>
-        {inGame && (
-          <>
-            <span className="rounded-full border-2 border-[var(--ink)] bg-card px-2.5 py-1 text-[11px] sm:px-3 sm:text-sm">
-              第 {room.current_round}/{room.total_rounds} 轮 · {turnInRound}/{turnsPerRound}
-              <span className="hidden sm:inline"> 位</span>
-            </span>
-            <span
-              className={cn(
-                "ml-auto flex size-9 items-center justify-center rounded-full border-2 border-[var(--ink)] font-display text-base tabular-nums sm:size-11 sm:text-lg",
-                urgent ? "animate-urgent bg-primary text-primary-foreground" : "bg-accent",
-              )}
-            >
-              {secondsLeft}
-            </span>
-          </>
-        )}
-        <div className={inGame ? "" : "ml-auto"}>
+    <main
+      className={cn(
+        "arcade-room",
+        inGame && "arcade-room--playing",
+        inGame && iAmDrawer && room.status === "drawing" && "arcade-room--drawing",
+        inGame && chatExpanded && "arcade-room--chat-expanded",
+        inGame && viewport?.keyboard && "arcade-room--keyboard",
+      )}
+      style={
+        {
+          "--room-viewport-height": viewport ? `${viewport.height}px` : "100dvh",
+          "--room-viewport-top": `${viewport?.top ?? 0}px`,
+        } as React.CSSProperties
+      }
+    >
+      <header className="arcade-room-header">
+        <Brand compact />
+        <div className="arcade-room-header-middle">
           <button
             type="button"
-            onClick={doLeave}
-            aria-label="离开房间"
-            className="press flex items-center gap-1 rounded-md border-2 border-[var(--ink)] bg-card px-2.5 py-1 text-sm shadow-[2px_2px_0_0_var(--ink)] hover:bg-accent"
+            onClick={() => void copyInvite()}
+            className="arcade-room-code-button"
+            aria-label={`复制房间号码 ${upper}`}
           >
-            <LogOut className="size-3.5" /> <span className="hidden sm:inline">离开</span>
+            <span className="arcade-room-live-dot" /> {upper}
+            {copied ? <Check size={14} /> : <Copy size={14} />}
           </button>
+          <span className="arcade-room-header-caption">
+            {isLobby ? "集合中" : room.status === "ended" ? "今晚的神作" : "LIVE SESSION"}
+          </span>
         </div>
+        <SoundToggle />
+        <button
+          type="button"
+          onClick={() => void doLeave()}
+          className="arcade-room-icon-button"
+          aria-label="离开房间"
+        >
+          <LogOut size={18} />
+          <span>离开</span>
+        </button>
       </header>
 
-      {inGame && (
-        <div className="panel game-word-banner shrink-0 px-3 py-1.5 text-center sm:px-4 sm:py-2">
-          <p className="truncate text-[11px] text-muted-foreground sm:text-xs">
-            {iAmDrawer
-              ? "你正在画："
-              : `${drawer?.name ?? "画画人"} 正在画 · ${room.word_length ?? "?"} 个字`}
-          </p>
-          <p className="font-display text-xl tracking-[0.25em] break-all sm:text-2xl sm:tracking-[0.3em]">
-            {wordDisplay || "…"}
-          </p>
-        </div>
-      )}
+      {isLobby && (
+        <div className="arcade-room-lobby">
+          <section className="arcade-room-lobby-main">
+            <div className="arcade-room-lobby-intro">
+              <span className="arcade-room-eyebrow">
+                <span className="arcade-room-live-dot" /> THE PRE-PARTY
+              </span>
+              <h1>
+                人齐了，
+                <br />
+                <span>就开闹。</span>
+              </h1>
+              <p>画功可以没有，朋友一定要有。</p>
+              <div className="arcade-room-lobby-orbit" aria-hidden="true">
+                <Sparkles />
+              </div>
+            </div>
 
-      <div className="game-stage grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] gap-2 lg:grid-cols-[230px_minmax(0,1fr)_310px] lg:grid-rows-1 lg:gap-3">
-        <div className="order-1 min-w-0 shrink-0 lg:order-1 lg:h-auto lg:min-h-0">
-          {/* Mobile: horizontal avatar strip. Desktop keeps the tall leaderboard. */}
-          <div className="lg:hidden">
-            <Scoreboard
-              players={players}
-              drawerId={room.drawer_id}
-              meId={identity.playerId}
-              meAvatarSvg={avatarSvg}
-              variant="strip"
-            />
-          </div>
-          <div className="hidden h-full min-h-0 lg:block">
-            <Scoreboard
-              players={players}
-              drawerId={room.drawer_id}
-              meId={identity.playerId}
-              meAvatarSvg={avatarSvg}
-            />
-          </div>
-        </div>
+            <div className="arcade-room-invite">
+              <div>
+                <span className="arcade-room-eyebrow">今晚的入场暗号</span>
+                <button
+                  type="button"
+                  className="arcade-room-invite-code"
+                  onClick={() => void copyInvite()}
+                  aria-label={`复制房间号 ${upper}`}
+                >
+                  {upper} {copied ? <Check size={20} /> : <Copy size={20} />}
+                </button>
+              </div>
+              <button
+                type="button"
+                className="arcade-room-share"
+                onClick={() => void shareInvite()}
+              >
+                <Share2 size={18} /> 喊朋友来
+              </button>
+            </div>
 
-        <div className="relative order-2 min-h-0 min-w-0 lg:order-2">
-          <DrawBoard
-            strokes={isLobby ? scratch : strokes}
-            live={live}
-            canDraw={isLobby || (iAmDrawer && room.status === "drawing")}
-            lockReason={lockReason}
-            modeLabel={
-              isLobby ? "自由涂鸦" : iAmDrawer && room.status === "drawing" ? "轮到你画" : undefined
-            }
-            onStroke={handleStroke}
-            onLive={broadcastLive}
-            onLiveEnd={broadcastLiveEnd}
-            overlay={
-              <>
-                {room.status === "waiting" && (
-                  <Overlay transparent>
-                    <WaitingCard
-                      canStart={isHost && players.length >= 2}
-                      playerCount={players.length}
-                      isHost={isHost}
-                      code={upper}
-                      totalRounds={room.total_rounds}
-                      drawSeconds={room.draw_seconds}
-                      difficulty={room.difficulty}
-                      roomTheme={currentRoomTheme}
-                      devTools={
-                        import.meta.env.DEV
-                          ? {
-                              botCount: bots.length,
-                              busy: botBusy,
-                              onAdd: addTestPlayer,
-                              onClear: removeTestPlayers,
-                            }
-                          : null
-                      }
-                      onSettings={(s) =>
-                        void settingsFn({ data: { ...auth!, ...s } }).catch((e) =>
-                          toast.error(e instanceof Error ? e.message : "保存失败"),
-                        )
-                      }
-                      onStart={() =>
-                        void startFn({ data: auth! }).catch((e) =>
-                          toast.error(e instanceof Error ? e.message : "无法开始"),
-                        )
-                      }
-                    />
-                  </Overlay>
+            <section className="arcade-room-crew" aria-labelledby="crew-title">
+              <div className="arcade-room-section-heading">
+                <h2 id="crew-title">
+                  <Users size={16} /> 今晚的阵容
+                </h2>
+                <span>{connectedPlayers.length} / 12 已到场</span>
+              </div>
+              <div className="arcade-room-crew-grid">
+                {players.map((player) => (
+                  <div
+                    className={cn(
+                      "arcade-room-crew-player",
+                      player.id === identity.playerId && "arcade-room-crew-player--you",
+                      player.connection_status === "disconnected" &&
+                        "arcade-room-crew-player--away",
+                    )}
+                    key={player.id}
+                  >
+                    <PlayerAvatar player={withLocalAvatar(player)} size="lg" />
+                    <div className="arcade-room-player-name">
+                      <strong title={player.name}>{player.name}</strong>
+                      <span>
+                        {player.connection_status === "disconnected"
+                          ? "暂时断线"
+                          : player.is_host
+                            ? "组局的人"
+                            : player.id === identity.playerId
+                              ? "就是你"
+                              : "已就位"}
+                      </span>
+                    </div>
+                    {player.is_host ? (
+                      <Crown size={15} />
+                    ) : (
+                      <span className="arcade-room-presence-dot" />
+                    )}
+                  </div>
+                ))}
+                {players.length < 12 && (
+                  <button
+                    type="button"
+                    onClick={() => void shareInvite()}
+                    className="arcade-room-crew-empty"
+                  >
+                    <span>+</span>
+                    <div>
+                      给朋友留个位<small>点击发送邀请</small>
+                    </div>
+                  </button>
                 )}
+              </div>
+            </section>
 
-                {room.status === "choosing" &&
-                  lockedTurnKey !== `${room.current_round}-${room.turn_index}` && (
-                    <Overlay>
-                      {iAmDrawer ? (
-                        <div className="text-center">
-                          <p className="font-display text-xl">选一个题目开始画</p>
-                          <div className="mt-3 flex flex-wrap justify-center gap-2">
-                            {priv.choices.map((w) => (
-                              <button
-                                key={w}
-                                type="button"
-                                data-testid="word-choice"
-                                onClick={() => void handleChooseWord(w)}
-                                disabled={choosingWord}
-                                aria-pressed={selectedWord === w}
-                                className={cn(
-                                  "press animate-pop-in rounded-md border-2 border-[var(--ink)] px-4 py-2 font-display text-lg shadow-[3px_3px_0_0_var(--ink)] disabled:cursor-wait",
-                                  selectedWord === w
-                                    ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2"
-                                    : "bg-card hover:bg-accent",
-                                  choosingWord && selectedWord !== w && "opacity-45",
-                                )}
-                              >
-                                {selectedWord === w ? `✓ ${w}` : w}
-                              </button>
-                            ))}
-                          </div>
-                          {selectedWord && (
-                            <p className="mt-3 text-sm font-semibold" role="status">
-                              已选「{selectedWord}」{choosingWord ? "，正在锁定…" : ""}
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="font-display text-xl">{drawer?.name ?? "画画人"} 正在选题…</p>
-                      )}
-                    </Overlay>
+            <MatchSettings
+              isHost={isHost}
+              totalRounds={room.total_rounds}
+              drawSeconds={room.draw_seconds}
+              difficulty={room.difficulty}
+              roomTheme={currentRoomTheme}
+              onSettings={(settings) =>
+                void settingsFn({ data: { ...auth!, ...settings } })
+                  .then(() => broadcastSync())
+                  .catch((error) =>
+                    toast.error(
+                      error instanceof Error ? error.message : "设置没保存成功，再试一次。",
+                    ),
+                  )
+              }
+            />
+            <div className="arcade-room-start">
+              {isHost ? (
+                <button
+                  type="button"
+                  onClick={() => void doStart()}
+                  disabled={!canStart || starting}
+                  className="arcade-room-primary"
+                >
+                  {starting ? (
+                    <LoaderCircle className="animate-spin" size={18} />
+                  ) : (
+                    <Play size={18} fill="currentColor" />
                   )}
-
-                {room.status === "turn_end" && (
-                  <Overlay>
-                    <div className="panel animate-pop-in max-w-xs px-6 py-4 text-center">
-                      <p className="text-sm text-muted-foreground">答案是</p>
-                      <p className="stamp mx-auto mt-1 inline-block rounded-md px-3 py-1 font-display text-3xl">
-                        {room.revealed_word ?? "—"}
-                      </p>
-                      <ul className="mt-3 space-y-1 text-sm">
-                        {players
-                          .filter((p) => p.round_score > 0)
-                          .sort((a, b) => b.round_score - a.round_score)
-                          .map((p, i) => (
-                            <li
-                              key={p.id}
-                              className="animate-pop-in flex items-center justify-center gap-1"
-                              style={{ animationDelay: `${i * 90}ms` }}
-                            >
-                              <PlayerAvatar player={withLocalAvatar(p)} size="sm" />
-                              <span className="max-w-32 truncate" title={p.name}>
-                                {p.name}
-                              </span>
-                              <span className="font-semibold text-[var(--success)]">
-                                +{p.round_score}
-                              </span>
-                            </li>
-                          ))}
-                      </ul>
-                    </div>
-                  </Overlay>
-                )}
-
-                {room.status === "ended" && (
-                  <Overlay>
-                    <div className="panel animate-pop-in max-w-xs px-6 py-4 text-center">
-                      <p className="font-display text-2xl">🏆 最后排名</p>
-                      <ol className="mt-3 space-y-1 text-base">
-                        {[...players]
-                          .sort((a, b) => b.score - a.score)
-                          .map((p, i) => (
-                            <li
-                              key={p.id}
-                              className="animate-pop-in flex items-center justify-center gap-1"
-                              style={{ animationDelay: `${i * 120}ms` }}
-                            >
-                              <span>{["🥇", "🥈", "🥉"][i] ?? `${i + 1}.`}</span>
-                              <PlayerAvatar player={withLocalAvatar(p)} size="sm" />
-                              <span className="max-w-32 truncate" title={p.name}>
-                                {p.name}
-                              </span>
-                              <span className="tabular-nums">· {p.score}</span>
-                            </li>
-                          ))}
-                      </ol>
-                      {isHost && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void startFn({ data: auth! }).catch((e) =>
-                              toast.error(e instanceof Error ? e.message : "无法开始"),
-                            )
-                          }
-                          className="press mt-4 rounded-md border-2 border-[var(--ink)] bg-primary px-5 py-2 font-display text-lg text-primary-foreground shadow-[3px_3px_0_0_var(--ink)]"
-                        >
-                          再来一局
-                        </button>
-                      )}
-                    </div>
-                  </Overlay>
-                )}
-              </>
-            }
-          />
-        </div>
-
-        {/* Mobile: 答题室 is always on screen under the canvas; desktop keeps
-            the right column with the drawer hint stacked above it. */}
-        <div
-          className="order-3 min-h-0 min-w-0 overflow-hidden lg:flex lg:h-full lg:flex-col lg:gap-3"
-          style={{ ["--chat-h" as string]: chatExpanded ? "56dvh" : "30dvh" }}
-        >
-          {drawingHint && <div className="hidden shrink-0 lg:block">{drawingHint}</div>}
-          <div
-            className={cn(
-              "h-[var(--chat-h)] min-h-0 overflow-hidden transition-[height] duration-200 lg:h-auto",
-              drawingHint ? "lg:flex-1" : "lg:h-full",
+                  {starting ? "派对启动中…" : canStart ? "人齐，开画！" : "还差一位朋友"}
+                  <ArrowRight size={18} />
+                </button>
+              ) : (
+                <p className="arcade-room-waiting">
+                  <Radio size={18} /> {canStart ? "已就位，等房主开画。" : "再喊一位朋友就能开局。"}
+                </p>
+              )}
+              <p>
+                {isHost ? "至少 2 人就能开始。每个人都会轮到画。" : "放轻松，画得不像才有故事。"}
+              </p>
+            </div>
+            {import.meta.env.DEV && (
+              <details className="arcade-room-dev">
+                <summary>本地测试工具</summary>
+                <button type="button" onClick={() => void addTestPlayer()} disabled={botBusy}>
+                  加一名测试玩家
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void removeTestPlayers()}
+                  disabled={botBusy || bots.length === 0}
+                >
+                  清掉测试玩家（{bots.length}）
+                </button>
+              </details>
             )}
-          >
-            {chat}
-          </div>
+          </section>
+          <aside className="arcade-room-lobby-side">
+            <div className="arcade-room-lobby-note">
+              <span>HOUSE RULE NO. 01</span>
+              <p>
+                画得越歪，
+                <br />
+                笑得越大声。
+              </p>
+              <Pencil size={28} />
+            </div>
+            <div className="arcade-room-lobby-chat">{chat}</div>
+            <details className="arcade-room-doodle">
+              <summary>
+                <Pencil size={16} /> 等人时，先涂两笔 <ChevronDown size={16} />
+              </summary>
+              <p>大家共用一张纸。开局会自动清空。</p>
+              <div className="arcade-room-doodle-canvas">
+                <DrawBoard
+                  strokes={scratch}
+                  live={live}
+                  canDraw
+                  modeLabel="暖场涂鸦"
+                  onStroke={handleStroke}
+                  onLive={broadcastLive}
+                  onLiveEnd={broadcastLiveEnd}
+                />
+              </div>
+            </details>
+          </aside>
         </div>
-      </div>
-
-      {/* Mobile: the drawer hint opens on demand instead of eating canvas space */}
-      {drawingHint && (
-        <button
-          type="button"
-          onClick={() => setHintOpen(true)}
-          className="press fixed right-3 bottom-[38dvh] z-40 flex items-center gap-1 rounded-full border-2 border-[var(--ink)] bg-primary px-3 py-2 text-sm text-primary-foreground shadow-[3px_3px_0_0_var(--ink)] lg:hidden"
-        >
-          <Lightbulb className="size-4" /> 提示图
-        </button>
       )}
-      {drawingHint && hintOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-[2px] lg:hidden">
-          <button
-            type="button"
-            aria-label="关闭提示图"
-            onClick={() => setHintOpen(false)}
-            className="absolute inset-0"
-          />
-          <div className="relative w-full max-w-sm">
-            <button
-              type="button"
-              aria-label="关闭提示图"
-              onClick={() => setHintOpen(false)}
-              className="absolute -top-3 -right-2 z-10 grid size-9 place-items-center rounded-full border-2 border-[var(--ink)] bg-card shadow-[2px_2px_0_0_var(--ink)]"
+
+      {inGame && (
+        <>
+          <section
+            className={cn("arcade-room-roundbar", urgent && "arcade-room-roundbar--urgent")}
+            aria-label="当前回合"
+          >
+            <div className="arcade-room-roundcount">
+              <span>ROUND</span>
+              <strong>
+                {String(room.current_round).padStart(2, "0")}
+                <small> / {String(room.total_rounds).padStart(2, "0")}</small>
+              </strong>
+              <p>
+                第 {turnInRound} / {turnsPerRound} 位画手
+              </p>
+            </div>
+            <div className="arcade-room-word">
+              <span>
+                {room.status === "turn_end"
+                  ? "这波脑洞，接住了吗？"
+                  : room.status === "choosing"
+                    ? iAmDrawer
+                      ? "你的回合 · 选一个题目"
+                      : `${drawer?.name ?? "画手"} 正在选题`
+                    : iAmDrawer
+                      ? "你的秘密题目 · 别说出来"
+                      : `${drawer?.name ?? "画手"} 正在画 · ${room.word_length ?? "?"} 个字`}
+              </span>
+              <strong>
+                {room.status === "turn_end"
+                  ? room.revealed_word
+                  : room.status === "choosing"
+                    ? "准备开画"
+                    : wordDisplay || "···"}
+              </strong>
+            </div>
+            <div className="arcade-room-timer" role="timer" aria-label={`剩余 ${secondsLeft} 秒`}>
+              <strong>{String(secondsLeft).padStart(2, "0")}</strong>
+              <span>SECONDS</span>
+            </div>
+            <div className="arcade-room-time-track" aria-hidden="true">
+              <span style={{ width: `${room.status === "drawing" ? progress : 100}%` }} />
+            </div>
+          </section>
+          <div className="arcade-room-stage">
+            <aside className="arcade-room-scores">
+              <div className="arcade-room-score-strip">
+                <Scoreboard
+                  players={players}
+                  drawerId={room.drawer_id}
+                  meId={identity.playerId}
+                  meAvatarSvg={avatarSvg}
+                  variant="strip"
+                />
+              </div>
+              <div className="arcade-room-score-list">
+                <Scoreboard
+                  players={players}
+                  drawerId={room.drawer_id}
+                  meId={identity.playerId}
+                  meAvatarSvg={avatarSvg}
+                />
+              </div>
+            </aside>
+            <div
+              className={cn(
+                "arcade-room-canvas",
+                iAmDrawer && room.status === "drawing" && "arcade-room-canvas--drawing",
+              )}
             >
-              <X className="size-4" />
-            </button>
-            {drawingHint}
+              <DrawBoard
+                strokes={strokes}
+                live={live}
+                canDraw={iAmDrawer && room.status === "drawing"}
+                lockReason={lockReason}
+                modeLabel={iAmDrawer && room.status === "drawing" ? "你的主场" : "现场神作"}
+                onStroke={handleStroke}
+                onLive={broadcastLive}
+                onLiveEnd={broadcastLiveEnd}
+                overlay={
+                  <>
+                    {room.status === "choosing" &&
+                      lockedTurnKey !== `${room.current_round}-${room.turn_index}` && (
+                        <Overlay>
+                          {iAmDrawer ? (
+                            <div className="arcade-room-choice">
+                              <span className="arcade-room-eyebrow">PICK YOUR PLOT TWIST</span>
+                              <h2>这一笔，画什么？</h2>
+                              <p>选一个就开画，别让朋友等太久。</p>
+                              <div className="arcade-room-choices">
+                                {priv.choices.map((word, index) => (
+                                  <button
+                                    key={word}
+                                    type="button"
+                                    data-testid="word-choice"
+                                    onClick={() => void handleChooseWord(word)}
+                                    disabled={choosingWord}
+                                    aria-pressed={selectedWord === word}
+                                    className={cn(
+                                      "arcade-room-choice-card",
+                                      selectedWord === word && "arcade-room-choice-card--selected",
+                                    )}
+                                  >
+                                    <span>0{index + 1}</span>
+                                    <strong>{word}</strong>
+                                    {selectedWord === word ? (
+                                      <Check size={18} />
+                                    ) : (
+                                      <ArrowRight size={18} />
+                                    )}
+                                  </button>
+                                ))}
+                                {priv.choices.length === 0 && (
+                                  <p className="arcade-room-choice-loading" role="status">
+                                    <LoaderCircle size={18} className="animate-spin" />{" "}
+                                    题目正在赶来…
+                                  </p>
+                                )}
+                              </div>
+                              {selectedWord && (
+                                <p role="status">
+                                  「{selectedWord}」{choosingWord ? "正在锁定…" : "，准备开画。"}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="arcade-room-on-deck">
+                              {drawer && (
+                                <PlayerAvatar player={withLocalAvatar(drawer)} size="lg" />
+                              )}
+                              <span className="arcade-room-eyebrow">NEXT ON THE CANVAS</span>
+                              <h2>
+                                {drawer?.name ?? "画手"}
+                                <br />
+                                <span>正在酝酿神作。</span>
+                              </h2>
+                              <p>他在选题，你先把脑洞打开。</p>
+                              <div className="arcade-room-wait-dots" aria-hidden="true">
+                                <i />
+                                <i />
+                                <i />
+                              </div>
+                            </div>
+                          )}
+                        </Overlay>
+                      )}
+                    {room.status === "turn_end" && (
+                      <Overlay>
+                        <div className="arcade-room-reveal">
+                          <span className="arcade-room-eyebrow">THE BIG REVEAL</span>
+                          <p>原来画的是</p>
+                          <h2>{room.revealed_word ?? "—"}</h2>
+                          <div className="arcade-room-round-winners">
+                            {roundWinners.length ? (
+                              roundWinners.map((player) => (
+                                <div key={player.id}>
+                                  <PlayerAvatar player={withLocalAvatar(player)} size="sm" />
+                                  <span>{player.name}</span>
+                                  <strong>+{player.round_score}</strong>
+                                </div>
+                              ))
+                            ) : (
+                              <p>这波脑洞太大，全场没接住。</p>
+                            )}
+                          </div>
+                          <span className="arcade-room-next-round">
+                            下位画手准备 · {secondsLeft}s
+                          </span>
+                        </div>
+                      </Overlay>
+                    )}
+                  </>
+                }
+              />
+            </div>
+            <aside
+              className={cn(
+                "arcade-room-chat-column",
+                chatExpanded && "arcade-room-chat-column--expanded",
+              )}
+            >
+              {drawingHint && (
+                <button
+                  type="button"
+                  onClick={() => setHintOpen(true)}
+                  className="arcade-room-hint-button"
+                >
+                  <Lightbulb size={17} /> 没灵感？偷看一下提示图 <ArrowRight size={15} />
+                </button>
+              )}
+              <div className="arcade-room-stage-chat">{chat}</div>
+            </aside>
           </div>
+        </>
+      )}
+
+      {room.status === "ended" && (
+        <div className="arcade-room-finale">
+          <section className="arcade-room-results">
+            <span className="arcade-room-eyebrow">
+              <Trophy size={16} /> THE AFTERPARTY
+            </span>
+            <h1>
+              今晚，<span>谁最懂？</span>
+            </h1>
+            <p>有人靠画功，有人靠脑洞。反正全场都赢了笑声。</p>
+            <div className="arcade-room-podium" aria-label="本局前三名">
+              {rankedPlayers.slice(0, 3).map((player, index) => (
+                <div
+                  className={`arcade-room-podium-player arcade-room-podium-player--${index + 1}`}
+                  key={player.id}
+                >
+                  {index === 0 && <Crown className="arcade-room-podium-crown" size={26} />}
+                  <PlayerAvatar player={withLocalAvatar(player)} size="lg" />
+                  <strong title={player.name}>{player.name}</strong>
+                  <span>
+                    {player.score}
+                    <small> PTS</small>
+                  </span>
+                  <div className="arcade-room-podium-step">
+                    <span>0{index + 1}</span>
+                    <small>{["脑洞之王", "灵魂画友", "猜题高手"][index]}</small>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {rankedPlayers.length > 3 && (
+              <ol className="arcade-room-final-ranks" start={4}>
+                {rankedPlayers.slice(3).map((player, index) => (
+                  <li key={player.id}>
+                    <span>{String(index + 4).padStart(2, "0")}</span>
+                    <PlayerAvatar player={withLocalAvatar(player)} size="sm" />
+                    <strong>{player.name}</strong>
+                    <span>{player.score} PTS</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+            <div className="arcade-room-replay">
+              {isHost ? (
+                <button
+                  type="button"
+                  onClick={() => void doStart()}
+                  disabled={starting || !canStart}
+                  className="arcade-room-primary"
+                >
+                  <RotateCcw size={18} />{" "}
+                  {starting ? "准备下一局…" : canStart ? "不服？再来一局" : "等朋友回来，再来一局"}{" "}
+                  <ArrowRight size={18} />
+                </button>
+              ) : (
+                <p className="arcade-room-waiting">
+                  <Radio size={17} /> 还想玩？叫房主再开一局。
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => void shareInvite()}
+                className="arcade-room-secondary"
+              >
+                <Share2 size={16} /> 喊更多朋友来
+              </button>
+            </div>
+          </section>
+          <aside className="arcade-room-results-chat">{chat}</aside>
         </div>
+      )}
+
+      {drawingHint && hintOpen && (
+        <HintDialog onClose={() => setHintOpen(false)}>
+          <DrawingHintPanel auth={auth!} turnIndex={room.turn_index} word={priv.word!} compact />
+        </HintDialog>
       )}
       <GameFeedback event={feedback} />
     </main>
@@ -894,87 +1260,96 @@ function RoomPage() {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="game-shell flex min-h-screen items-center justify-center p-6">{children}</main>
+    <main className="arcade-room-shell">
+      <header>
+        <Brand />
+      </header>
+      <div className="arcade-room-shell-content">{children}</div>
+      <footer>GOOD FRIENDS. QUESTIONABLE DRAWINGS.</footer>
+    </main>
   );
 }
 
-function Overlay({ children, transparent }: { children: React.ReactNode; transparent?: boolean }) {
-  // `transparent` keeps the canvas usable underneath (lobby doodling).
+function Overlay({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className={cn(
-        "absolute inset-0 flex items-center justify-center overflow-y-auto overscroll-contain p-2 sm:p-4",
-        transparent ? "pointer-events-none" : "bg-background/85 backdrop-blur-[2px]",
-      )}
-    >
-      <div
-        className={cn("my-auto max-h-full w-full max-w-md", transparent && "pointer-events-auto")}
-      >
-        {children}
-      </div>
+    <div className="arcade-room-overlay">
+      <div>{children}</div>
     </div>
   );
 }
 
-function WaitingCard({
-  canStart,
-  playerCount,
+function HintDialog({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, []);
+  return (
+    <dialog
+      ref={dialogRef}
+      className="arcade-room-hint-dialog"
+      aria-label="只给画手看的灵感提示"
+      onCancel={onClose}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div>
+        <div className="arcade-room-hint-heading">
+          <span>画手专属 · 不许剧透</span>
+          <button type="button" onClick={onClose} aria-label="关闭提示图" autoFocus>
+            <X size={20} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </dialog>
+  );
+}
+
+function MatchSettings({
   isHost,
-  code,
   totalRounds,
   drawSeconds,
   difficulty,
   roomTheme,
-  devTools,
   onSettings,
-  onStart,
 }: {
-  canStart: boolean;
-  playerCount: number;
   isHost: boolean;
-  code: string;
   totalRounds: number;
   drawSeconds: number;
   difficulty: string;
   roomTheme: RoomTheme;
-  devTools?: {
-    botCount: number;
-    busy: boolean;
-    onAdd: () => void;
-    onClear: () => void;
-  } | null;
-  onSettings: (s: {
+  onSettings: (settings: {
     totalRounds: number;
     drawSeconds: number;
     difficulty: Difficulty;
     roomTheme: RoomTheme;
   }) => void;
-  onStart: () => void;
 }) {
   const currentDifficulty = asDifficulty(difficulty);
-  const currentRoomTheme = normalizeRoomTheme(roomTheme);
-  const select =
-    "mt-1 w-full rounded-md border-2 border-[var(--ink)] bg-background px-2 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60";
+  const settings = { totalRounds, drawSeconds, difficulty: currentDifficulty, roomTheme };
   return (
-    <div className="panel w-full max-w-sm p-5 text-center">
-      <p className="font-display text-xl">等大家加入</p>
-      <p className="mt-1 text-sm text-muted-foreground">
-        把号码 <span className="font-semibold tracking-[0.2em]">{code}</span> 发给朋友
-      </p>
-      <div className="mt-4 grid grid-cols-2 gap-2 text-left">
-        <label className="text-xs font-medium">
-          主题房
+    <details className="arcade-room-settings">
+      <summary>
+        <SlidersHorizontal size={17} />
+        <span>
+          <strong>今晚怎么玩</strong>
+          <small>
+            {roomTheme} · {totalRounds} 轮 · {drawSeconds} 秒 · {currentDifficulty}
+          </small>
+        </span>
+        <ChevronDown size={17} />
+      </summary>
+      <div className="arcade-room-settings-fields">
+        <label>
+          题目频道
           <select
-            className={select}
             disabled={!isHost}
-            value={currentRoomTheme}
-            onChange={(e) =>
-              onSettings({
-                totalRounds,
-                drawSeconds,
-                difficulty: currentDifficulty,
-                roomTheme: normalizeRoomTheme(e.target.value),
-              })
+            value={roomTheme}
+            onChange={(event) =>
+              onSettings({ ...settings, roomTheme: normalizeRoomTheme(event.target.value) })
             }
           >
             {ROOM_THEME_OPTIONS.map((theme) => (
@@ -984,119 +1359,56 @@ function WaitingCard({
             ))}
           </select>
         </label>
-        <label className="text-xs font-medium">
-          难度
+        <label>
+          脑洞难度
           <select
-            className={select}
             disabled={!isHost}
             value={currentDifficulty}
-            onChange={(e) =>
-              onSettings({
-                totalRounds,
-                drawSeconds,
-                difficulty: asDifficulty(e.target.value),
-                roomTheme: currentRoomTheme,
-              })
+            onChange={(event) =>
+              onSettings({ ...settings, difficulty: asDifficulty(event.target.value) })
             }
           >
-            {DIFFICULTIES.map((d) => (
-              <option key={d} value={d}>
-                {d}
+            {DIFFICULTIES.map((value) => (
+              <option key={value} value={value}>
+                {value}
               </option>
             ))}
           </select>
         </label>
-        <label className="text-xs font-medium">
-          轮数
+        <label>
+          玩几轮
           <select
-            className={select}
             disabled={!isHost}
             value={totalRounds}
-            onChange={(e) =>
-              onSettings({
-                totalRounds: Number(e.target.value),
-                drawSeconds,
-                difficulty: currentDifficulty,
-                roomTheme: currentRoomTheme,
-              })
+            onChange={(event) =>
+              onSettings({ ...settings, totalRounds: Number(event.target.value) })
             }
           >
-            {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
-              <option key={n} value={n}>
-                {n}
+            {[1, 2, 3, 4, 5, 6, 8, 10].map((value) => (
+              <option key={value} value={value}>
+                {value} 轮
               </option>
             ))}
           </select>
         </label>
-        <label className="text-xs font-medium">
-          每轮秒数
+        <label>
+          每人画多久
           <select
-            className={select}
             disabled={!isHost}
             value={drawSeconds}
-            onChange={(e) =>
-              onSettings({
-                totalRounds,
-                drawSeconds: Number(e.target.value),
-                difficulty: currentDifficulty,
-                roomTheme: currentRoomTheme,
-              })
+            onChange={(event) =>
+              onSettings({ ...settings, drawSeconds: Number(event.target.value) })
             }
           >
-            {[40, 60, 80, 100, 120].map((n) => (
-              <option key={n} value={n}>
-                {n}
+            {[40, 60, 80, 100, 120].map((value) => (
+              <option key={value} value={value}>
+                {value} 秒
               </option>
             ))}
           </select>
         </label>
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">
-        {playerCount < 2
-          ? `还差 ${2 - playerCount} 人才能开始（现在 ${playerCount}/2）`
-          : isHost
-            ? "全部难度会随机出题；主题和设置会自动保存"
-            : "等主持人调整主题和设置"}
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground">画纸现在可以自由涂鸦，开局会自动清空。</p>
-      {isHost ? (
-        <button
-          type="button"
-          onClick={onStart}
-          disabled={!canStart}
-          className="mt-4 w-full rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-2 font-display text-lg text-primary-foreground shadow-[3px_3px_0_0_var(--ink)] disabled:opacity-50"
-        >
-          {canStart ? "开始这一局" : `还差 ${Math.max(1, 2 - playerCount)} 人才能开始`}
-        </button>
-      ) : (
-        <p className="mt-4 text-sm text-muted-foreground">等主持人开始…</p>
-      )}
-      {devTools && (
-        <div className="mt-4 rounded-md border-2 border-dashed border-[var(--ink)]/40 p-3 text-left">
-          <p className="text-xs font-semibold">本地测试模式</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            一键补一名测试玩家凑够人数；轮到它画时会自动选题，方便你验证落笔与回合流程。
-          </p>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={devTools.onAdd}
-              disabled={devTools.busy}
-              className="flex-1 rounded-md border-2 border-[var(--ink)] bg-card px-3 py-1.5 text-xs font-medium shadow-[2px_2px_0_0_var(--ink)] disabled:opacity-50"
-            >
-              {devTools.busy ? "处理中…" : "加一名测试玩家"}
-            </button>
-            <button
-              type="button"
-              onClick={devTools.onClear}
-              disabled={devTools.busy || devTools.botCount === 0}
-              className="rounded-md border-2 border-[var(--ink)] bg-background px-3 py-1.5 text-xs font-medium disabled:opacity-40"
-            >
-              清掉（{devTools.botCount}）
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+      <p>{isHost ? "设置自动保存，全场一起同步。" : "房主决定今晚的玩法。"}</p>
+    </details>
   );
 }

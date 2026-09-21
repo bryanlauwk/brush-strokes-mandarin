@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, ChevronDown, Shuffle, Sparkles } from "lucide-react";
+import { useId, useState } from "react";
+import { Check, ChevronDown, Shuffle } from "lucide-react";
 import { InlineSvgAvatar } from "@/components/game/PlayerAvatar";
 import { CHARACTER_AVATARS, createDefaultAvatar } from "@/lib/character-avatars";
 import { cn } from "@/lib/utils";
+import "@/styles/arcade-tools.css";
 
 type Props = {
   value: string | null;
@@ -11,116 +12,78 @@ type Props = {
   compact?: boolean;
 };
 
-export function CharacterPicker({ value, onChange, name = "画画人", compact }: Props) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
+export function CharacterPicker({ value, onChange, name = "夜猫子", compact }: Props) {
+  const [expanded, setExpanded] = useState(!compact);
+  const labelId = useId();
+  const gridId = useId();
   const currentSvg = value ?? createDefaultAvatar(name);
+  const selected = CHARACTER_AVATARS.find((avatar) => avatar.svg === currentSvg);
+  const compactAvatars = CHARACTER_AVATARS.slice(0, 4);
+  if (selected && !compactAvatars.includes(selected)) compactAvatars[3] = selected;
+  const visibleAvatars = expanded ? CHARACTER_AVATARS : compactAvatars;
 
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  const pickRandom = () => {
-    const seed = Date.now() + Math.floor(Math.random() * 1000);
-    const avatar = CHARACTER_AVATARS[seed % CHARACTER_AVATARS.length] ?? CHARACTER_AVATARS[0];
-    onChange(avatar.svg);
-    setOpen(false);
-  };
-
-  const selectAvatar = (svg: string) => {
-    onChange(svg);
-    setOpen(false);
-  };
+  function pickRandom() {
+    const options = CHARACTER_AVATARS.filter((avatar) => avatar.svg !== currentSvg);
+    onChange(options[Math.floor(Math.random() * options.length)].svg);
+  }
 
   return (
-    <div ref={rootRef} className="relative">
-      <label className="mb-2 block text-sm font-semibold" id="character-picker-label">
-        角色
-      </label>
-      <button
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-labelledby="character-picker-label"
-        onClick={() => setOpen((current) => !current)}
-        className={cn(
-          "press flex w-full items-center gap-3 rounded-md border-2 border-[var(--ink)] bg-card px-3 py-2 text-left shadow-[3px_3px_0_0_var(--ink)]",
-          open && "bg-[var(--wash)]",
-        )}
-      >
-        <span className="relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-[var(--ink)] bg-secondary">
-          <InlineSvgAvatar svg={currentSvg} label="目前角色" />
-          <span className="absolute right-0 bottom-0 grid size-4 place-items-center rounded-full border-2 border-[var(--ink)] bg-[var(--success)] text-white">
-            <CheckCircle2 className="size-2.5" />
-          </span>
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-display text-lg leading-none text-primary">已选角色</span>
-          <span className="mt-1 inline-flex items-center gap-1 rounded-full border-2 border-[var(--ink)] bg-accent px-2 py-0.5 text-[11px] font-semibold">
-            <Sparkles className="size-3" /> 点击更换
-          </span>
-        </span>
-        <ChevronDown className={cn("size-5 shrink-0 text-primary transition-transform", open && "rotate-180")} />
-      </button>
+    <div className="arcade-character-picker">
+      <div className="arcade-picker-heading">
+        <span id={labelId}>选个分身，今晚放飞。</span>
+        <button
+          type="button"
+          className="arcade-shuffle"
+          onClick={pickRandom}
+          aria-label="随机换一个角色"
+        >
+          <Shuffle size={15} aria-hidden="true" /> 随缘
+        </button>
+      </div>
 
-      {open && (
-        <div className="absolute left-0 right-0 z-30 mt-2 rounded-md border-2 border-[var(--ink)] bg-card p-3 shadow-[5px_5px_0_0_var(--ink)]">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold text-muted-foreground">选择一个头像</p>
+      <div id={gridId} className="arcade-character-grid" role="group" aria-labelledby={labelId}>
+        {visibleAvatars.map((avatar) => {
+          const isSelected = avatar.svg === currentSvg;
+          return (
             <button
+              key={avatar.id}
               type="button"
-              onClick={pickRandom}
-              className="press inline-flex shrink-0 items-center gap-1 rounded-md border-2 border-[var(--ink)] bg-secondary px-2 py-1 text-xs font-semibold shadow-[2px_2px_0_0_var(--ink)]"
+              aria-pressed={isSelected}
+              aria-label={`${avatar.name}：${avatar.caption}`}
+              title={avatar.caption}
+              onClick={() => onChange(avatar.svg)}
+              className={cn("arcade-character-option", isSelected && "arcade-character-selected")}
+              style={{ "--character-color": avatar.accent } as React.CSSProperties}
             >
-              <Shuffle className="size-3.5" /> 随机
+              <span className="arcade-character-art">
+                <InlineSvgAvatar svg={avatar.svg} label="" />
+                {isSelected && (
+                  <span className="arcade-character-check">
+                    <Check size={11} strokeWidth={3} aria-hidden="true" />
+                  </span>
+                )}
+              </span>
+              <span className="arcade-character-name">{avatar.name}</span>
             </button>
-          </div>
+          );
+        })}
+      </div>
 
-          <div
-            className={cn("grid max-h-[min(55vh,420px)] gap-2 overflow-y-auto pr-1", compact ? "grid-cols-5" : "grid-cols-5")}
-            role="radiogroup"
-            aria-label="选择入场角色"
+      <div className="arcade-character-caption" aria-live="polite">
+        <span>{selected?.caption ?? "今晚的神秘嘉宾，已就位。"}</span>
+        {compact && (
+          <button
+            type="button"
+            className="arcade-picker-expand"
+            aria-expanded={expanded}
+            aria-controls={gridId}
+            onClick={() => setExpanded((current) => !current)}
           >
-            {CHARACTER_AVATARS.map((avatar, index) => {
-              const selected = avatar.svg === value;
-              return (
-                <button
-                  key={avatar.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  aria-label={`角色 ${index + 1}`}
-                  title={`角色 ${index + 1}`}
-                  onClick={() => selectAvatar(avatar.svg)}
-                  className={cn(
-                    "press relative aspect-square min-w-0 overflow-hidden rounded-full border-2 border-[var(--ink)] bg-secondary shadow-[2px_2px_0_0_var(--ink)] transition-transform hover:-translate-y-0.5 focus-visible:z-10",
-                    selected && "ring-4 ring-primary ring-offset-2 ring-offset-card",
-                  )}
-                >
-                  <InlineSvgAvatar svg={avatar.svg} label={`角色 ${index + 1}`} />
-                  {selected && (
-                    <span className="absolute right-0 top-0 grid size-5 place-items-center rounded-full border-2 border-[var(--ink)] bg-[var(--success)] text-white">
-                      <CheckCircle2 className="size-3" />
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+            {expanded ? "收起" : "全部 8 位"}
+            <ChevronDown size={13} className={expanded ? "arcade-rotate" : ""} aria-hidden="true" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

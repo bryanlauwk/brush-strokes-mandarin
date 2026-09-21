@@ -51,6 +51,8 @@ export const Route = createFileRoute("/")({
       { name: "description", content: appDescription },
       { property: "og:title", content: appTitle },
       { property: "og:description", content: appDescription },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Index,
@@ -275,31 +277,31 @@ function Index() {
     "home-field w-full rounded-md border-2 border-[var(--ink)] bg-card px-3 py-3 outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-primary";
 
   return (
-    <main className="home-shell mx-auto grid min-h-screen w-full max-w-6xl items-start content-center gap-5 px-5 py-6 sm:px-8 lg:grid-cols-[minmax(0,1fr)_440px]">
+    <main className="home-shell mx-auto grid min-h-[100dvh] w-full max-w-7xl items-center gap-8 px-5 py-8 sm:px-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(400px,0.85fr)] lg:px-12 xl:gap-14">
       <div aria-hidden="true" className="home-ukiyo-bg">
         <span className="ukiyo-art" style={{ backgroundImage: `url(${homeUkiyoBg.url})` }} />
         <span className="ukiyo-veil" />
       </div>
 
-      <section className="space-y-5">
+      <section className="home-intro space-y-7 lg:py-10">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="label-chip text-xs font-semibold text-primary animate-pop-in">
-            <Sparkles className="size-3.5 animate-sparkle" /> 马来西亚华语画猜
+          <span className="label-chip home-kicker text-xs font-bold text-primary animate-pop-in">
+            <Sparkles className="size-3.5 animate-sparkle" /> 马来西亚华语画猜派对
           </span>
         </div>
 
-        <div className="title-backing relative block w-full min-w-0 rounded-2xl border-2 border-[var(--ink)]/15 bg-[var(--card)]/72 p-5 shadow-[4px_4px_0_0_var(--ink)] backdrop-blur-sm sm:p-6">
-          <div className="absolute -right-3 -top-3 hidden text-5xl opacity-30 sm:block">✦</div>
-          <h1 className="ink-title title-anim font-display text-5xl leading-none text-primary sm:text-6xl xl:text-7xl 2xl:text-8xl whitespace-nowrap">
+        <div className="title-backing relative block w-full min-w-0 py-2">
+          <span aria-hidden="true" className="home-calligraphy">妙笔</span>
+          <h1 className="ink-title title-anim home-title whitespace-nowrap text-6xl leading-none text-foreground sm:text-7xl xl:text-8xl">
             {"画啦猜啦".split("").map((char, i) => (
               <span key={i} className="title-char">
                 {char}
               </span>
             ))}
           </h1>
-          <div className="title-underline mt-2 h-2 max-w-[12rem] rounded-full bg-[var(--primary)]/80" />
-          <p className="subtitle-paper mt-4 max-w-xl rounded-xl border-2 border-[var(--ink)]/20 bg-[var(--wash)]/92 px-4 py-3 text-lg leading-8 text-muted-foreground shadow-[3px_3px_0_0_color-mix(in_oklab,var(--ink)_35%,transparent)] backdrop-blur-sm">
-            开个主题房，朋友进来就画。
+          <div className="title-underline home-ink-line mt-3" />
+          <p className="subtitle-paper mt-6 max-w-xl text-lg font-medium leading-8 text-foreground sm:text-xl">
+            开个主题房，朋友进来就画。<span className="text-primary">轮流出招，抢先猜中。</span>
           </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -312,15 +314,15 @@ function Index() {
               <DoorOpen className="size-5" />
               开始玩
             </button>
-            <span className="text-sm text-muted-foreground">
-              免注册，选角即玩 · 右边填好就能开局
+            <span className="home-note text-sm font-medium text-muted-foreground">
+              免注册 · 选角即玩 · 把房号丢给朋友
             </span>
           </div>
         </div>
 
         <ol className="home-steps grid gap-3 sm:grid-cols-3">
           {steps.map(({ icon: Icon, label, text }, i) => (
-            <li key={label} className="home-step studio-panel relative p-4">
+            <li key={label} className="home-step relative p-4">
               <div className="flex items-center gap-2">
                 <span className="home-step-num grid size-8 shrink-0 place-items-center rounded-full border-2 border-[var(--ink)] bg-primary font-display text-lg text-primary-foreground">
                   {i + 1}
@@ -334,10 +336,10 @@ function Index() {
         </ol>
       </section>
 
-      <aside className="studio-panel p-4 sm:p-5">
-        <div className="relative overflow-hidden rounded-md border-2 border-[var(--ink)] bg-[var(--wash)] p-4">
-          <span className="absolute -right-2 -top-2 text-3xl opacity-25">✦</span>
-          <p className="font-display text-2xl text-primary">准备开玩</p>
+      <aside className="studio-panel home-ticket p-4 sm:p-6">
+        <div className="home-ticket-heading relative overflow-hidden p-4">
+          <span aria-hidden="true" className="home-stamp">开画</span>
+          <p className="font-display text-3xl text-primary">准备开玩</p>
           <p className="mt-1 text-sm text-muted-foreground">
             填名字、选角色，然后开房或输入朋友的号码。
           </p>
@@ -517,7 +519,7 @@ function Index() {
 
         <Link
           to="/how-to-play"
-          className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-primary underline underline-offset-4"
+          className="mt-5 inline-flex items-center gap-1 text-sm font-bold text-primary underline decoration-2 underline-offset-4"
         >
           怎么玩
           <ArrowRight className="size-3.5" />

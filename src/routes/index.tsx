@@ -1,13 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
-import { ArrowRight, Brush, ChevronDown, DoorOpen, UserRound } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ChevronDown,
+  Gamepad2,
+  LoaderCircle,
+  ShieldCheck,
+  Users,
+  Zap,
+} from "lucide-react";
+import { Brand } from "@/components/arcade/Brand";
+import { ArcadeScene } from "@/components/arcade/ArcadeScene";
 import { CharacterPicker } from "@/components/game/CharacterPicker";
+import { InlineSvgAvatar } from "@/components/game/PlayerAvatar";
 import { createRoom, joinRoom, roomExists } from "@/lib/game.functions";
 import { ROOM_THEME_OPTIONS, type RoomTheme } from "@/lib/game-themes";
 import { createDefaultAvatar, isPresetCharacterAvatar } from "@/lib/character-avatars";
-import homeUkiyoBg from "@/assets/home-ukiyo-bg.png.asset.json";
 import {
   getOrCreateClientId,
   loadAvatarSvg,
@@ -16,521 +27,480 @@ import {
   saveIdentity,
   saveNickname,
 } from "@/lib/player-identity";
-import "@/styles/home-ukiyo.css";
-
-const appTitle = "画啦猜啦 · 马来西亚华语画猜派对";
-const appDescription = "选角色、开房间、一起画画猜题。";
-
-type EntryIntent = "create" | "join";
-type EntryTab = "create" | "join";
-
-const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const CODE_LENGTH = 5;
-
-type CodeStatus = "idle" | "checking" | "found" | "missing" | "error";
-
-function sanitizeCode(raw: string) {
-  const upper = raw.toUpperCase().replace(/\s+/g, "");
-  let clean = "";
-  let dropped = false;
-  for (const ch of upper) {
-    if (CODE_ALPHABET.includes(ch)) {
-      if (clean.length < CODE_LENGTH) clean += ch;
-      else dropped = true;
-    } else {
-      dropped = true;
-    }
-  }
-  return { clean, dropped };
-}
+import "@/styles/arcade-home.css";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: appTitle },
-      { name: "description", content: appDescription },
-      { property: "og:title", content: appTitle },
-      { property: "og:description", content: appDescription },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
+      { title: "乱画俱乐部 · AFTERHOURS DRAW CLUB" },
+      {
+        name: "description",
+        content: "画到离谱，猜到上头。给马来西亚朋友的华语画猜派对，2–12 人，免注册，手机即玩。",
+      },
+      { property: "og:title", content: "乱画俱乐部 · 朋友的烂画，只有你懂。" },
+      { property: "og:description", content: "今晚不刷屏，一起乱画。开一局，把朋友叫齐。" },
     ],
   }),
   component: Index,
 });
 
-const steps = [
-  { icon: UserRound, label: "填名选角", text: "写个名字，挑一个角色。" },
-  { icon: DoorOpen, label: "开房分享", text: "选主题开房，把号码丢给朋友。" },
-  { icon: Brush, label: "开画抢答", text: "轮到谁就大胆画，其他人抢答。" },
-];
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+type CodeStatus = "idle" | "checking" | "found" | "missing" | "error";
 
 function Index() {
   const navigate = useNavigate();
   const createFn = useServerFn(createRoom);
   const joinFn = useServerFn(joinRoom);
-  const roomExistsFn = useServerFn(roomExists);
+  const existsFn = useServerFn(roomExists);
+  const [step, setStep] = useState<1 | 2>(1);
+  const [intent, setIntent] = useState<"create" | "join">("create");
   const [name, setName] = useState("");
-  const [avatarSvg, setAvatarSvg] = useState<string | null>(null);
-  const [roomTheme, setRoomTheme] = useState<RoomTheme>("全部主题");
+  const [avatar, setAvatar] = useState<string | null>(null);
+  const [theme, setTheme] = useState<RoomTheme>("全部主题");
   const [code, setCode] = useState("");
-  const [tab, setTab] = useState<EntryTab>("create");
-  const [codeHint, setCodeHint] = useState<string | null>(null);
   const [codeStatus, setCodeStatus] = useState<CodeStatus>("idle");
-  const [joinError, setJoinError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const nameRef = useRef<HTMLInputElement | null>(null);
-  const themeRef = useRef<HTMLSelectElement | null>(null);
-  const codeRef = useRef<HTMLInputElement | null>(null);
-  const createButtonRef = useRef<HTMLButtonElement | null>(null);
-  const codeHintTimer = useRef<number | null>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const submitRef = useRef(false);
+  const mountedRef = useRef(true);
+  const didChangeStep = useRef(false);
+  const savedAvatar = avatar ?? createDefaultAvatar(name.trim() || "夜猫");
+  const chosenTheme = ROOM_THEME_OPTIONS.find((option) => option.value === theme)!;
 
   useEffect(() => {
-    const savedName = loadNickname();
-    const savedAvatar = loadAvatarSvg();
-    setName(savedName);
-    setAvatarSvg(
-      isPresetCharacterAvatar(savedAvatar)
-        ? savedAvatar
-        : createDefaultAvatar(savedName || "画画人"),
+    mountedRef.current = true;
+    const storedName = loadNickname();
+    const storedAvatar = loadAvatarSvg();
+    setName(storedName);
+    setAvatar(
+      isPresetCharacterAvatar(storedAvatar)
+        ? storedAvatar
+        : createDefaultAvatar(storedName || "夜猫"),
     );
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
-  const trimmedName = name.trim();
-  const activeTheme =
-    ROOM_THEME_OPTIONS.find((theme) => theme.value === roomTheme) ?? ROOM_THEME_OPTIONS[0];
-  const codeComplete = code.length === CODE_LENGTH;
-
-  // 自动校验：号码输满后，去后台确认这个房间还在不在。
   useEffect(() => {
-    if (!codeComplete) {
+    if (!didChangeStep.current) return;
+    headingRef.current?.focus({ preventScroll: true });
+  }, [step]);
+
+  useEffect(() => {
+    if (intent !== "join" || code.length !== 5) {
       setCodeStatus("idle");
       return;
     }
     let cancelled = false;
     setCodeStatus("checking");
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        try {
-          const res = await roomExistsFn({ data: { code } });
-          if (!cancelled) setCodeStatus(res.exists ? "found" : "missing");
-        } catch {
-          if (!cancelled) setCodeStatus("error");
-        }
-      })();
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await existsFn({ data: { code } });
+        if (!cancelled) setCodeStatus(result.exists ? "found" : "missing");
+      } catch {
+        if (!cancelled) setCodeStatus("error");
+      }
     }, 350);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [code, codeComplete, roomExistsFn]);
+  }, [code, intent, existsFn]);
 
-  const codeMessage = (() => {
-    if (codeHint) return { tone: "error" as const, text: codeHint };
-    if (joinError) return { tone: "error" as const, text: joinError };
-    if (!code) return null;
-    if (!codeComplete)
-      return {
-        tone: "hint" as const,
-        text: `号码是 ${CODE_LENGTH} 位，还差 ${CODE_LENGTH - code.length} 位。`,
-      };
-    if (codeStatus === "checking") return { tone: "hint" as const, text: "查看这局还在不在…" };
-    if (codeStatus === "found") return { tone: "ok" as const, text: "找到这一局了，可以进去。" };
-    if (codeStatus === "missing")
-      return {
-        tone: "error" as const,
-        text: "找不到这个号码，可能已经结束或打错了。",
-      };
-    if (codeStatus === "error") return { tone: "error" as const, text: "网络不稳，等下再试一次。" };
-    return null;
-  })();
+  const codeHint =
+    codeStatus === "checking"
+      ? "正在找你的朋友…"
+      : codeStatus === "found"
+        ? "房间找到了，朋友等你入场。"
+        : codeStatus === "missing"
+          ? "找不到这个房号，请跟朋友确认一下。"
+          : codeStatus === "error"
+            ? "暂时查不到房间，仍可点击加入重试。"
+            : code.length > 0 && code.length < 5
+              ? `还差 ${5 - code.length} 位房号。`
+              : "跟朋友要一个 5 位房号，例如 K7M3D。";
 
-  const handleCodeChange = (raw: string) => {
-    const { clean, dropped } = sanitizeCode(raw);
-    setCode(clean);
-    setJoinError(null);
-    // 提示要停留一下，不然下一个按键就把它冲掉了。
-    if (!dropped) return;
-    if (codeHintTimer.current) window.clearTimeout(codeHintTimer.current);
-    setCodeHint("号码只用字母和数字，不含 I、O、0、1。");
-    codeHintTimer.current = window.setTimeout(() => setCodeHint(null), 2600);
-  };
-
-  useEffect(
-    () => () => {
-      if (codeHintTimer.current) window.clearTimeout(codeHintTimer.current);
-    },
-    [],
-  );
-
-  const focusControl = (target: HTMLElement | null) => {
-    target?.scrollIntoView({ behavior: "smooth", block: "center" });
-    window.setTimeout(() => target?.focus(), 220);
-  };
-
-  const focusEntry = (intent: EntryIntent) => {
-    setTab(intent);
-    if (!trimmedName) {
-      focusControl(nameRef.current);
+  const advance = () => {
+    if (!name.trim()) {
+      setError("先取个昵称，让朋友认得你。");
+      nameRef.current?.focus();
       return;
     }
-    window.setTimeout(
-      () => focusControl(intent === "create" ? themeRef.current : codeRef.current),
-      0,
-    );
+    setError(null);
+    saveNickname(name.trim());
+    saveAvatarSvg(savedAvatar);
+    didChangeStep.current = true;
+    setStep(2);
   };
 
-  const validateName = () => {
-    if (!trimmedName) {
-      toast.error("先填你的名字，再开房或加入");
-      focusControl(nameRef.current);
-      return false;
+  const enterRoom = async () => {
+    if (submitRef.current) return;
+    if (!name.trim()) {
+      setError("先取个昵称，让朋友认得你。");
+      setStep(1);
+      return;
     }
-    return true;
-  };
-
-  const validateJoinCode = () => {
-    if (!code) {
-      toast.error("先输入房间号码（5 位）");
-      setJoinError("还没输入房间号码。");
-      focusControl(codeRef.current);
-      return false;
+    if (intent === "join" && code.length !== 5) {
+      setError("房号需要 5 位，检查一下再试。");
+      return;
     }
-    if (!codeComplete) {
-      toast.error(`房间号码是 ${CODE_LENGTH} 位，还差 ${CODE_LENGTH - code.length} 位`);
-      focusControl(codeRef.current);
-      return false;
+    if (intent === "join" && codeStatus === "missing") {
+      setError("找不到这个房号，请跟朋友确认一下。");
+      return;
     }
-    if (codeStatus === "missing") {
-      toast.error("找不到这个房间，可能已结束或号码打错了。");
-      focusControl(codeRef.current);
-      return false;
-    }
-    return true;
-  };
-
-  const requestEntry = (intent: EntryIntent) => {
-    if (!validateName()) return;
-    if (intent === "join" && !validateJoinCode()) return;
-    if (intent === "create") void createWithProfile();
-    else void joinWithProfile();
-  };
-
-  const createWithProfile = async () => {
-    if (!validateName()) return;
-    const svg = avatarSvg ?? createDefaultAvatar(trimmedName);
+    submitRef.current = true;
     setBusy(true);
+    setError(null);
     try {
-      const res = await createFn({
-        data: {
-          name: trimmedName,
-          avatarSvg: svg,
-          roomTheme,
-          clientId: getOrCreateClientId(),
-        },
-      });
-      saveNickname(trimmedName);
-      saveAvatarSvg(svg);
-      saveIdentity(res);
-      void navigate({ to: "/room/$code", params: { code: res.code } });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "开局失败");
-      setBusy(false);
+      const profile = {
+        name: name.trim(),
+        avatarSvg: savedAvatar,
+        clientId: getOrCreateClientId(),
+      };
+      const identity =
+        intent === "create"
+          ? await createFn({ data: { ...profile, roomTheme: theme } })
+          : await joinFn({ data: { ...profile, code } });
+      saveNickname(profile.name);
+      saveAvatarSvg(savedAvatar);
+      saveIdentity(identity);
+      if (mountedRef.current)
+        await navigate({ to: "/room/$code", params: { code: identity.code } });
+    } catch (err) {
+      if (mountedRef.current) {
+        const message = err instanceof Error ? err.message : "";
+        setError(
+          message.includes("满")
+            ? "这一局坐满了（12 人），试试自己开一间。"
+            : message || "没连上，检查网络后再试一次。",
+        );
+        setBusy(false);
+      }
+    } finally {
+      submitRef.current = false;
     }
   };
 
-  const joinWithProfile = async () => {
-    if (!validateName() || !validateJoinCode()) return;
-    const svg = avatarSvg ?? createDefaultAvatar(trimmedName);
-    setBusy(true);
-    setJoinError(null);
-    try {
-      const res = await joinFn({
-        data: {
-          code,
-          name: trimmedName,
-          avatarSvg: svg,
-          clientId: getOrCreateClientId(),
-        },
-      });
-      saveNickname(trimmedName);
-      saveAvatarSvg(svg);
-      saveIdentity(res);
-      void navigate({ to: "/room/$code", params: { code: res.code } });
-    } catch (e) {
-      const raw = e instanceof Error ? e.message : "";
-      const full = raw.includes("满");
-      const missing = raw.includes("找不到");
-      const text = full
-        ? "这一局人满了（最多 12 人），换一个号码或自己开一间。"
-        : missing
-          ? "找不到这个房间，可能已结束或号码打错了。"
-          : raw || "加入失败，网络不稳，等下再试。";
-      toast.error(text);
-      setJoinError(text);
-      if (missing) setCodeStatus("missing");
-      focusControl(codeRef.current);
-      setBusy(false);
-    }
+  const updateCode = (raw: string) => {
+    const normalized = raw.toUpperCase().replace(/\s/g, "");
+    const cleaned = [...normalized]
+      .filter((character) => CODE_ALPHABET.includes(character))
+      .join("")
+      .slice(0, 5);
+    setCode(cleaned);
+    setCodeStatus("idle");
+    setError(normalized !== cleaned ? "房号只含 5 位字母和数字，不含 I、O、0、1。" : null);
   };
-
-  const field =
-    "home-field w-full rounded-md border-2 border-[var(--ink)] bg-card px-3 py-3 outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-primary";
 
   return (
-    <main className="home-shell mx-auto grid min-h-[100dvh] w-full max-w-[1440px] items-center gap-8 px-5 py-8 sm:px-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(400px,0.8fr)] lg:px-14 xl:gap-20">
-      <div aria-hidden="true" className="home-ukiyo-bg">
-        <span className="ukiyo-art" style={{ backgroundImage: `url(${homeUkiyoBg.url})` }} />
-        <span className="ukiyo-veil" />
-      </div>
-
-      <section className="home-intro space-y-7 lg:py-10">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="label-chip home-kicker text-xs font-bold text-primary animate-pop-in">
-            <span className="home-live-dot" /> 今晚开画 · 马来西亚华语派对
+    <div className="arcade-home">
+      <a className="arcade-skip" href="#entry">
+        跳到入场
+      </a>
+      <header className="arcade-home-nav">
+        <Brand />
+        <nav aria-label="主导航">
+          <Link to="/how-to-play">
+            怎么玩 <ArrowUpRightIcon />
+          </Link>
+          <span className="arcade-region">
+            <span /> MY / 中文
           </span>
-        </div>
-
-        <div className="title-backing relative block w-full min-w-0 py-2">
-          <span aria-hidden="true" className="home-calligraphy">
-            妙笔
-          </span>
-          <p className="home-eyebrow">DRAW · GUESS · SHOUT · REPEAT</p>
-          <h1 className="ink-title title-anim home-title whitespace-nowrap text-[clamp(4.4rem,9vw,8.5rem)] leading-[0.82] text-foreground">
-            {"画啦猜啦".split("").map((char, i) => (
-              <span key={i} className="title-char">
-                {char}
-              </span>
-            ))}
-          </h1>
-          <div className="title-underline home-ink-line mt-3" />
-          <p className="subtitle-paper mt-7 max-w-xl text-xl font-medium leading-9 text-foreground sm:text-2xl">
-            一张画纸。一群朋友。
-            <br />
-            <span className="text-primary">画得越不像，现场越好笑。</span>
+        </nav>
+      </header>
+      <main className="arcade-home-main">
+        <section className="arcade-hero" aria-labelledby="hero-title">
+          <p className="arcade-hero-kicker">
+            <span /> THE NIGHT IS STILL YOUNG
           </p>
-
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => focusEntry("create")}
-              aria-label="前往开房表单"
-              className="press cta-pulse inline-flex items-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-5 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)] lg:hidden"
-            >
-              <DoorOpen className="size-5" />
-              开始玩
-            </button>
-            <span className="home-note text-sm font-medium text-muted-foreground">
-              免注册 · 2–12 人 · 手机直接玩
+          <h1 id="hero-title">
+            画到离谱。
+            <br />
+            <span>猜到上头。</span>
+            <svg viewBox="0 0 36 42" aria-hidden="true">
+              <path d="m22 1-9 17H2l13 7-3 16 11-15h12l-11-7Z" fill="currentColor" />
+            </svg>
+          </h1>
+          <p className="arcade-hero-description">
+            朋友的灵魂画作，只有你懂。
+            <br />
+            叫上你的 kaki，今晚一起乱画。
+          </p>
+          <div className="arcade-hero-facts">
+            <span>
+              <Users size={14} /> 2–12 人
+            </span>
+            <span>
+              <Zap size={14} /> 免下载
+            </span>
+            <span>
+              <Gamepad2 size={14} /> 华语画猜
             </span>
           </div>
-        </div>
-
-        <ol className="home-steps grid gap-3 sm:grid-cols-3">
-          {steps.map(({ icon: Icon, label, text }, i) => (
-            <li key={label} className="home-step relative p-4">
-              <div className="flex items-center gap-2">
-                <span className="home-step-num grid size-8 shrink-0 place-items-center rounded-full border-2 border-[var(--ink)] bg-primary font-display text-lg text-primary-foreground">
-                  {i + 1}
-                </span>
-                <Icon className="size-5 shrink-0 text-primary" />
-                <h2 className="min-w-0 truncate font-display text-xl text-foreground">{label}</h2>
-              </div>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <aside className="studio-panel home-ticket p-4 sm:p-6">
-        <div className="home-ticket-heading relative overflow-hidden p-4">
-          <span aria-hidden="true" className="home-stamp">
-            开画
-          </span>
-          <p className="home-ticket-index">ADMIT ONE / 01</p>
-          <p className="font-display text-3xl text-primary">先占个位</p>
-          <p className="mt-1 text-sm text-muted-foreground">取个名字，选张脸。十秒后你就在画。</p>
-        </div>
-
-        <div className="mt-4 space-y-4">
-          <div>
-            <label className="mb-2 block text-sm font-semibold" htmlFor="name">
-              你的名字
-            </label>
-            <input
-              id="name"
-              ref={nameRef}
-              value={name}
-              maxLength={12}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                e.preventDefault();
-                if (!e.currentTarget.value.trim()) {
-                  validateName();
-                  return;
-                }
-                focusControl(tab === "create" ? themeRef.current : codeRef.current);
-              }}
-              placeholder="画画人"
-              className={field}
-            />
+          <ArcadeScene />
+        </section>
+        <section className="arcade-entry" id="entry" aria-labelledby="entry-title">
+          <div className="arcade-entry-top">
+            <span className="arcade-eyebrow">YOUR NIGHT STARTS HERE</span>
+            <span className="arcade-entry-light" aria-hidden="true" />
           </div>
-
-          <CharacterPicker
-            value={avatarSvg}
-            onChange={setAvatarSvg}
-            name={trimmedName || "画画人"}
-            compact
-          />
-
-          <div
-            role="tablist"
-            aria-label="开房或加入"
-            className="home-tabs grid grid-cols-2 gap-2 rounded-md border-2 border-[var(--ink)] bg-card/70 p-1"
-          >
-            {(["create", "join"] as const).map((key) => (
-              <button
-                key={key}
-                role="tab"
-                type="button"
-                id={`tab-${key}`}
-                aria-selected={tab === key}
-                aria-controls={`panel-${key}`}
-                tabIndex={tab === key ? 0 : -1}
-                onClick={() => setTab(key)}
-                onKeyDown={(e) => {
-                  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-                  e.preventDefault();
-                  setTab(key === "create" ? "join" : "create");
-                }}
-                className={`press rounded-sm px-3 py-2 font-display text-lg transition-colors ${
-                  tab === key
-                    ? "border-2 border-[var(--ink)] bg-primary text-primary-foreground"
-                    : "border-2 border-transparent text-muted-foreground"
-                }`}
-              >
-                {key === "create" ? "开新房" : "加入房"}
-              </button>
-            ))}
+          <div className="arcade-entry-progress" aria-label={`入场步骤 ${step} / 2`}>
+            <span className={step >= 1 ? "active" : ""} />
+            <span className={step >= 2 ? "active" : ""} />
           </div>
-
-          <div
-            role="tabpanel"
-            id="panel-create"
-            aria-labelledby="tab-create"
-            hidden={tab !== "create"}
-            className="space-y-4"
-          >
+          <div className="arcade-entry-heading">
+            <span className="arcade-step-number" aria-hidden="true">
+              0{step}
+            </span>
             <div>
-              <label className="mb-2 block text-sm font-semibold" htmlFor="room-theme">
-                主题房
-              </label>
-              <div className="relative">
-                <select
-                  id="room-theme"
-                  ref={themeRef}
-                  value={roomTheme}
-                  onChange={(event) => setRoomTheme(event.target.value as RoomTheme)}
-                  onKeyDown={(e) => {
-                    if (e.key !== "Enter") return;
-                    e.preventDefault();
-                    focusControl(createButtonRef.current);
-                  }}
-                  className={`${field} appearance-none pr-10 font-semibold`}
-                >
-                  {ROOM_THEME_OPTIONS.map((theme) => (
-                    <option key={theme.value} value={theme.value}>
-                      {theme.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-primary" />
+              <h2 id="entry-title" tabIndex={-1} ref={headingRef}>
+                {step === 1 ? "今晚，你是谁？" : "朋友，齐了没？"}
+              </h2>
+              <p>{step === 1 ? "挑个分身，带上你的奇怪画风。" : "当一回局长，或去朋友那一局。"}</p>
+            </div>
+          </div>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (step === 1) advance();
+              else void enterRoom();
+            }}
+            aria-busy={busy}
+          >
+            {step === 1 ? (
+              <div className="arcade-entry-fields">
+                <div>
+                  <label className="arcade-label" htmlFor="player-name">
+                    怎么称呼你？ <small>YOUR ALIAS</small>
+                  </label>
+                  <input
+                    ref={nameRef}
+                    id="player-name"
+                    className="arcade-field"
+                    value={name}
+                    onChange={(event) => {
+                      setName(event.target.value);
+                      setError(null);
+                    }}
+                    maxLength={12}
+                    autoComplete="nickname"
+                    placeholder="例如：画不到重点"
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? "entry-error" : undefined}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" &&
+                        (event.nativeEvent.isComposing || event.keyCode === 229)
+                      )
+                        event.preventDefault();
+                    }}
+                  />
+                </div>
+                <CharacterPicker
+                  value={avatar}
+                  onChange={setAvatar}
+                  name={name.trim() || "夜猫"}
+                  compact
+                />
+                {error && (
+                  <p id="entry-error" className="arcade-entry-error" role="alert">
+                    {error}
+                  </p>
+                )}
+                <button type="submit" className="arcade-button arcade-entry-submit">
+                  就这个我，继续 <ArrowRight size={18} />
+                </button>
               </div>
-              <p className="mt-2 rounded-md border-2 border-border bg-card/70 px-3 py-2 text-sm leading-6 text-muted-foreground">
-                {activeTheme.description}
-              </p>
-            </div>
-
-            <button
-              ref={createButtonRef}
-              type="button"
-              onClick={() => requestEntry("create")}
-              disabled={busy}
-              className="press flex w-full items-center justify-center gap-2 rounded-md border-2 border-[var(--ink)] bg-primary px-4 py-3 font-display text-xl text-primary-foreground shadow-[5px_5px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
-            >
-              {busy ? "准备中…" : "创建房间"}
-              <ArrowRight className="size-5" />
-            </button>
-          </div>
-
-          <div role="tabpanel" id="panel-join" aria-labelledby="tab-join" hidden={tab !== "join"}>
-            <div className="grid grid-cols-[minmax(0,1fr)_96px] gap-2">
-              <input
-                ref={codeRef}
-                id="room-code"
-                value={code}
-                maxLength={CODE_LENGTH}
-                inputMode="text"
-                autoCapitalize="characters"
-                autoComplete="off"
-                spellCheck={false}
-                aria-label="房间号码"
-                aria-invalid={codeMessage?.tone === "error"}
-                aria-describedby="room-code-status"
-                onChange={(e) => handleCodeChange(e.target.value)}
-                onPaste={(e) => {
-                  e.preventDefault();
-                  handleCodeChange(e.clipboardData.getData("text"));
-                }}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  e.preventDefault();
-                  requestEntry("join");
-                }}
-                placeholder="输入号码"
-                style={
-                  codeMessage?.tone === "error"
-                    ? { borderColor: "var(--destructive)" }
-                    : codeMessage?.tone === "ok"
-                      ? { borderColor: "var(--teal)" }
-                      : undefined
-                }
-                className={`${field} tracking-[0.28em]`}
-              />
-              <button
-                type="button"
-                onClick={() => requestEntry("join")}
-                disabled={busy || codeStatus === "missing"}
-                className="press rounded-md border-2 border-[var(--ink)] bg-accent px-4 font-display text-lg text-accent-foreground shadow-[4px_4px_0_0_var(--ink)] disabled:translate-y-0 disabled:opacity-50"
-              >
-                {busy && tab === "join" ? "加入中…" : "加入"}
-              </button>
-            </div>
-            <p
-              id="room-code-status"
-              role="status"
-              aria-live="polite"
-              className={`mt-2 text-sm leading-6 ${
-                codeMessage?.tone === "error"
-                  ? "font-semibold text-destructive"
-                  : codeMessage?.tone === "ok"
-                    ? "font-semibold text-[var(--teal)]"
-                    : "text-muted-foreground"
-              }`}
-            >
-              {codeMessage?.text ?? `跟朋友要 ${CODE_LENGTH} 位号码，例如 K7M3D。`}
-            </p>
-          </div>
+            ) : (
+              <div className="arcade-entry-fields">
+                <div className="arcade-entry-profile">
+                  <div>
+                    <InlineSvgAvatar svg={savedAvatar} label={`${name} 的分身`} />
+                  </div>
+                  <span>
+                    <small>PLAYER READY</small>
+                    <strong>{name}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      setStep(1);
+                      setError(null);
+                    }}
+                    aria-label="返回更换昵称或分身"
+                  >
+                    <ArrowLeft size={14} /> 更换
+                  </button>
+                </div>
+                <div role="tablist" aria-label="创建或加入房间" className="arcade-entry-tabs">
+                  {(["create", "join"] as const).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="tab"
+                      id={`entry-tab-${value}`}
+                      aria-selected={intent === value}
+                      aria-controls="entry-room-panel"
+                      tabIndex={intent === value ? 0 : -1}
+                      disabled={busy}
+                      onClick={() => {
+                        setIntent(value);
+                        setError(null);
+                      }}
+                      onKeyDown={(event) => {
+                        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                        event.preventDefault();
+                        const next =
+                          event.key === "Home"
+                            ? "create"
+                            : event.key === "End"
+                              ? "join"
+                              : value === "create"
+                                ? "join"
+                                : "create";
+                        setIntent(next);
+                        setError(null);
+                        document.getElementById(`entry-tab-${next}`)?.focus();
+                      }}
+                    >
+                      {value === "create" ? "我来开一局" : "找朋友的局"}
+                    </button>
+                  ))}
+                </div>
+                <div
+                  role="tabpanel"
+                  id="entry-room-panel"
+                  aria-labelledby={`entry-tab-${intent}`}
+                  className="arcade-room-options"
+                >
+                  {intent === "create" ? (
+                    <>
+                      <label className="arcade-label" htmlFor="room-theme">
+                        今晚画什么？ <small>THEME PACK</small>
+                      </label>
+                      <div className="arcade-select-wrap">
+                        <select
+                          className="arcade-field"
+                          id="room-theme"
+                          value={theme}
+                          disabled={busy}
+                          onChange={(event) => setTheme(event.target.value as RoomTheme)}
+                        >
+                          {ROOM_THEME_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown size={16} />
+                      </div>
+                      <p className="arcade-entry-hint">{chosenTheme.description}</p>
+                    </>
+                  ) : (
+                    <>
+                      <label className="arcade-label" htmlFor="room-code">
+                        朋友的房号 <small>ROOM CODE</small>
+                      </label>
+                      <input
+                        id="room-code"
+                        className="arcade-field arcade-code-input"
+                        value={code}
+                        onChange={(event) => updateCode(event.target.value)}
+                        onPaste={(event) => {
+                          event.preventDefault();
+                          updateCode(event.clipboardData.getData("text"));
+                        }}
+                        autoComplete="off"
+                        autoCapitalize="characters"
+                        spellCheck={false}
+                        placeholder="K7M3D"
+                        disabled={busy}
+                        aria-invalid={codeStatus === "missing" || Boolean(error)}
+                        aria-describedby="room-code-hint"
+                      />
+                      <p
+                        className={`arcade-entry-hint ${codeStatus === "found" ? "is-success" : codeStatus === "missing" ? "is-error" : ""}`}
+                        id="room-code-hint"
+                        role="status"
+                      >
+                        {codeStatus === "found" && <Check size={13} />}
+                        {codeHint}
+                      </p>
+                    </>
+                  )}
+                </div>
+                {error && (
+                  <p id="entry-error" className="arcade-entry-error" role="alert">
+                    {error}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={busy || (intent === "join" && codeStatus === "missing")}
+                  className="arcade-button arcade-entry-submit"
+                >
+                  {busy ? (
+                    <>
+                      <LoaderCircle size={18} className="arcade-loading" /> 正在入场…
+                    </>
+                  ) : (
+                    <>
+                      {intent === "create" ? "开一局，叫上朋友" : "加入朋友的局"}
+                      <ArrowRight size={18} />
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </form>
+          <p className="arcade-entry-footnote">
+            <ShieldCheck size={13} /> 免注册。没有下载。只有你们的烂画。
+          </p>
+        </section>
+      </main>
+      <section className="arcade-home-strip" aria-label="游戏玩法">
+        <div>
+          <span>01 /</span>
+          <strong>开一局</strong>
+          <p>房号丢进群，kaki 自动集合。</p>
         </div>
-
-        <Link
-          to="/how-to-play"
-          className="mt-5 inline-flex items-center gap-1 text-sm font-bold text-primary underline decoration-2 underline-offset-4"
-        >
-          怎么玩
-          <ArrowRight className="size-3.5" />
+        <span className="arcade-strip-star" aria-hidden="true">
+          ✳
+        </span>
+        <div>
+          <span>02 /</span>
+          <strong>放胆画</strong>
+          <p>画技不重要，脑洞要够大。</p>
+        </div>
+        <span className="arcade-strip-star" aria-hidden="true">
+          ✳
+        </span>
+        <div>
+          <span>03 /</span>
+          <strong>抢着猜</strong>
+          <p>越快答中，分数越上头。</p>
+        </div>
+      </section>
+      <footer className="arcade-home-footer">
+        <span>
+          MADE FOR YOUR KAKIS. <span aria-hidden="true">✦</span>
+        </span>
+        <span>画得好不好，朋友说了算。</span>
+        <Link to="/how-to-play">
+          入场须知 <ArrowRight size={12} />
         </Link>
-      </aside>
-    </main>
+      </footer>
+    </div>
+  );
+}
+function ArrowUpRightIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M4 12 12 4M4 4h8v8" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
   );
 }

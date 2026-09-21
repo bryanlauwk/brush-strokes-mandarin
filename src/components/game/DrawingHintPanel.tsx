@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ImageIcon, Pencil, RefreshCcw } from "lucide-react";
+import { EyeOff, Lightbulb, RefreshCcw, Sparkles } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { generateDrawingHint } from "@/lib/drawing-hint.functions";
 import { cn } from "@/lib/utils";
+import "@/styles/arcade-social.css";
 
 type Auth = {
   code: string;
@@ -44,77 +45,73 @@ export function DrawingHintPanel({ auth, turnIndex, word, compact }: Props) {
       setHint(null);
       setStatus("error");
     }
-  // generateFn is provided by useServerFn; the actual request should be keyed to room identity and turn only.
+    // generateFn is provided by useServerFn; the actual request should be keyed to room identity and turn only.
   }, [auth.code, auth.playerId, auth.token, turnIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setHint(null);
     void load();
+    return () => {
+      requestId.current += 1;
+    };
   }, [load, word]);
 
   const imageReady = hint?.source === "ai" && !!hint.imageUrl;
-  const badge = imageReady ? "已准备" : status === "loading" ? "准备中" : "未出图";
   const failText = (() => {
     if (status === "loading") return null;
     switch (hint?.reason) {
       case "no-key":
-        return { title: "提示还没接上", hint: "稍后再试一次。" };
+        return { title: "灵感暂时缺席", hint: "随手画也可以，朋友会懂的。" };
       case "blocked":
-        return { title: "这题暂时出不了图", hint: "点重试，换个画法。" };
+        return { title: "这题靠你发挥了", hint: "也可以点刷新，换个灵感。" };
       case "timeout":
-        return { title: "出图太慢了", hint: "点一下重试。" };
+        return { title: "灵感来得有点慢", hint: "先动笔，或点刷新再试一次。" };
       default:
-        return { title: "提示图没生成", hint: "点一下重试。" };
+        return { title: "灵感还没跟上", hint: "随手画，或点刷新再试一次。" };
     }
   })();
 
   return (
-    <section className={cn("studio-panel overflow-hidden", compact ? "p-2" : "p-3")}>
-      <div className="flex items-center gap-2">
-        <span className="grid size-8 shrink-0 place-items-center rounded-md border-2 border-[var(--ink)] bg-card">
-          <Pencil className="size-4 text-primary" />
+    <section
+      className={cn("social-hint", compact && "social-hint-compact")}
+      aria-label="仅画画的人可见的参考图"
+    >
+      <div className="social-hint-header">
+        <span className="social-hint-icon">
+          <Lightbulb aria-hidden="true" />
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="font-display text-lg leading-none">画图提示</p>
-          <p className="mt-1 text-xs text-muted-foreground">只给画家看</p>
+        <div>
+          <h3>灵感小抄</h3>
+          <span>
+            <EyeOff aria-hidden="true" />
+            只有你看得到
+          </span>
         </div>
-        <span className="rounded-full border-2 border-[var(--ink)] bg-card px-2 py-0.5 text-[10px] font-semibold">
-          {badge}
-        </span>
-      </div>
-
-      <div
-        className={cn(
-          "mt-3 overflow-hidden rounded-md border-2 border-[var(--ink)] bg-[#fffdf7]",
-          compact ? "aspect-[5/3]" : "aspect-square",
-        )}
-      >
-        {imageReady ? (
-          <img src={hint.imageUrl!} alt="画图提示" className="h-full w-full bg-[#fffdf7] object-contain p-2" />
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 bg-[linear-gradient(#00000008_1px,transparent_1px),linear-gradient(90deg,#00000008_1px,transparent_1px)] bg-[size:22px_22px] px-4 text-center text-muted-foreground">
-            <ImageIcon className={cn("text-primary", compact ? "size-6" : "size-8")} />
-            <p className="text-xs font-semibold text-foreground">
-              {status === "loading" ? "正在画提示…" : failText?.title}
-            </p>
-            {failText && <p className="text-[11px] leading-4">{failText.hint}</p>}
-          </div>
-        )}
-      </div>
-
-      <div className="mt-3 flex items-center gap-2">
-        <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={word}>
-          题目：{word}
-        </p>
         <button
           type="button"
           onClick={() => void load()}
           disabled={status === "loading"}
-          className="press flex shrink-0 items-center gap-1 rounded-md border-2 border-[var(--ink)] bg-card px-2 py-1 text-xs font-semibold shadow-[2px_2px_0_0_var(--ink)] disabled:opacity-60"
+          className="social-hint-refresh"
+          aria-label="重新生成参考图"
+          title="刷新灵感"
         >
-          <RefreshCcw className="size-3.5" /> 重试
+          <RefreshCcw aria-hidden="true" />
         </button>
       </div>
+
+      <div className="social-hint-image" aria-busy={status === "loading"}>
+        {imageReady ? (
+          <img src={hint.imageUrl!} alt={`${word}的绘画参考`} />
+        ) : (
+          <div className="social-hint-placeholder" role="status">
+            <Sparkles aria-hidden="true" />
+            <p>{status === "loading" ? "给你的灵感正在路上…" : failText?.title}</p>
+            {failText && <span>{failText.hint}</span>}
+          </div>
+        )}
+      </div>
+
+      <p className="social-hint-footer">灵感参考而已。你的画风，你说了算。</p>
     </section>
   );
 }

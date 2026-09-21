@@ -1,0 +1,203 @@
+.arcade-guide {
+  max-width: 1000px;
+  margin: auto;
+  padding: 0 32px;
+}
+.arcade-guide-nav {
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  gap: 20px;
+}
+.arcade-guide-nav > a:last-child {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.arcade-guide-heading {
+  padding: 60px 0 40px;
+}
+.arcade-guide-heading h1 {
+  margin: 15px 0;
+  font-size: clamp(40px, 6vw, 64px);
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  line-height: 1.2;
+}
+.arcade-guide-heading h1 span {
+  color: var(--primary);
+}
+.arcade-guide-heading > p:last-child {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  line-height: 1.8;
+}
+.arcade-guide-content {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+}
+.arcade-guide-tabs {
+  padding: 18px;
+  background: #17171c;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-right: 1px solid var(--border);
+}
+.arcade-guide-tabs button {
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+.arcade-guide-tabs button span {
+  font-size: 10px;
+}
+.arcade-guide-tabs button svg {
+  margin-left: auto;
+}
+.arcade-guide-tabs button[aria-selected="true"] {
+  background: #d8ff3e12;
+  border-color: #d8ff3e44;
+  color: var(--primary);
+}
+.arcade-guide-panel {
+  min-height: 355px;
+  padding: 34px;
+  background: var(--card);
+}
+.arcade-guide-symbol {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--arcade-purple);
+  margin-bottom: 30px;
+}
+.arcade-guide-symbol span {
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: -0.09em;
+  color: #3c3c46;
+}
+.arcade-guide-panel h2 {
+  margin-top: 9px;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+.arcade-guide-body {
+  color: #bdbdc6;
+  font-size: 14px;
+  line-height: 1.9;
+  margin: 15px 0;
+}
+.arcade-guide-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--arcade-purple);
+}
+.arcade-guide-tip svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.arcade-guide-faq {
+  margin-top: 28px;
+  border-top: 1px solid var(--border);
+}
+.arcade-guide-faq details {
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.arcade-guide-faq summary {
+  padding: 20px 0;
+  min-height: 52px;
+}
+.arcade-guide-faq p {
+  color: var(--muted-foreground);
+  line-height: 1.9;
+  margin-bottom: 20px;
+  max-width: 630px;
+}
+.arcade-guide-bottom {
+  padding: 36px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+.arcade-guide-bottom p {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+.arcade-guide-footer {
+  padding: 20px 0 32px;
+  border-top: 1px solid var(--border);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--muted-foreground);
+}
+@media (max-width: 650px) {
+  .arcade-guide {
+    padding: 0 20px;
+  }
+  .arcade-guide-nav {
+    min-height: 82px;
+    gap: 14px;
+  }
+  .arcade-guide-heading {
+    padding: 32px 0 26px;
+  }
+  .arcade-guide-heading > p:last-child {
+    font-size: 12px;
+  }
+  .arcade-guide-content {
+    display: flex;
+    flex-direction: column;
+  }
+  .arcade-guide-tabs {
+    flex-direction: row;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 10px;
+    gap: 6px;
+  }
+  .arcade-guide-tabs button {
+    flex: 1;
+    justify-content: center;
+    min-height: 48px;
+    padding: 10px 5px;
+    gap: 6px;
+    font-size: 12px;
+  }
+  .arcade-guide-tabs button svg {
+    display: none;
+  }
+  .arcade-guide-panel {
+    padding: 24px;
+    min-height: 375px;
+  }
+  .arcade-guide-panel h2 {
+    font-size: 22px;
+  }
+  .arcade-guide-bottom {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+}

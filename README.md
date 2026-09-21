@@ -1,6 +1,8 @@
-# 画啦猜啦
+# 乱画俱乐部 · AFTERHOURS DRAW CLUB
 
-马来西亚华语画猜派对：开一局、分享号码、轮流画画，用华语猜答案。题目包含本地吃喝、地方、节庆、校园、交通和日常生活，也会随机出现挑战题。
+给马来西亚朋友的午夜华语画猜派对。2–12 人，免注册，手机即玩。选一个怪可爱的分身，把房号丢进群，轮流画画、抢答、比默契。
+
+The interface uses a phone-first midnight arcade system: charcoal surfaces, acid lime actions, lavender characters, and a light 4:3 drawing canvas. The lobby, drawing round and final podium each have a dedicated layout. Game rules and reconnect identities remain compatible.
 
 This project was built with [Lovable](https://lovable.dev).
 
@@ -24,3 +26,9 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## UI checks
+
+With Bun installed, run `bun test tests/ui/arcade.test.tsx` for the avatar compatibility and component rendering checks. `bunx tsc --noEmit` checks types and `bun run build` builds the app.
+
+The older Python browser scripts under `tests/e2e/` refer to the previous interface. Their screen text and selectors need updating before they can exercise the redesigned entry flow.

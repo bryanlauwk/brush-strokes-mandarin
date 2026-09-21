@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Check, Crown, Pencil, Trophy, UsersRound } from "lucide-react";
+import { Check, Crown, Pencil, Trophy, WifiOff } from "lucide-react";
 import { PlayerAvatar } from "@/components/game/PlayerAvatar";
 import type { Player } from "@/lib/game-types";
 import { loadAvatarSvg } from "@/lib/player-identity";
 import { cn } from "@/lib/utils";
+import "@/styles/arcade-social.css";
 
 export function Scoreboard({
   players,
@@ -27,96 +28,91 @@ export function Scoreboard({
   }, [meId]);
 
   const fallbackSvg = meAvatarSvg ?? localAvatarSvg;
-  const withFallback = (p: Player) =>
-    p.id === meId && !p.avatar_svg && fallbackSvg ? { ...p, avatar_svg: fallbackSvg } : p;
+  const withFallback = (player: Player) =>
+    player.id === meId && !player.avatar_svg && fallbackSvg
+      ? { ...player, avatar_svg: fallbackSvg }
+      : player;
+
+  const roster = ranked.map((player, index) => {
+    const drawing = player.id === drawerId;
+    const guessed = player.has_guessed && !drawing;
+    const away = player.connection_status === "disconnected";
+    const StatusIcon = away
+      ? WifiOff
+      : drawing
+        ? Pencil
+        : guessed
+          ? Check
+          : player.is_host
+            ? Crown
+            : null;
+    const status = away
+      ? "暂时离开"
+      : drawing
+        ? "正在乱画"
+        : guessed
+          ? "猜中啦"
+          : player.is_host
+            ? "房主"
+            : "准备开猜";
+    const leading = topScore > 0 && player.score === topScore;
+
+    return (
+      <li
+        key={player.id}
+        className={cn(
+          "social-player",
+          drawing && "social-player-drawing",
+          guessed && "social-player-guessed",
+          away && "social-player-away",
+          player.id === meId && "social-player-me",
+        )}
+        title={`${player.name} · ${player.score} 分 · ${status}`}
+      >
+        <span className="social-player-rank" aria-label={`第 ${index + 1} 名`}>
+          {String(index + 1).padStart(2, "0")}
+        </span>
+        <PlayerAvatar player={withFallback(player)} size={variant === "strip" ? "sm" : "md"} />
+        <div className="social-player-info">
+          <p className="social-player-name">
+            <span>{player.name}</span>
+            {player.id === meId && <small>你</small>}
+          </p>
+          <span className="social-player-status">
+            {StatusIcon && <StatusIcon aria-hidden="true" />}
+            {status}
+          </span>
+        </div>
+        <div className={cn("social-player-score", leading && "social-player-leading")}>
+          {leading && variant === "list" && <Trophy aria-label="领先" />}
+          <strong>{player.score}</strong>
+          <span className="sr-only">分</span>
+        </div>
+      </li>
+    );
+  });
 
   if (variant === "strip") {
     return (
-      <div className="studio-panel flex items-center gap-2 overflow-x-auto overscroll-x-contain px-2 py-1.5">
-        {ranked.map((p) => (
-          <div
-            key={p.id}
-            title={p.name}
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 rounded-full border-2 border-border bg-card py-1 pr-2 pl-1",
-              p.has_guessed && "border-[var(--success)]/70 bg-[var(--success)]/10",
-              p.id === drawerId && "border-primary/70 bg-accent/60",
-              p.id === meId && "border-[var(--ink)]",
-            )}
-          >
-            <PlayerAvatar player={withFallback(p)} size="sm" />
-            <span className="max-w-16 truncate text-xs leading-none">{p.name}</span>
-            <span className="text-xs leading-none font-semibold tabular-nums">{p.score}</span>
-            {p.id === drawerId && <Pencil className="size-3 shrink-0 text-primary" />}
-            {p.has_guessed && p.id !== drawerId && (
-              <Check className="size-3 shrink-0 text-[var(--success)]" />
-            )}
-          </div>
-        ))}
-      </div>
+      <section className="social-roster-strip" aria-label="玩家与分数，可左右滚动查看" tabIndex={0}>
+        <ul>{roster}</ul>
+      </section>
     );
   }
 
   return (
-    <div className="studio-panel flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-2 border-b-2 border-[var(--ink)] bg-secondary px-3 py-2">
-        <span className="grid size-8 place-items-center rounded-md border-2 border-[var(--ink)] bg-card">
-          <Trophy className="size-4 text-primary" />
-        </span>
-        <div className="min-w-0">
-          <p className="font-display text-lg leading-none">分数榜</p>
-          <p className="flex items-center gap-1 text-xs text-muted-foreground">
-            <UsersRound className="size-3" /> {players.length} 人在线
-          </p>
+    <section className="social-roster" aria-label="玩家排行榜">
+      <header className="social-roster-header">
+        <div>
+          <span className="social-eyebrow">THE LINEUP</span>
+          <h2>今晚这班人</h2>
         </div>
-      </div>
-
-      <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
-        {ranked.map((p, i) => {
-          const scoreWidth = topScore > 0 ? Math.max(12, Math.round((p.score / topScore) * 100)) : 0;
-          const displayPlayer = withFallback(p);
-          return (
-            <li
-              key={p.id}
-              title={p.name}
-              className={cn(
-                "relative overflow-hidden rounded-md border-2 border-border bg-card px-2 py-2 transition-colors",
-                p.has_guessed && "border-[var(--success)]/60 bg-[var(--success)]/10",
-                p.id === drawerId && "border-primary/70 bg-accent/55",
-                p.id === meId && "border-[var(--ink)]",
-              )}
-            >
-              {scoreWidth > 0 && (
-                <span
-                  className="absolute inset-y-0 left-0 bg-primary/10"
-                  style={{ width: `${scoreWidth}%` }}
-                />
-              )}
-              <div className="relative grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2">
-                <span className="w-5 shrink-0 text-center font-display text-sm text-primary">{i + 1}</span>
-                <PlayerAvatar
-                  player={displayPlayer}
-                  className={cn(i === 0 && "bg-[var(--gold)]/60", p.id === drawerId && "bg-primary/15")}
-                />
-                <span className="min-w-0 text-sm leading-tight break-words [overflow-wrap:anywhere] line-clamp-2">
-                  {p.name}
-                  {p.id === meId && <span className="text-muted-foreground">（你）</span>}
-                </span>
-                <span className="flex shrink-0 items-center gap-1">
-                  {p.is_host && <Crown className="size-3.5 text-primary" aria-label="主持人" />}
-                  {p.id === drawerId && (
-                    <Pencil className="size-3.5 origin-bottom animate-wiggle text-primary" aria-label="画的人" />
-                  )}
-                  {p.has_guessed && p.id !== drawerId && (
-                    <Check className="size-3.5 text-[var(--success)]" aria-label="已猜中" />
-                  )}
-                  <span className="tabular-nums text-sm font-semibold">{p.score}</span>
-                </span>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+        <span className="social-roster-count" aria-label={`${players.length} 位玩家`}>
+          {String(players.length).padStart(2, "0")}
+        </span>
+      </header>
+      <ul className="social-roster-list">{roster}</ul>
+      <p className="social-roster-footnote">画技随意，默契第一。</p>
+    </section>
   );
 }

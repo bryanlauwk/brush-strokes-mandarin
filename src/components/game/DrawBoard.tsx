@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Brush, Eraser, PaintBucket, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { Check, ChevronUp, Eraser, PaintBucket, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { BRUSH_SIZES, PALETTE, type Stroke } from "@/lib/game-types";
 import type { LiveStroke } from "@/hooks/use-room";
 import { cn } from "@/lib/utils";
+import "@/styles/arcade-tools.css";
 
 type Props = {
   strokes: Stroke[];
@@ -20,6 +21,21 @@ const WIDTH = 1200;
 const HEIGHT = 900;
 const LIVE_SEND_MS = 50;
 const MIN_POINT_DISTANCE = 0.0022;
+const COLOR_NAMES = [
+  "墨黑",
+  "石灰",
+  "白色",
+  "西瓜红",
+  "橘子",
+  "柠檬黄",
+  "草绿",
+  "海蓝",
+  "葡萄紫",
+  "桃粉",
+  "咖啡",
+  "湖水蓝",
+];
+const SIZE_NAMES = ["细线", "常规", "粗线", "大笔"];
 
 function drawLine(
   ctx: CanvasRenderingContext2D,
@@ -84,12 +100,27 @@ export function DrawBoard({
   overlay,
 }: Props) {
   const committedCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasStageRef = useRef<HTMLDivElement | null>(null);
   const transientCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef<LiveStroke | null>(null);
   const lastSentRef = useRef(0);
   const [color, setColor] = useState(PALETTE[0]);
   const [size, setSize] = useState(BRUSH_SIZES[1]);
   const [tool, setTool] = useState<"pen" | "eraser" | "fill">("pen");
+  const [boardSize, setBoardSize] = useState<{ width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    const stage = canvasStageRef.current;
+    if (!stage) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (!width || !height) return;
+      const fittedWidth = Math.min(width, (height * WIDTH) / HEIGHT);
+      setBoardSize({ width: fittedWidth, height: (fittedWidth * HEIGHT) / WIDTH });
+    });
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, []);
 
   // Committed history is expensive to replay, so keep it on its own layer and
   // rebuild that layer only when the committed stroke list changes.
@@ -226,160 +257,148 @@ export function DrawBoard({
     onLiveEnd(current.id);
   };
 
-  const activeLabel = tool === "pen" ? "笔" : tool === "eraser" ? "擦" : "填色";
+  const activeLabel = tool === "pen" ? "画笔" : tool === "eraser" ? "橡皮" : "整张填色";
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2 sm:gap-3">
-      <div className="flex min-h-0 flex-1 items-center justify-center">
-        <div className="studio-panel relative flex h-full max-h-full w-full flex-col overflow-hidden p-1.5 sm:p-3">
-          <div className="mb-2 hidden shrink-0 items-center gap-2 px-1 lg:flex">
-            <span className="grid size-8 place-items-center rounded-md border-2 border-[var(--ink)] bg-secondary">
-              <Brush className="size-4 text-primary" />
-            </span>
-            <div className="min-w-0">
-              <p className="font-display text-lg leading-none">大画纸</p>
-              <p className="truncate text-xs text-muted-foreground">
-                {canDraw ? `${activeLabel} · ${size}px` : (lockReason ?? "看大家怎么画")}
-              </p>
-            </div>
-            {modeLabel && (
-              <span className="ml-auto shrink-0 rounded-full border-2 border-[var(--ink)] bg-card px-3 py-1 text-xs font-semibold">
-                {modeLabel}
-              </span>
-            )}
-          </div>
-
-          {/* Mobile: one-line status strip instead of the tall header block. */}
-          <div className="mb-1.5 flex shrink-0 items-center gap-2 px-1 lg:hidden">
-            <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-              {canDraw ? `大画纸 · ${activeLabel} ${size}px` : (lockReason ?? "看大家怎么画")}
-            </p>
-            {modeLabel && (
-              <span className="shrink-0 rounded-full border-2 border-[var(--ink)] bg-card px-2 py-0.5 text-[11px] font-semibold">
-                {modeLabel}
-              </span>
-            )}
-          </div>
-
-          <div className="flex min-h-0 flex-1 items-center justify-center">
-            <div className="paper relative aspect-[4/3] max-h-full w-full max-w-full overflow-hidden rounded-md border-2 border-[var(--ink)] shadow-[4px_4px_0_0_var(--ink)]">
-              <canvas
-                ref={committedCanvasRef}
-                width={WIDTH}
-                height={HEIGHT}
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 block h-full w-full"
-              />
-              <canvas
-                ref={transientCanvasRef}
-                width={WIDTH}
-                height={HEIGHT}
-                onPointerDown={handleDown}
-                onPointerMove={handleMove}
-                onPointerUp={handleUp}
-                onPointerCancel={handleUp}
-                className={cn(
-                  "absolute inset-0 block h-full w-full touch-none",
-                  canDraw ? "cursor-crosshair" : "cursor-default",
-                )}
-              />
-              {overlay}
-            </div>
-          </div>
+    <div className="arcade-drawboard">
+      <div className="arcade-canvas-shell">
+        <div className="arcade-canvas-heading">
+          <span className={cn("arcade-canvas-signal", canDraw && "arcade-canvas-signal-active")} />
+          <p>{canDraw ? `你的画场 · ${activeLabel}` : (lockReason ?? "灵魂画作，正在发生")}</p>
+          {modeLabel && <span className="arcade-canvas-mode">{modeLabel}</span>}
         </div>
-      </div>
 
-      <div
-        className={cn(
-          "studio-panel flex shrink-0 items-center gap-2 overflow-x-auto overscroll-x-contain p-1.5 sm:flex-wrap sm:justify-center sm:gap-3 sm:overflow-visible sm:p-3",
-          !canDraw && "pointer-events-none opacity-45 saturate-50",
-        )}
-        aria-disabled={!canDraw}
-      >
-        <div className="grid shrink-0 grid-cols-6 gap-1">
-          {PALETTE.map((c) => (
-            <button
-              key={c}
-              type="button"
-              disabled={!canDraw}
-              aria-label={`颜色 ${c}`}
-              onClick={() => {
-                setColor(c);
-                if (tool === "eraser") setTool("pen");
-              }}
-              style={{ backgroundColor: c }}
+        <div ref={canvasStageRef} className="arcade-canvas-stage">
+          <div className="arcade-canvas-paper" style={boardSize ?? undefined}>
+            <canvas
+              ref={committedCanvasRef}
+              width={WIDTH}
+              height={HEIGHT}
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 block h-full w-full"
+            />
+            <canvas
+              ref={transientCanvasRef}
+              width={WIDTH}
+              height={HEIGHT}
+              onPointerDown={handleDown}
+              onPointerMove={handleMove}
+              onPointerUp={handleUp}
+              onPointerCancel={handleUp}
+              aria-label={canDraw ? "绘画区域：用手指或鼠标作画" : "实时画作"}
               className={cn(
-                "press size-7 rounded-md border-2 border-[var(--ink)] shadow-[1px_1px_0_0_var(--ink)]",
-                color === c && tool !== "eraser"
-                  ? "scale-110 ring-2 ring-primary"
-                  : "hover:scale-105",
+                "absolute inset-0 block h-full w-full",
+                canDraw ? "touch-none cursor-crosshair" : "touch-pan-y cursor-default",
               )}
             />
-          ))}
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1 rounded-md border-2 border-border bg-card/70 p-1">
-          {BRUSH_SIZES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              disabled={!canDraw}
-              aria-label={`笔刷 ${s}`}
-              onClick={() => setSize(s)}
-              className={cn(
-                "press flex size-9 items-center justify-center rounded-md border-2 border-[var(--ink)] bg-card shadow-[1px_1px_0_0_var(--ink)]",
-                size === s && "bg-accent",
-              )}
-            >
-              <span
-                className="rounded-full bg-[var(--ink)]"
-                style={{ width: s / 1.6 + 4, height: s / 1.6 + 4 }}
-              />
-            </button>
-          ))}
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1 rounded-md border-2 border-border bg-card/70 p-1">
-          <ToolButton
-            disabled={!canDraw}
-            active={tool === "pen"}
-            onClick={() => setTool("pen")}
-            label="画笔"
-          >
-            <Pencil className="size-4" />
-          </ToolButton>
-          <ToolButton
-            disabled={!canDraw}
-            active={tool === "eraser"}
-            onClick={() => setTool("eraser")}
-            label="擦掉"
-          >
-            <Eraser className="size-4" />
-          </ToolButton>
-          <ToolButton
-            disabled={!canDraw}
-            active={tool === "fill"}
-            onClick={() => setTool("fill")}
-            label="填色"
-          >
-            <PaintBucket className="size-4" />
-          </ToolButton>
-          <ToolButton
-            disabled={!canDraw}
-            onClick={() => onStroke({ id: crypto.randomUUID(), kind: "undo" })}
-            label="退一步"
-          >
-            <RotateCcw className="size-4" />
-          </ToolButton>
-          <ToolButton
-            disabled={!canDraw}
-            onClick={() => onStroke({ id: crypto.randomUUID(), kind: "clear" })}
-            label="清空画纸"
-          >
-            <Trash2 className="size-4" />
-          </ToolButton>
+            {overlay}
+          </div>
         </div>
       </div>
+
+      {canDraw ? (
+        <div className="arcade-drawing-controls" aria-label="绘画工具">
+          <div className="arcade-tools-main" role="group" aria-label="选择工具">
+            <ToolButton active={tool === "pen"} onClick={() => setTool("pen")} label="画笔">
+              <Pencil size={18} />
+            </ToolButton>
+            <ToolButton active={tool === "eraser"} onClick={() => setTool("eraser")} label="橡皮">
+              <Eraser size={18} />
+            </ToolButton>
+            <ToolButton active={tool === "fill"} onClick={() => setTool("fill")} label="整张填色">
+              <PaintBucket size={18} />
+            </ToolButton>
+            <span className="arcade-tools-divider" />
+            <ToolButton
+              onClick={() => onStroke({ id: crypto.randomUUID(), kind: "undo" })}
+              label="撤销"
+            >
+              <RotateCcw size={18} />
+            </ToolButton>
+            <ToolButton
+              onClick={() => onStroke({ id: crypto.randomUUID(), kind: "clear" })}
+              label="清空"
+            >
+              <Trash2 size={18} />
+            </ToolButton>
+            <details
+              className="arcade-brush-menu"
+              onKeyDown={(event) => {
+                if (event.key !== "Escape" || !event.currentTarget.open) return;
+                event.preventDefault();
+                event.currentTarget.open = false;
+                event.currentTarget.querySelector("summary")?.focus();
+              }}
+            >
+              <summary aria-label={`笔刷粗细：${SIZE_NAMES[BRUSH_SIZES.indexOf(size)]}`}>
+                <span
+                  className="arcade-brush-preview"
+                  style={{ width: size / 2 + 3, height: size / 2 + 3 }}
+                />
+                <ChevronUp size={12} aria-hidden="true" />
+              </summary>
+              <div className="arcade-brush-options" role="group" aria-label="笔刷粗细">
+                {BRUSH_SIZES.map((brushSize, index) => (
+                  <button
+                    key={brushSize}
+                    type="button"
+                    aria-pressed={size === brushSize}
+                    onClick={(event) => {
+                      setSize(brushSize);
+                      const menu = event.currentTarget.closest("details");
+                      if (menu) {
+                        menu.open = false;
+                        menu.querySelector("summary")?.focus();
+                      }
+                    }}
+                  >
+                    <span
+                      className="arcade-brush-preview"
+                      style={{ width: brushSize / 2 + 3, height: brushSize / 2 + 3 }}
+                    />
+                    <span>{SIZE_NAMES[index]}</span>
+                    {size === brushSize && <Check size={14} aria-hidden="true" />}
+                  </button>
+                ))}
+              </div>
+            </details>
+          </div>
+
+          <div className="arcade-color-strip" role="group" aria-label="画笔颜色，可横向滚动">
+            {PALETTE.map((c, index) => (
+              <button
+                key={c}
+                type="button"
+                aria-label={COLOR_NAMES[index]}
+                title={COLOR_NAMES[index]}
+                aria-pressed={color === c && tool !== "eraser"}
+                onClick={() => {
+                  setColor(c);
+                  if (tool === "eraser") setTool("pen");
+                }}
+                style={{ "--swatch": c } as React.CSSProperties}
+                className={cn(
+                  "arcade-color-swatch",
+                  color === c && tool !== "eraser" && "arcade-color-selected",
+                )}
+              >
+                <span>
+                  {color === c && tool !== "eraser" && (
+                    <Check
+                      size={14}
+                      strokeWidth={3}
+                      style={{ color: [0, 3, 6, 7, 8, 10].includes(index) ? "white" : "#101014" }}
+                      aria-hidden="true"
+                    />
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="arcade-spectator-note">画得抽象？靠默契的时候到了。</p>
+      )}
     </div>
   );
 }
@@ -402,14 +421,13 @@ function ToolButton({
       type="button"
       title={label}
       aria-label={label}
+      aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
-      className={cn(
-        "press flex size-9 items-center justify-center rounded-md border-2 border-[var(--ink)] bg-card shadow-[2px_2px_0_0_var(--ink)] hover:bg-accent",
-        active && "bg-primary text-primary-foreground",
-      )}
+      className={cn("arcade-tool-button", active && "arcade-tool-active")}
     >
       {children}
+      <span>{label === "整张填色" ? "填色" : label}</span>
     </button>
   );
 }

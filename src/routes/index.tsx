@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowRight, Brush, ChevronDown, DoorOpen, Sparkles, UserRound } from "lucide-react";
+import { ArrowRight, Brush, ChevronDown, DoorOpen, UserRound } from "lucide-react";
 import { CharacterPicker } from "@/components/game/CharacterPicker";
 import { createRoom, joinRoom, roomExists } from "@/lib/game.functions";
 import { ROOM_THEME_OPTIONS, type RoomTheme } from "@/lib/game-themes";
@@ -277,7 +277,7 @@ function Index() {
     "home-field w-full rounded-md border-2 border-[var(--ink)] bg-card px-3 py-3 outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-primary";
 
   return (
-    <main className="home-shell mx-auto grid min-h-[100dvh] w-full max-w-7xl items-center gap-8 px-5 py-8 sm:px-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(400px,0.85fr)] lg:px-12 xl:gap-14">
+    <main className="home-shell mx-auto grid min-h-[100dvh] w-full max-w-[1440px] items-center gap-8 px-5 py-8 sm:px-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(400px,0.8fr)] lg:px-14 xl:gap-20">
       <div aria-hidden="true" className="home-ukiyo-bg">
         <span className="ukiyo-art" style={{ backgroundImage: `url(${homeUkiyoBg.url})` }} />
         <span className="ukiyo-veil" />
@@ -286,13 +286,16 @@ function Index() {
       <section className="home-intro space-y-7 lg:py-10">
         <div className="flex flex-wrap items-center gap-2">
           <span className="label-chip home-kicker text-xs font-bold text-primary animate-pop-in">
-            <Sparkles className="size-3.5 animate-sparkle" /> 马来西亚华语画猜派对
+            <span className="home-live-dot" /> 今晚开画 · 马来西亚华语派对
           </span>
         </div>
 
         <div className="title-backing relative block w-full min-w-0 py-2">
-          <span aria-hidden="true" className="home-calligraphy">妙笔</span>
-          <h1 className="ink-title title-anim home-title whitespace-nowrap text-6xl leading-none text-foreground sm:text-7xl xl:text-8xl">
+          <span aria-hidden="true" className="home-calligraphy">
+            妙笔
+          </span>
+          <p className="home-eyebrow">DRAW · GUESS · SHOUT · REPEAT</p>
+          <h1 className="ink-title title-anim home-title whitespace-nowrap text-[clamp(4.4rem,9vw,8.5rem)] leading-[0.82] text-foreground">
             {"画啦猜啦".split("").map((char, i) => (
               <span key={i} className="title-char">
                 {char}
@@ -300,8 +303,10 @@ function Index() {
             ))}
           </h1>
           <div className="title-underline home-ink-line mt-3" />
-          <p className="subtitle-paper mt-6 max-w-xl text-lg font-medium leading-8 text-foreground sm:text-xl">
-            开个主题房，朋友进来就画。<span className="text-primary">轮流出招，抢先猜中。</span>
+          <p className="subtitle-paper mt-7 max-w-xl text-xl font-medium leading-9 text-foreground sm:text-2xl">
+            一张画纸。一群朋友。
+            <br />
+            <span className="text-primary">画得越不像，现场越好笑。</span>
           </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -315,7 +320,7 @@ function Index() {
               开始玩
             </button>
             <span className="home-note text-sm font-medium text-muted-foreground">
-              免注册 · 选角即玩 · 把房号丢给朋友
+              免注册 · 2–12 人 · 手机直接玩
             </span>
           </div>
         </div>
@@ -338,11 +343,12 @@ function Index() {
 
       <aside className="studio-panel home-ticket p-4 sm:p-6">
         <div className="home-ticket-heading relative overflow-hidden p-4">
-          <span aria-hidden="true" className="home-stamp">开画</span>
-          <p className="font-display text-3xl text-primary">准备开玩</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            填名字、选角色，然后开房或输入朋友的号码。
-          </p>
+          <span aria-hidden="true" className="home-stamp">
+            开画
+          </span>
+          <p className="home-ticket-index">ADMIT ONE / 01</p>
+          <p className="font-display text-3xl text-primary">先占个位</p>
+          <p className="mt-1 text-sm text-muted-foreground">取个名字，选张脸。十秒后你就在画。</p>
         </div>
 
         <div className="mt-4 space-y-4">

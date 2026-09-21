@@ -13,29 +13,35 @@ export const Route = createFileRoute("/how-to-play")({
 });
 
 function HowToPlay() {
+  const rules = [
+    ["01", "开一间房", "主持人把五位号码发给朋友。两个人到齐，就能开画。"],
+    ["02", "选题出招", "轮到你时，从三个题目挑一个。别画字，也别偷偷提示。"],
+    ["03", "快猜快赢", "越早猜中，分数越高；有人猜中，画的人也会得分。"],
+    ["04", "大胆乱猜", "直接输入完整华语答案。很接近时，系统会悄悄提醒你。"],
+  ];
   return (
-    <main className="mx-auto max-w-2xl p-6">
-      <h1 className="font-display text-4xl text-primary">怎么玩</h1>
-      <div className="panel mt-5 space-y-4 p-6 text-sm leading-7">
-        <section>
-          <h2 className="font-display text-xl">开始一局</h2>
-          <p>主持人开局后，把号码发给朋友。2 人以上就可以开始，系统会轮流安排每个人画画。</p>
-        </section>
-        <section>
-          <h2 className="font-display text-xl">选题和作画</h2>
-          <p>轮到你时，从三个题目里选一个开始画。题目有容易、普通、挑战和高手难度，也会随机混入本地吃喝、地方、节庆和日常主题。</p>
-        </section>
-        <section>
-          <h2 className="font-display text-xl">计分</h2>
-          <p>越快猜中分数越高；画的人每次被猜中也会得分。每轮结束会公布答案和这一轮的得分。</p>
-        </section>
-        <section>
-          <h2 className="font-display text-xl">猜答案</h2>
-          <p>请输入完整的华语答案，系统会忽略空格和常见标点。答案很靠近时，会给你提示，但不会公开你的猜测。</p>
-        </section>
+    <main className="guide-shell mx-auto min-h-screen max-w-5xl p-6 sm:p-10">
+      <header className="guide-hero">
+        <p>HOUSE RULES · 规矩很少</p>
+        <h1 className="font-display text-6xl text-primary sm:text-8xl">怎么玩？</h1>
+        <p className="mt-4 max-w-xl text-lg leading-8">
+          不会画，最好。这里比的不是画功，是谁最懂朋友脑袋里的奇怪东西。
+        </p>
+      </header>
+      <div className="guide-grid mt-10 grid gap-4 sm:grid-cols-2">
+        {rules.map(([number, title, body]) => (
+          <section key={number} className="guide-card panel p-6">
+            <span>{number}</span>
+            <h2 className="mt-8 font-display text-3xl">{title}</h2>
+            <p className="mt-3 text-sm leading-7 text-muted-foreground">{body}</p>
+          </section>
+        ))}
       </div>
-      <Link to="/" className="mt-6 inline-block text-sm text-primary underline underline-offset-4">
-        回到主页
+      <Link
+        to="/"
+        className="press mt-8 inline-flex border-2 border-[var(--ink)] bg-primary px-5 py-3 font-display text-lg text-primary-foreground shadow-[5px_5px_0_var(--ink)]"
+      >
+        好了，开玩 →
       </Link>
     </main>
   );

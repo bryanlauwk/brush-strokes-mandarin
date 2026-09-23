@@ -8,6 +8,8 @@ import {
   MessageCircle,
   ArrowUp,
   Sparkles,
+  LoaderCircle,
+  RotateCcw,
 } from "lucide-react";
 import type { ChatMessage } from "@/lib/game-types";
 import { cn } from "@/lib/utils";
@@ -17,7 +19,7 @@ type Props = {
   messages: ChatMessage[];
   disabled: boolean;
   placeholder: string;
-  onSend: (text: string) => void;
+  onSend: (text: string) => void | Promise<{ correct?: boolean; close?: boolean } | void>;
   expanded?: boolean;
   onToggleExpanded?: () => void;
 };
@@ -33,6 +35,12 @@ export function ChatPanel({
   const [value, setValue] = useState("");
   const [atBottom, setAtBottom] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [sending, setSending] = useState(false);
+  const [sendStatus, setSendStatus] = useState("");
+  const [failedTexts, setFailedTexts] = useState<string[]>([]);
+  const sendingRef = useRef(false);
+  const draftRevisionRef = useRef(0);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const atBottomRef = useRef(true);
   const composingRef = useRef(false);
   const hydratedRef = useRef(false);
@@ -109,13 +117,42 @@ export function ChatPanel({
     return () => observer.disconnect();
   }, []);
 
-  const submit = () => {
-    const text = value.trim();
-    if (!text || disabled || composingRef.current) return;
-    onSend(text);
-    setValue("");
-    scrollToBottom(true);
+  const submit = async (retryText?: string) => {
+    const text = retryText ?? value.trim();
+    if (!text || disabled || composingRef.current || sendingRef.current) return;
+    sendingRef.current = true;
+    setSending(true);
+    setSendStatus("正在发送…");
+    setFailedTexts((previous) => previous.filter((failed) => failed !== text));
+    const revision = draftRevisionRef.current;
+    if (!retryText || value.trim() === retryText) setValue("");
+    inputRef.current?.focus({ preventScroll: true });
+    scrollToBottom();
+    try {
+      const pending = onSend(text);
+      if (!pending) {
+        // Legacy callbacks do not expose completion; do not claim delivery.
+        setSendStatus("已提交");
+        return;
+      }
+      const result = await pending;
+      setSendStatus(result?.correct ? "猜中了！" : result?.close ? "就差一点！" : "发出去了");
+    } catch {
+      setSendStatus("没发出去");
+      setFailedTexts((previous) => (previous.includes(text) ? previous : [...previous, text]));
+      // A failed request must not overwrite the next guess being typed.
+      if (draftRevisionRef.current === revision) {
+        setValue((current) => current || text);
+      }
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
+    }
   };
+
+  useLayoutEffect(() => {
+    if (atBottomRef.current) scrollToBottom();
+  }, [failedTexts, scrollToBottom]);
 
   const showJumpButton = !atBottom || unreadCount > 0;
 
@@ -125,7 +162,9 @@ export function ChatPanel({
         <div className="social-chat-heading">
           <span className="social-live-dot" aria-hidden="true" />
           <h2>放胆猜</h2>
-          <span className="social-eyebrow">LIVE CHAT</span>
+          <span className="social-eyebrow" role="status" aria-live="polite">
+            {sendStatus || "LIVE CHAT"}
+          </span>
         </div>
         {onToggleExpanded && (
           <button
@@ -153,7 +192,7 @@ export function ChatPanel({
           }}
           className="social-message-list"
         >
-          {messages.length === 0 ? (
+          {messages.length === 0 && failedTexts.length === 0 ? (
             <div className="social-chat-empty">
               <span className="social-chat-empty-icon">
                 <MessageCircle aria-hidden="true" />
@@ -166,6 +205,23 @@ export function ChatPanel({
           ) : (
             messages.map((m) => <MessageRow key={m.id} message={m} />)
           )}
+          {failedTexts.map((text) => (
+            <div key={text} className="social-event social-event-close items-center" role="alert">
+              <p className="min-w-0 flex-1">
+                <span className="social-event-label">没发出去</span>
+                {text}
+              </p>
+              <button
+                type="button"
+                disabled={sending || disabled}
+                onClick={() => void submit(text)}
+                className="flex min-h-11 shrink-0 items-center gap-1 rounded-lg px-2 text-xs disabled:opacity-50"
+                aria-label={`重试发送：${text}`}
+              >
+                <RotateCcw className="size-3" aria-hidden="true" /> 重试
+              </button>
+            </div>
+          ))}
         </div>
         {showJumpButton && (
           <button
@@ -181,6 +237,7 @@ export function ChatPanel({
 
       <div className="social-chat-composer" role="group" aria-label="发送答案或消息">
         <input
+          ref={inputRef}
           aria-label={disabled ? "这回合由你画画，暂时不能发送答案" : "输入答案或聊天消息"}
           value={value}
           disabled={disabled}
@@ -188,7 +245,11 @@ export function ChatPanel({
           maxLength={40}
           autoComplete="off"
           enterKeyHint="send"
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+            draftRevisionRef.current += 1;
+            setValue(e.target.value);
+            if (!sendingRef.current) setSendStatus("");
+          }}
           onFocus={() => scrollToBottom()}
           onCompositionStart={() => {
             composingRef.current = true;
@@ -204,19 +265,25 @@ export function ChatPanel({
               e.nativeEvent.keyCode !== 229
             ) {
               e.preventDefault();
-              submit();
+              void submit();
             }
           }}
           className="social-chat-input"
         />
         <button
           type="button"
-          onClick={submit}
-          disabled={disabled || !value.trim()}
-          aria-label="发送答案或消息"
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={() => void submit()}
+          disabled={disabled || sending || !value.trim()}
+          aria-label={sending ? "正在发送答案或消息" : "发送答案或消息"}
+          aria-busy={sending}
           className="social-chat-send"
         >
-          <ArrowUp className="size-5" aria-hidden="true" />
+          {sending ? (
+            <LoaderCircle className="size-5 animate-spin" aria-hidden="true" />
+          ) : (
+            <ArrowUp className="size-5" aria-hidden="true" />
+          )}
         </button>
       </div>
     </section>

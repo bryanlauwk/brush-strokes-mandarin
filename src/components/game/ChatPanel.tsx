@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowDown,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Flame,
@@ -292,9 +291,16 @@ export function ChatPanel({
 
 function MessageRow({ message }: { message: ChatMessage }) {
   if (message.kind === "correct") {
+    const excellent = message.id % 2 !== 0;
     return (
       <div className="social-event social-event-correct">
-        <CheckCircle2 aria-hidden="true" />
+        <span
+          className={cn("social-mini-stamp", excellent && "social-mini-stamp--excellent")}
+          role="img"
+          aria-label={excellent ? "妙答印章" : "命中印章"}
+        >
+          <span aria-hidden="true">{excellent ? "妙" : "中"}</span>
+        </span>
         <p>
           <span className="social-event-label">命中！</span>
           {message.text}

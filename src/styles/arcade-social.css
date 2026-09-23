@@ -158,6 +158,39 @@
   color: var(--arcade-lime, #d8ff3e);
 }
 
+.social-mini-stamp {
+  display: inline-grid;
+  width: 23px;
+  height: 23px;
+  flex: 0 0 23px;
+  place-items: center;
+  margin-top: 1px;
+  border: 1.5px solid #ee715f;
+  border-radius: 3px 2px 4px 2px;
+  background: #361e1b;
+  box-shadow: inset 0 0 0 1px #ff99883d;
+  color: #ff9988;
+  font-family: "Noto Serif SC", "Songti SC", STSong, serif;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+  transform: rotate(-7deg);
+}
+
+.social-mini-stamp--excellent {
+  border-radius: 2px 4px 2px 3px;
+  transform: rotate(5deg);
+}
+
+@media (min-width: 640px) {
+  .social-mini-stamp {
+    width: 25px;
+    height: 25px;
+    flex-basis: 25px;
+    font-size: 18px;
+  }
+}
+
 .social-event-close {
   background: #ff85680d;
   color: var(--arcade-coral, #ff8568);
@@ -562,6 +595,207 @@
   }
 }
 
+.social-stamp-feedback {
+  --stamp-ink: #ed5b45;
+  position: fixed;
+  z-index: 60;
+  top: var(--room-viewport-top, 0px);
+  right: 0;
+  left: 0;
+  display: grid;
+  height: var(--room-viewport-height, 100dvh);
+  place-items: center;
+  padding: 24px;
+  pointer-events: none;
+}
+
+.social-stamp-content {
+  width: min(100%, 290px);
+  text-align: center;
+  animation: social-stamp-lifetime 1900ms ease both;
+}
+
+.social-stamp-stage {
+  position: relative;
+  display: grid;
+  width: min(58vw, 198px);
+  aspect-ratio: 1;
+  place-items: center;
+  margin: 0 auto 27px;
+  color: var(--stamp-ink);
+  filter: drop-shadow(0 3px 14px #10101480);
+}
+
+.social-stamp-mark {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 12px;
+  border: 5px solid currentColor;
+  border-radius: 7px 10px 5px 8px;
+  outline: 1px solid currentColor;
+  outline-offset: -11px;
+  transform: rotate(-4deg);
+  /* Two offset, fine-grained masks let the surface show through the ink. */
+  -webkit-mask-image:
+    radial-gradient(ellipse at 24% 33%, transparent 0.6px, #000 1px),
+    radial-gradient(ellipse at 70% 63%, transparent 0.8px, #000 1.2px);
+  mask-image:
+    radial-gradient(ellipse at 24% 33%, transparent 0.6px, #000 1px),
+    radial-gradient(ellipse at 70% 63%, transparent 0.8px, #000 1.2px);
+  -webkit-mask-size:
+    7px 11px,
+    13px 9px;
+  mask-size:
+    7px 11px,
+    13px 9px;
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  animation: social-stamp-impact 460ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+
+.social-stamp-club {
+  font-size: clamp(8px, 2.1vw, 10px);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+
+.social-stamp-lettering {
+  display: flex;
+  flex-direction: column;
+  font-family: "Zhi Mang Xing", "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  font-size: clamp(42px, 14vw, 58px);
+  font-weight: 400;
+  line-height: 0.98;
+  letter-spacing: 0.04em;
+  -webkit-text-stroke: 0.7px currentColor;
+}
+
+.social-stamp-signoff {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.23em;
+  line-height: 1;
+}
+
+.social-stamp-title,
+.social-stamp-subtitle {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin-right: auto;
+  margin-left: auto;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #101014eb;
+  color: #f5f5ef;
+  overflow-wrap: anywhere;
+}
+
+.social-stamp-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  line-height: 1.4;
+}
+
+.social-stamp-subtitle {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.social-stamp-dust {
+  position: absolute;
+  inset: 0;
+}
+
+.social-stamp-dust::before,
+.social-stamp-dust::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 4px;
+  border-radius: 1px 2px 1px 0;
+  background: currentColor;
+  box-shadow:
+    -86px -96px 0 -0.5px currentColor,
+    -105px -31px 0 0 currentColor,
+    -104px 64px 0 -0.5px currentColor,
+    -48px 104px 0 0 currentColor,
+    55px 106px 0 -0.5px currentColor,
+    108px 41px 0 0 currentColor,
+    99px -70px 0 -0.5px currentColor,
+    33px -109px 0 0 currentColor;
+  opacity: 0;
+  content: "";
+  animation: social-stamp-ink-burst 720ms 80ms ease-out both;
+}
+
+.social-stamp-dust::after {
+  width: 2px;
+  height: 2px;
+  rotate: 24deg;
+  animation-delay: 120ms;
+  animation-duration: 620ms;
+}
+
+@keyframes social-stamp-impact {
+  0% {
+    transform: rotate(-7deg) scale(1.35);
+  }
+  60% {
+    transform: rotate(-3deg) scale(0.95);
+  }
+  100% {
+    transform: rotate(-4deg) scale(1);
+  }
+}
+
+@keyframes social-stamp-lifetime {
+  0% {
+    opacity: 0;
+  }
+  5%,
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes social-stamp-ink-burst {
+  0% {
+    opacity: 0;
+    transform: scale(0.65);
+  }
+  20% {
+    opacity: 0.28;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.22);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .social-stamp-content,
+  .social-stamp-mark {
+    animation: none;
+  }
+  .social-stamp-dust {
+    display: none;
+  }
+}
+
 .social-hint {
   padding: 14px;
 }
@@ -722,133 +956,4 @@
   .social-chat-send:hover:not(:disabled) {
     transform: none;
   }
-}
-
-/* ---- 朱红落款印章（猜中反馈） ---- */
-.social-stamp {
-  position: fixed;
-  z-index: 70;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-}
-.social-stamp-inner {
-  display: grid;
-  justify-items: center;
-  gap: 12px;
-  animation: social-stamp-impact 640ms cubic-bezier(0.22, 1.3, 0.36, 1) both;
-}
-.social-stamp-seal {
-  position: relative;
-  display: grid;
-  width: 138px;
-  height: 138px;
-  place-items: center;
-  transform: rotate(-4deg);
-  border: 6px solid #c0392b;
-  border-radius: 14px;
-  background: #c0392b0f;
-  color: #c0392b;
-  font-family: "Zhi Mang Xing", "Noto Serif SC", var(--font-display), serif;
-  font-size: 66px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0.04em;
-  box-shadow:
-    inset 0 0 22px #c0392b26,
-    0 18px 50px #00000055;
-  filter: saturate(1.1);
-}
-.social-stamp-seal::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 8px;
-  background-image:
-    radial-gradient(circle at 22% 30%, #ffffff55 0 2px, transparent 3px),
-    radial-gradient(circle at 68% 18%, #ffffff44 0 2px, transparent 3px),
-    radial-gradient(circle at 40% 76%, #ffffff4d 0 3px, transparent 4px),
-    radial-gradient(circle at 82% 62%, #ffffff3d 0 2px, transparent 3px);
-  mix-blend-mode: screen;
-  opacity: 0.8;
-}
-.social-stamp-dust {
-  position: absolute;
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #c0392b3d 0%, transparent 62%);
-  animation: social-stamp-dust 900ms ease-out both;
-}
-.social-stamp-caption {
-  max-width: 320px;
-  padding: 8px 16px;
-  border-radius: 12px;
-  background: #101014d9;
-  color: var(--foreground);
-  font-size: 15px;
-  font-weight: 700;
-  text-align: center;
-  overflow-wrap: anywhere;
-}
-.social-stamp-caption small {
-  display: block;
-  margin-top: 3px;
-  color: var(--muted-foreground);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-@keyframes social-stamp-impact {
-  0% {
-    opacity: 0;
-    transform: scale(1.35) rotate(3deg);
-  }
-  55% {
-    opacity: 1;
-    transform: scale(0.95) rotate(-1deg);
-  }
-  75% {
-    transform: scale(1.03);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-@keyframes social-stamp-dust {
-  0% {
-    opacity: 0.9;
-    transform: scale(0.5);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.6);
-  }
-}
-.social-stamp-out {
-  animation: social-feedback-exit 320ms ease both;
-}
-@keyframes social-feedback-exit {
-  to {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-}
-
-/* 答题室内的迷你朱印 */
-.social-seal-mini {
-  display: inline-grid;
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-  place-items: center;
-  border: 2px solid #c0392b;
-  border-radius: 5px;
-  background: #c0392b1a;
-  color: #e05a4a;
-  font-family: "Zhi Mang Xing", "Noto Serif SC", serif;
-  font-size: 14px;
-  line-height: 1;
 }

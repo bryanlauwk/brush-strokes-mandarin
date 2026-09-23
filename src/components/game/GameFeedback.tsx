@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Check, Sparkles, Flag } from "lucide-react";
+import { Sparkles, Flag } from "lucide-react";
 import { isSoundEnabled } from "@/lib/arcade-sound";
+import { playCorrectAnswerSound } from "@/lib/feedback-sound";
 import "@/styles/arcade-social.css";
 
 export type GameFeedbackKind = "correct" | "round-start" | "round-end";
@@ -13,12 +14,13 @@ export type GameFeedbackEvent = {
 };
 
 export function GameFeedback({ event }: { event: GameFeedbackEvent | null }) {
-  const [visible, setVisible] = useState<GameFeedbackEvent | null>(null);
+  const [visible, setVisible] = useState<GameFeedbackEvent | null>(event);
 
   useEffect(() => {
     if (!event) return;
     setVisible(event);
-    if (isSoundEnabled()) playFeedbackSound(event.kind);
+    if (event.kind === "correct") playCorrectAnswerSound();
+    else if (isSoundEnabled()) playFeedbackSound(event.kind);
     const timer = window.setTimeout(
       () => setVisible((current) => (current?.id === event.id ? null : current)),
       1900,
@@ -26,56 +28,67 @@ export function GameFeedback({ event }: { event: GameFeedbackEvent | null }) {
     return () => window.clearTimeout(timer);
   }, [event]);
 
-  if (!visible) return null;
+  // Keep this region mounted so assistive technology sees its text update.
+  // The animated version below is purely decorative and would otherwise be
+  // unreliable as a just-mounted live region.
+  const announcement = visible
+    ? [visible.title, visible.subtitle].filter(Boolean).join("。")
+    : "";
+  const liveRegion = (
+    <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+      {announcement}
+    </p>
+  );
+
+  if (!visible) return liveRegion;
 
   if (visible.kind === "correct") {
     return (
-      <div key={visible.id} className="social-stamp" role="status" aria-live="polite" aria-atomic="true">
-        <div className="social-stamp-inner">
-          <div className="relative grid place-items-center">
-            <span className="social-stamp-dust" aria-hidden="true" />
-            <span className="social-stamp-seal" aria-hidden="true">
-              妙
-            </span>
+      <>
+        {liveRegion}
+        <div key={visible.id} className="social-stamp-feedback" aria-hidden="true">
+          <div className="social-stamp-content">
+            <div className="social-stamp-stage">
+              <span className="social-stamp-dust" />
+              <div className="social-stamp-mark">
+                <span className="social-stamp-club">乱画俱乐部 · 默契认证</span>
+                <strong className="social-stamp-lettering">
+                  <span>猜中</span>
+                  <span>了啦</span>
+                </strong>
+                <span className="social-stamp-signoff">NAIS LAH!</span>
+              </div>
+            </div>
+            <p className="social-stamp-title">{visible.title}</p>
+            {visible.subtitle && <p className="social-stamp-subtitle">{visible.subtitle}</p>}
           </div>
-          <p className="social-stamp-caption">
-            {visible.title}
-            {visible.subtitle && <small>{visible.subtitle}</small>}
-          </p>
         </div>
-      </div>
+      </>
     );
   }
 
-  const Icon =
-    visible.kind === "correct" ? Check : visible.kind === "round-start" ? Sparkles : Flag;
-  const label =
-    visible.kind === "correct"
-      ? "NAIS LAH!"
-      : visible.kind === "round-start"
-        ? "NEXT UP"
-        : "THAT’S A WRAP";
+  const Icon = visible.kind === "round-start" ? Sparkles : Flag;
+  const label = visible.kind === "round-start" ? "NEXT UP" : "THAT’S A WRAP";
 
   return (
-    <div
-      key={visible.id}
-      className={`social-feedback social-feedback-${visible.kind}`}
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
-    >
-      <span className="social-feedback-icon" aria-hidden="true">
-        <Icon />
-      </span>
-      <div>
-        <span className="social-feedback-label">{label}</span>
-        <p className="social-feedback-title">{visible.title}</p>
-        {visible.subtitle && <p className="social-feedback-subtitle">{visible.subtitle}</p>}
+    <>
+      {liveRegion}
+      <div
+        key={visible.id}
+        className={`social-feedback social-feedback-${visible.kind}`}
+        aria-hidden="true"
+      >
+        <span className="social-feedback-icon">
+          <Icon />
+        </span>
+        <div>
+          <span className="social-feedback-label">{label}</span>
+          <p className="social-feedback-title">{visible.title}</p>
+          {visible.subtitle && <p className="social-feedback-subtitle">{visible.subtitle}</p>}
+        </div>
+        <span className="social-feedback-spark">✳</span>
       </div>
-      <span className="social-feedback-spark" aria-hidden="true">
-        ✳
-      </span>
-    </div>
+    </>
   );
 }
 

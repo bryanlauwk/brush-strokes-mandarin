@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Check, ChevronUp, Eraser, PaintBucket, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { BRUSH_SIZES, PALETTE, type Stroke } from "@/lib/game-types";
 import type { LiveStroke } from "@/hooks/use-room";
@@ -71,11 +71,10 @@ function drawLine(
 }
 
 function posFromClient(
-  canvas: HTMLCanvasElement,
+  rect: Pick<DOMRect, "left" | "top" | "width" | "height">,
   clientX: number,
   clientY: number,
 ): [number, number] {
-  const rect = canvas.getBoundingClientRect();
   return [
     Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)),
     Math.min(1, Math.max(0, (clientY - rect.top) / rect.height)),
@@ -88,7 +87,7 @@ function shouldAddPoint(points: [number, number][], point: [number, number]) {
   return Math.hypot(point[0] - last[0], point[1] - last[1]) >= MIN_POINT_DISTANCE;
 }
 
-export function DrawBoard({
+export const DrawBoard = memo(function DrawBoard({
   strokes,
   live,
   canDraw,
@@ -103,6 +102,8 @@ export function DrawBoard({
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
   const transientCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef<LiveStroke | null>(null);
+  const activePointerRef = useRef<number | null>(null);
+  const paintedStrokesRef = useRef<Stroke[] | null>(null);
   const lastSentRef = useRef(0);
   const [color, setColor] = useState(PALETTE[0]);
   const [size, setSize] = useState(BRUSH_SIZES[1]);
@@ -116,31 +117,49 @@ export function DrawBoard({
       const { width, height } = entry.contentRect;
       if (!width || !height) return;
       const fittedWidth = Math.min(width, (height * WIDTH) / HEIGHT);
-      setBoardSize({ width: fittedWidth, height: (fittedWidth * HEIGHT) / WIDTH });
+      const fittedHeight = (fittedWidth * HEIGHT) / WIDTH;
+      setBoardSize((previous) =>
+        previous &&
+        Math.abs(previous.width - fittedWidth) < 0.5 &&
+        Math.abs(previous.height - fittedHeight) < 0.5
+          ? previous
+          : { width: fittedWidth, height: fittedHeight },
+      );
     });
     observer.observe(stage);
     return () => observer.disconnect();
   }, []);
 
-  // Committed history is expensive to replay, so keep it on its own layer and
-  // rebuild that layer only when the committed stroke list changes.
+  // Appending a line should cost one line, not the entire drawing's history.
+  // Undo or a replaced history still rebuilds the layer to preserve semantics.
   const paintCommitted = useCallback(() => {
     const canvas = committedCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.fillStyle = "#fffdf7";
-    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    const previous = paintedStrokesRef.current;
+    const extendsHistory =
+      previous !== null &&
+      previous.length <= strokes.length &&
+      previous.every((stroke, index) => stroke.id === strokes[index].id);
+    const appended = extendsHistory ? strokes.slice(previous.length) : strokes;
+    const needsReplay = !extendsHistory || appended.some((stroke) => stroke.kind === "undo");
+    paintedStrokesRef.current = strokes;
 
-    const committed: Stroke[] = [];
-    for (const s of strokes) {
-      if (s.kind === "clear") committed.length = 0;
-      else if (s.kind === "undo") committed.pop();
-      else committed.push(s);
+    let committed = appended;
+    if (needsReplay) {
+      ctx.fillStyle = "#fffdf7";
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      committed = [];
+      for (const stroke of strokes) {
+        if (stroke.kind === "clear") committed.length = 0;
+        else if (stroke.kind === "undo") committed.pop();
+        else committed.push(stroke);
+      }
     }
     for (const s of committed) {
-      if (s.kind === "fill") {
-        ctx.fillStyle = s.color ?? "#fffdf7";
+      if (s.kind === "fill" || s.kind === "clear") {
+        ctx.fillStyle = s.kind === "clear" ? "#fffdf7" : (s.color ?? "#fffdf7");
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
       } else if (s.kind === "line") {
         drawLine(ctx, {
@@ -156,6 +175,14 @@ export function DrawBoard({
     paintCommitted();
   }, [paintCommitted]);
 
+  useEffect(() => {
+    if (canDraw || !drawingRef.current) return;
+    const id = drawingRef.current.id;
+    drawingRef.current = null;
+    activePointerRef.current = null;
+    onLiveEnd(id);
+  }, [canDraw, onLiveEnd]);
+
   // Remote in-progress strokes live on a cheap transient layer. Repainting
   // this layer never replays the committed history underneath it.
   useEffect(() => {
@@ -166,7 +193,7 @@ export function DrawBoard({
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     for (const stroke of Object.values(live)) drawLine(ctx, stroke);
     if (drawingRef.current) drawLine(ctx, drawingRef.current);
-  }, [live, strokes]);
+  }, [live, strokes, canDraw]);
 
   const paintLocalIncrement = useCallback((fromIndex: number) => {
     const canvas = transientCanvasRef.current;
@@ -195,11 +222,15 @@ export function DrawBoard({
       const native = e.nativeEvent as PointerEvent & {
         getCoalescedEvents?: () => PointerEvent[];
       };
-      const events = native.getCoalescedEvents?.() ?? [native];
+      const coalesced = native.getCoalescedEvents?.();
+      // Browsers can expose the API but return no coalesced events, especially
+      // on pointerup. Never lose the actual event or the end of the line.
+      const events = coalesced?.length ? coalesced : [native];
+      const rect = e.currentTarget.getBoundingClientRect();
       const fromIndex = drawingRef.current?.points.length ?? 0;
       let changed = false;
       for (const event of events) {
-        changed = addPoint(posFromClient(e.currentTarget, event.clientX, event.clientY)) || changed;
+        changed = addPoint(posFromClient(rect, event.clientX, event.clientY)) || changed;
       }
       return changed ? fromIndex : -1;
     },
@@ -207,14 +238,15 @@ export function DrawBoard({
   );
 
   const handleDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!canDraw) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const point = posFromClient(e.currentTarget, e.clientX, e.clientY);
+    if (!canDraw || !e.isPrimary || e.button !== 0 || activePointerRef.current !== null) return;
 
     if (tool === "fill") {
       onStroke({ id: crypto.randomUUID(), kind: "fill", color });
       return;
     }
+    e.currentTarget.setPointerCapture(e.pointerId);
+    activePointerRef.current = e.pointerId;
+    const point = posFromClient(e.currentTarget.getBoundingClientRect(), e.clientX, e.clientY);
     drawingRef.current = {
       id: crypto.randomUUID(),
       color: tool === "eraser" ? "#fffdf7" : color,
@@ -228,7 +260,7 @@ export function DrawBoard({
 
   const handleMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const current = drawingRef.current;
-    if (!canDraw || !current) return;
+    if (!canDraw || !current || e.pointerId !== activePointerRef.current) return;
     const fromIndex = addPointerPoints(e);
     if (fromIndex < 0) return;
     paintLocalIncrement(fromIndex);
@@ -240,11 +272,13 @@ export function DrawBoard({
     }
   };
 
-  const handleUp = (e?: React.PointerEvent<HTMLCanvasElement>) => {
-    const fromIndex = e && drawingRef.current ? addPointerPoints(e) : -1;
+  const handleUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerId !== activePointerRef.current) return;
+    const fromIndex = e.type === "pointerup" && drawingRef.current ? addPointerPoints(e) : -1;
     if (fromIndex >= 0) paintLocalIncrement(fromIndex);
     const current = drawingRef.current;
     drawingRef.current = null;
+    activePointerRef.current = null;
     if (!current) return;
     const finalStroke: Stroke = {
       id: current.id,
@@ -285,6 +319,7 @@ export function DrawBoard({
               onPointerMove={handleMove}
               onPointerUp={handleUp}
               onPointerCancel={handleUp}
+              onLostPointerCapture={handleUp}
               aria-label={canDraw ? "绘画区域：用手指或鼠标作画" : "实时画作"}
               className={cn(
                 "absolute inset-0 block h-full w-full",
@@ -401,7 +436,7 @@ export function DrawBoard({
       )}
     </div>
   );
-}
+});
 
 function ToolButton({
   children,

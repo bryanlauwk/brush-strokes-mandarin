@@ -29,7 +29,13 @@ type StrokeBroadcast = { stroke: Stroke; turnIndex: number; round: number };
 function mergeStrokes(snapshot: Stroke[], optimistic: Stroke[]) {
   const seen = new Set(snapshot.map((stroke) => stroke.id));
   const localOnly = optimistic.filter((stroke) => !seen.has(stroke.id));
-  return localOnly.length ? [...snapshot, ...localOnly] : snapshot;
+  const merged = localOnly.length ? [...snapshot, ...localOnly] : snapshot;
+  // Stroke payloads are immutable. Keep the same array when a poll merely
+  // confirms the strokes we already rendered, rather than repainting history.
+  return merged.length === optimistic.length &&
+    merged.every((stroke, index) => stroke.id === optimistic[index].id)
+    ? optimistic
+    : merged;
 }
 
 function sameKnownTurn(marker: TurnMarker, currentTurn: number, currentRound: number) {
@@ -98,7 +104,10 @@ export function useRoom(code: string, identity: RoomIdentity) {
   useEffect(() => {
     if (!playerId || !token) return;
     let cancelled = false;
+    let refreshing = false;
+    let refreshQueued = false;
     const upper = code.toUpperCase();
+    const finishedLiveIds = new Set<string>();
 
     setMissing(false);
     setIdentityInvalid(false);
@@ -121,6 +130,8 @@ export function useRoom(code: string, identity: RoomIdentity) {
       const hadTurn = turnRef.current >= 0 && roundRef.current >= 0;
       const turnChanged =
         snap.room.turn_index !== turnRef.current || snap.room.current_round !== roundRef.current;
+      if (turnChanged) finishedLiveIds.clear();
+      for (const stroke of snap.strokes) finishedLiveIds.add(stroke.id);
       turnRef.current = snap.room.turn_index;
       roundRef.current = snap.room.current_round;
       if (hadTurn && turnChanged) {
@@ -130,27 +141,30 @@ export function useRoom(code: string, identity: RoomIdentity) {
         liveEndTimersRef.current = {};
       } else {
         setStrokes((prev) => mergeStrokes(snap.strokes, prev));
-        setLive((prev) => {
-          const next: Record<string, LiveStroke> = {};
-          for (const [id, s] of Object.entries(prev)) {
-            if (sameKnownTurn(s, turnRef.current, roundRef.current)) next[id] = s;
-            else clearLiveEndTimer(id);
-          }
-          return next;
-        });
       }
+      const committedIds = new Set(snap.strokes.map((stroke) => stroke.id));
       setLive((prev) => {
-        if (!snap.strokes.length) return prev;
-        const next = { ...prev };
-        for (const s of snap.strokes) {
-          delete next[s.id];
-          clearLiveEndTimer(s.id);
+        let next = prev;
+        for (const [id, stroke] of Object.entries(prev)) {
+          if (!sameKnownTurn(stroke, turnRef.current, roundRef.current) || committedIds.has(id)) {
+            if (next === prev) next = { ...prev };
+            delete next[id];
+            clearLiveEndTimer(id);
+          }
         }
         return next;
       });
     };
 
-    const refresh = async () => {
+    const refresh = async (queueIfBusy = true) => {
+      if (cancelled) return;
+      if (refreshing) {
+        // A successful action must get a snapshot taken after the action.
+        // Routine polling can skip a busy request without building a backlog.
+        refreshQueued ||= queueIfBusy;
+        return;
+      }
+      refreshing = true;
       try {
         // On lossy networks the snapshot request can be dropped entirely; retry
         // briefly so the room does not sit on a stale view until the next poll.
@@ -166,6 +180,7 @@ export function useRoom(code: string, identity: RoomIdentity) {
             }),
           { attempts: 3, baseDelayMs: 250 },
         );
+        if (cancelled) return;
         if ((snap as { authError?: boolean }).authError) {
           setIdentityInvalid(true);
           return;
@@ -180,17 +195,24 @@ export function useRoom(code: string, identity: RoomIdentity) {
           },
         );
       } catch (err) {
+        if (cancelled) return;
         const message = err instanceof Error ? err.message : "";
         if (message.includes("找不到这个号码")) setMissing(true);
         if (message.includes("身份验证失败") || message.includes("已经不在这局")) {
           setIdentityInvalid(true);
+        }
+      } finally {
+        refreshing = false;
+        if (refreshQueued && !cancelled) {
+          refreshQueued = false;
+          void refresh();
         }
       }
     };
 
     void refresh();
     refreshRef.current = () => void refresh();
-    const timer = window.setInterval(() => void refresh(), POLL_MS);
+    const timer = window.setInterval(() => void refresh(false), POLL_MS);
 
     // Coming back from another tab/route must not wait for the next poll,
     // otherwise players briefly see a stale turn or stale word choices.
@@ -203,32 +225,41 @@ export function useRoom(code: string, identity: RoomIdentity) {
     const channel = supabase
       .channel(`room-${upper}`, { config: { broadcast: { self: false } } })
       .on("broadcast", { event: "live" }, ({ payload }) => {
+        if (cancelled) return;
         const s = payload as LiveStroke;
-        if (!matchesCurrentTurn(s)) return;
+        if (!matchesCurrentTurn(s) || finishedLiveIds.has(s.id)) return;
         clearLiveEndTimer(s.id);
         setLive((prev) => ({ ...prev, [s.id]: s }));
       })
       .on("broadcast", { event: "stroke" }, ({ payload }) => {
+        if (cancelled) return;
         const { stroke, turnIndex, round } = payload as StrokeBroadcast;
         if (!matchesCurrentTurn({ turnIndex, round })) return;
+        finishedLiveIds.add(stroke.id);
         clearLiveEndTimer(stroke.id);
         setStrokes((prev) => (prev.some((s) => s.id === stroke.id) ? prev : [...prev, stroke]));
         setLive((prev) => {
+          if (!(stroke.id in prev)) return prev;
           const next = { ...prev };
           delete next[stroke.id];
           return next;
         });
       })
       .on("broadcast", { event: "live-end" }, ({ payload }) => {
+        if (cancelled) return;
         const { id, turnIndex, round } = payload as {
           id: string;
           turnIndex?: number;
           round?: number;
         };
         if (!matchesCurrentTurn({ turnIndex, round })) return;
+        // The final stroke normally arrives before live-end. It has already
+        // reconciled the preview; don't schedule another snapshot per pen lift.
+        if (finishedLiveIds.has(id)) return;
         clearLiveEndTimer(id);
         liveEndTimersRef.current[id] = window.setTimeout(() => {
           setLive((prev) => {
+            if (!(id in prev)) return prev;
             const next = { ...prev };
             delete next[id];
             return next;
@@ -242,16 +273,23 @@ export function useRoom(code: string, identity: RoomIdentity) {
       });
 
     channel.on("broadcast", { event: "scratch" }, ({ payload }) => {
+      if (cancelled) return;
       const s = payload as Stroke;
+      finishedLiveIds.add(s.id);
+      clearLiveEndTimer(s.id);
       setScratch((prev) => (prev.some((x) => x.id === s.id) ? prev : [...prev, s]));
       setLive((prev) => {
+        if (!(s.id in prev)) return prev;
         const next = { ...prev };
         delete next[s.id];
         return next;
       });
     });
 
-    channel.subscribe();
+    channel.subscribe((status) => {
+      // Reconnects can miss room updates between polls. Catch up immediately.
+      if (status === "SUBSCRIBED") void refresh();
+    });
     channelRef.current = channel;
 
     return () => {
@@ -264,10 +302,8 @@ export function useRoom(code: string, identity: RoomIdentity) {
         window.clearTimeout(pendingTimer),
       );
       liveEndTimersRef.current = {};
-      if (channelRef.current) {
-        void supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
+      void supabase.removeChannel(channel);
+      if (channelRef.current === channel) channelRef.current = null;
     };
   }, [code, playerId, token, clientId, clearLiveEndTimer]);
 

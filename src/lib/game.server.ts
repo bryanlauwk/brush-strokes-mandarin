@@ -1,5 +1,8 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DEFAULT_ROOM_THEME, normalizeRoomTheme, type RoomTheme } from "@/lib/game-themes";
+import { evaluateGuess } from "@/lib/guess-normalization.server";
+
+export { normalizeGuess } from "@/lib/guess-normalization.server";
 
 export const CHOOSE_SECONDS = 15;
 export const TURN_END_SECONDS = 6;
@@ -417,15 +420,6 @@ export function cleanName(raw: string) {
 export function normalizeDifficulty(raw?: string | null) {
   if (!raw || raw === "全部") return "全部";
   return DIFFICULTY_ALIASES[raw] ?? "全部";
-}
-
-/** Normalize a guess: strip whitespace/punctuation, full-width -> half-width. */
-export function normalizeGuess(raw: string) {
-  return (raw ?? "")
-    .replace(/[\s\u3000]+/g, "")
-    .replace(/[，。！？、；：""''（）,.!?;:"'()]/g, "")
-    .replace(/[\uFF01-\uFF5E]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
-    .toLowerCase();
 }
 
 function hintOrder(len: number) {
@@ -1135,14 +1129,13 @@ export async function scoreGuess(room: RoomRow, player: PlayerRow, text: string)
     .eq("room_id", room.id)
     .maybeSingle();
   const word = (secret?.word as string | null) ?? null;
-  const guess = normalizeGuess(text);
-
   if (room.status !== "drawing" || !word || player.id === room.drawer_id || player.has_guessed) {
     await say(room.id, room.current_round, "guess", text.slice(0, 40), player.id, player.name);
     return { correct: false, close: false };
   }
 
-  if (guess === normalizeGuess(word)) {
+  const { correct, close } = evaluateGuess(text, word);
+  if (correct) {
     const deadline = room.round_ends_at ? Date.parse(room.round_ends_at) : Date.now();
     const remaining = Math.max(0, (deadline - Date.now()) / 1000);
     const points = 100 + Math.round((200 * remaining) / Math.max(room.draw_seconds, 1));
@@ -1167,9 +1160,6 @@ export async function scoreGuess(room: RoomRow, player: PlayerRow, text: string)
 
   await say(room.id, room.current_round, "guess", text.slice(0, 40), player.id, player.name);
 
-  const target = [...normalizeGuess(word)];
-  const shared = [...new Set(guess)].filter((c) => target.includes(c)).length;
-  const close = guess.length === target.length && shared >= Math.ceil(target.length / 2);
   if (close) {
     await say(
       room.id,

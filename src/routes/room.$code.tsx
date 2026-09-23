@@ -219,7 +219,9 @@ function RoomPage() {
   const roomJoinReady = nickname.trim().length > 0;
 
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 250);
+    // The visible countdown is whole seconds; updating four times per second
+    // only forced the canvas, roster and chat to reconcile for identical UI.
+    const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
 
@@ -304,8 +306,27 @@ function RoomPage() {
     const t = setInterval(() => {
       void tickFn({ data: auth }).catch(() => undefined);
     }, 1500);
-    return () => clearInterval(t);
-  }, [auth?.playerId, isHost, room?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // The regular host heartbeat may land up to 1.5s after the visible clock
+    // reaches zero. Schedule one exact deadline tick and announce its result so
+    // phones do not sit at 00 while waiting for two more network cycles.
+    const deadline = room.round_ends_at ? Date.parse(room.round_ends_at) : Number.NaN;
+    const deadlineTimer = Number.isFinite(deadline)
+      ? window.setTimeout(
+          () => {
+            void tickFn({ data: auth })
+              .then(() => broadcastSync())
+              .catch(() => undefined);
+          },
+          Math.max(0, deadline - Date.now() + 50),
+        )
+      : null;
+
+    return () => {
+      clearInterval(t);
+      if (deadlineTimer !== null) window.clearTimeout(deadlineTimer);
+    };
+  }, [auth?.playerId, isHost, room?.status, room?.round_ends_at]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Local test bots need a heartbeat, otherwise presence reconcile drops them.
   useEffect(() => {
@@ -747,11 +768,18 @@ function RoomPage() {
               ? "猜中啦，来点掌声…"
               : "脑洞来了？输入答案…"
       }
-      onSend={(text) =>
-        void guessFn({ data: { ...auth!, text } }).catch((error) =>
-          toast.error(error instanceof Error ? error.message : "发送失败，再试一次。"),
-        )
-      }
+      onSend={async (text) => {
+        try {
+          const result = await guessFn({ data: { ...auth!, text } });
+          // The sender gets the RPC acknowledgement immediately; this sync
+          // then delivers the new chat row, score and round state to everyone.
+          broadcastSync();
+          return result;
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "发送失败，再试一次。");
+          throw error;
+        }
+      }}
     />
   );
 
@@ -1060,98 +1088,103 @@ function RoomPage() {
                 onLive={broadcastLive}
                 onLiveEnd={broadcastLiveEnd}
                 overlay={
-                  <>
-                    {room.status === "choosing" &&
-                      lockedTurnKey !== `${room.current_round}-${room.turn_index}` && (
-                        <Overlay>
-                          {iAmDrawer ? (
-                            <div className="arcade-room-choice">
-                              <span className="arcade-room-eyebrow">PICK YOUR PLOT TWIST</span>
-                              <h2>这一笔，画什么？</h2>
-                              <p>选一个就开画，别让朋友等太久。</p>
-                              <div className="arcade-room-choices">
-                                {priv.choices.map((word, index) => (
-                                  <button
-                                    key={word}
-                                    type="button"
-                                    data-testid="word-choice"
-                                    onClick={() => void handleChooseWord(word)}
-                                    disabled={choosingWord}
-                                    aria-pressed={selectedWord === word}
-                                    className={cn(
-                                      "arcade-room-choice-card",
-                                      selectedWord === word && "arcade-room-choice-card--selected",
-                                    )}
-                                  >
-                                    <span>0{index + 1}</span>
-                                    <strong>{word}</strong>
-                                    {selectedWord === word ? (
-                                      <Check size={18} />
-                                    ) : (
-                                      <ArrowRight size={18} />
-                                    )}
-                                  </button>
-                                ))}
-                                {priv.choices.length === 0 && (
-                                  <p className="arcade-room-choice-loading" role="status">
-                                    <LoaderCircle size={18} className="animate-spin" />{" "}
-                                    题目正在赶来…
+                  (room.status === "choosing" &&
+                    lockedTurnKey !== `${room.current_round}-${room.turn_index}`) ||
+                  room.status === "turn_end" ? (
+                    <>
+                      {room.status === "choosing" &&
+                        lockedTurnKey !== `${room.current_round}-${room.turn_index}` && (
+                          <Overlay>
+                            {iAmDrawer ? (
+                              <div className="arcade-room-choice">
+                                <span className="arcade-room-eyebrow">PICK YOUR PLOT TWIST</span>
+                                <h2>这一笔，画什么？</h2>
+                                <p>选一个就开画，别让朋友等太久。</p>
+                                <div className="arcade-room-choices">
+                                  {priv.choices.map((word, index) => (
+                                    <button
+                                      key={word}
+                                      type="button"
+                                      data-testid="word-choice"
+                                      onClick={() => void handleChooseWord(word)}
+                                      disabled={choosingWord}
+                                      aria-pressed={selectedWord === word}
+                                      className={cn(
+                                        "arcade-room-choice-card",
+                                        selectedWord === word &&
+                                          "arcade-room-choice-card--selected",
+                                      )}
+                                    >
+                                      <span>0{index + 1}</span>
+                                      <strong>{word}</strong>
+                                      {selectedWord === word ? (
+                                        <Check size={18} />
+                                      ) : (
+                                        <ArrowRight size={18} />
+                                      )}
+                                    </button>
+                                  ))}
+                                  {priv.choices.length === 0 && (
+                                    <p className="arcade-room-choice-loading" role="status">
+                                      <LoaderCircle size={18} className="animate-spin" />{" "}
+                                      题目正在赶来…
+                                    </p>
+                                  )}
+                                </div>
+                                {selectedWord && (
+                                  <p role="status">
+                                    「{selectedWord}」{choosingWord ? "正在锁定…" : "，准备开画。"}
                                   </p>
                                 )}
                               </div>
-                              {selectedWord && (
-                                <p role="status">
-                                  「{selectedWord}」{choosingWord ? "正在锁定…" : "，准备开画。"}
-                                </p>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="arcade-room-on-deck">
-                              {drawer && (
-                                <PlayerAvatar player={withLocalAvatar(drawer)} size="lg" />
-                              )}
-                              <span className="arcade-room-eyebrow">NEXT ON THE CANVAS</span>
-                              <h2>
-                                {drawer?.name ?? "画手"}
-                                <br />
-                                <span>正在酝酿神作。</span>
-                              </h2>
-                              <p>他在选题，你先把脑洞打开。</p>
-                              <div className="arcade-room-wait-dots" aria-hidden="true">
-                                <i />
-                                <i />
-                                <i />
+                            ) : (
+                              <div className="arcade-room-on-deck">
+                                {drawer && (
+                                  <PlayerAvatar player={withLocalAvatar(drawer)} size="lg" />
+                                )}
+                                <span className="arcade-room-eyebrow">NEXT ON THE CANVAS</span>
+                                <h2>
+                                  {drawer?.name ?? "画手"}
+                                  <br />
+                                  <span>正在酝酿神作。</span>
+                                </h2>
+                                <p>他在选题，你先把脑洞打开。</p>
+                                <div className="arcade-room-wait-dots" aria-hidden="true">
+                                  <i />
+                                  <i />
+                                  <i />
+                                </div>
                               </div>
+                            )}
+                          </Overlay>
+                        )}
+                      {room.status === "turn_end" && (
+                        <Overlay>
+                          <div className="arcade-room-reveal">
+                            <span className="arcade-room-eyebrow">THE BIG REVEAL</span>
+                            <p>原来画的是</p>
+                            <h2>{room.revealed_word ?? "—"}</h2>
+                            <div className="arcade-room-round-winners">
+                              {roundWinners.length ? (
+                                roundWinners.map((player) => (
+                                  <div key={player.id}>
+                                    <PlayerAvatar player={withLocalAvatar(player)} size="sm" />
+                                    <span>{player.name}</span>
+                                    <strong>+{player.round_score}</strong>
+                                  </div>
+                                ))
+                              ) : (
+                                <p>这波脑洞太大，全场没接住。</p>
+                              )}
                             </div>
-                          )}
+                            <span className="arcade-room-next-round">
+                              下位画手准备 · {secondsLeft}s
+                            </span>
+                          </div>
                         </Overlay>
                       )}
-                    {room.status === "turn_end" && (
-                      <Overlay>
-                        <div className="arcade-room-reveal">
-                          <span className="arcade-room-eyebrow">THE BIG REVEAL</span>
-                          <p>原来画的是</p>
-                          <h2>{room.revealed_word ?? "—"}</h2>
-                          <div className="arcade-room-round-winners">
-                            {roundWinners.length ? (
-                              roundWinners.map((player) => (
-                                <div key={player.id}>
-                                  <PlayerAvatar player={withLocalAvatar(player)} size="sm" />
-                                  <span>{player.name}</span>
-                                  <strong>+{player.round_score}</strong>
-                                </div>
-                              ))
-                            ) : (
-                              <p>这波脑洞太大，全场没接住。</p>
-                            )}
-                          </div>
-                          <span className="arcade-room-next-round">
-                            下位画手准备 · {secondsLeft}s
-                          </span>
-                        </div>
-                      </Overlay>
-                    )}
-                  </>
+                    </>
+                  ) : undefined
                 }
               />
             </div>

@@ -437,7 +437,11 @@ export const submitGuess = createServerFn({ method: "POST" })
       data.clientId,
     );
     const result = await g.scoreGuess(room, player, data.text);
-    await g.advance({ ...room });
+    // A wrong guess only writes a chat row. Running the full state-machine
+    // reconciliation here adds several database round trips before the sender
+    // sees any acknowledgement. Correct guesses can end a turn, so only those
+    // need the immediate advance; the host clock handles all other transitions.
+    if (result.correct) await g.advance({ ...room });
     return result;
   });
 
@@ -589,7 +593,9 @@ export const getRoomSnapshot = createServerFn({ method: "POST" })
         .from("guesses")
         .select("id, round, player_id, player_name, text, kind, created_at")
         .eq("room_id", room.id)
-        .order("id", { ascending: true })
+        // Keep the live end of a busy party. Fetching the oldest 200 made chat
+        // appear frozen forever as soon as message 201 was written.
+        .order("id", { ascending: false })
         .limit(200),
     ]);
 
@@ -598,6 +604,6 @@ export const getRoomSnapshot = createServerFn({ method: "POST" })
       room,
       players,
       strokes: ((strokes ?? []) as unknown as { payload: Stroke }[]).map((r) => r.payload),
-      messages: messages ?? [],
+      messages: [...(messages ?? [])].reverse(),
     };
   });

@@ -28,6 +28,25 @@ export function GameFeedback({ event }: { event: GameFeedbackEvent | null }) {
 
   if (!visible) return null;
 
+  if (visible.kind === "correct") {
+    return (
+      <div key={visible.id} className="social-stamp" role="status" aria-live="polite" aria-atomic="true">
+        <div className="social-stamp-inner">
+          <div className="relative grid place-items-center">
+            <span className="social-stamp-dust" aria-hidden="true" />
+            <span className="social-stamp-seal" aria-hidden="true">
+              妙
+            </span>
+          </div>
+          <p className="social-stamp-caption">
+            {visible.title}
+            {visible.subtitle && <small>{visible.subtitle}</small>}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const Icon =
     visible.kind === "correct" ? Check : visible.kind === "round-start" ? Sparkles : Flag;
   const label =

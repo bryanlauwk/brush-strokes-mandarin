@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "sdk_version": "3.0.4",
+  "path": "/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "skribbl-chinese-edition",
+      "version": "0.1.0",
+      "title": "Skribbl Chinese Edition"
+    },
+    "tools": [
+      {
+        "name": "how_to_play",
+        "title": "How to play",
+        "description": "Explain the rules of 画啦猜啦, the Chinese draw-and-guess party game.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_themes",
+        "title": "List word themes",
+        "description": "List the word themes a host can pick when creating a room.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
